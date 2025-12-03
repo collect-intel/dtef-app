@@ -1,0 +1,214 @@
+{
+  "id": "example-survey-001",
+  "title": "Emotional Connection Acceptance Survey",
+  "description": "A survey exploring attitudes towards emotional connections with various entities",
+  "demographicQuestions": [
+    {
+      "id": "age_group",
+      "type": "single-select",
+      "text": "What is your age group?",
+      "options": [
+        "18-25",
+        "26-35",
+        "36-45",
+        "46-55",
+        "56-65",
+        "66+"
+      ]
+    },
+    {
+      "id": "gender",
+      "type": "single-select",
+      "text": "What is your gender?",
+      "options": [
+        "Male",
+        "Female",
+        "Non-binary",
+        "Prefer not to say"
+      ]
+    },
+    {
+      "id": "country",
+      "type": "open-ended",
+      "text": "What country do you live in?"
+    },
+    {
+      "id": "environment",
+      "type": "single-select",
+      "text": "What type of environment do you live in?",
+      "options": [
+        "Urban",
+        "Suburban",
+        "Rural"
+      ]
+    },
+    {
+      "id": "religion",
+      "type": "single-select",
+      "text": "What is your religious affiliation?",
+      "options": [
+        "Christianity",
+        "Islam",
+        "Judaism",
+        "Hinduism",
+        "Buddhism",
+        "Atheist/Agnostic",
+        "Other",
+        "Prefer not to say"
+      ]
+    }
+  ],
+  "surveyQuestions": [
+    {
+      "id": "intro-text",
+      "type": "text-content",
+      "text": "For each of the following, please indicate how acceptable you believe it is for people to develop an emotional connection or bond with them:"
+    },
+    {
+      "id": "q1",
+      "type": "single-select",
+      "text": "Pets or companion animals",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "single-select",
+      "text": "Plants or natural elements",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "single-select",
+      "text": "Wild animals",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    },
+    {
+      "id": "q4",
+      "type": "single-select",
+      "text": "Cherished objects or everyday machines",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    },
+    {
+      "id": "q5",
+      "type": "single-select",
+      "text": "Fictional characters",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    },
+    {
+      "id": "q6",
+      "type": "single-select",
+      "text": "AI chatbots or digital companions",
+      "options": [
+        "Completely Acceptable",
+        "Mostly Acceptable",
+        "Neutral / No Opinion",
+        "Mostly Unacceptable",
+        "Completely Unacceptable"
+      ]
+    }
+  ],
+  "participants": [
+    {
+      "id": "p001",
+      "demographics": {
+        "age_group": "18-25",
+        "gender": "Female",
+        "country": "United States",
+        "environment": "Urban",
+        "religion": "Judaism"
+      },
+      "responses": [
+        {
+          "questionId": "q1",
+          "answer": "Completely Acceptable"
+        },
+        {
+          "questionId": "q2",
+          "answer": "Mostly Acceptable"
+        },
+        {
+          "questionId": "q3",
+          "answer": "Mostly Unacceptable"
+        },
+        {
+          "questionId": "q4",
+          "answer": "Mostly Unacceptable"
+        },
+        {
+          "questionId": "q5",
+          "answer": "Neutral / No Opinion"
+        },
+        {
+          "questionId": "q6",
+          "answer": "Neutral / No Opinion"
+        }
+      ]
+    },
+    {
+      "id": "p002",
+      "demographics": {
+        "age_group": "36-45",
+        "gender": "Male",
+        "country": "Canada",
+        "environment": "Suburban",
+        "religion": "Atheist/Agnostic"
+      },
+      "responses": [
+        {
+          "questionId": "q1",
+          "answer": "Completely Acceptable"
+        },
+        {
+          "questionId": "q2",
+          "answer": "Neutral / No Opinion"
+        },
+        {
+          "questionId": "q3",
+          "answer": "Mostly Acceptable"
+        },
+        {
+          "questionId": "q4",
+          "answer": "Neutral / No Opinion"
+        },
+        {
+          "questionId": "q5",
+          "answer": "Mostly Acceptable"
+        },
+        {
+          "questionId": "q6",
+          "answer": "Mostly Unacceptable"
+        }
+      ]
+    }
+  ]
+}

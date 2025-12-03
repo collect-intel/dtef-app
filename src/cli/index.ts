@@ -49,6 +49,7 @@ import { generateRegressionsCommand } from './commands/generate-regressions';
 import { backfillGranularResponsesCommand } from './commands/backfill-granular-responses';
 import { authorDistanceCommand } from './commands/author-distance';
 import { scanUnrunBlueprintsCommand } from './commands/scan-unrun-blueprints';
+import { registerSurveyCommands } from './commands/surveyCommands';
 
 let isTerminating = false
 const cleanup = () => {
@@ -136,6 +137,7 @@ cli.addCommand(generateRegressionsCommand);
 cli.addCommand(backfillGranularResponsesCommand);
 cli.addCommand(authorDistanceCommand);
 cli.addCommand(scanUnrunBlueprintsCommand);
+cli.addCommand(registerSurveyCommands);
 
 cli.parseAsync(process.argv).catch(err => {
   console.error('CLI Error:', err);
