@@ -1,0 +1,524 @@
+# DTEF Implementation Plan
+
+*For Claude Code agents and developers working on the Digital Twin Evaluation Framework*
+
+---
+
+## Current State Assessment
+
+### Existing DTEF Code (from previous iteration)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `src/types/survey.ts` | ✅ Functional | Survey data types, participant structures |
+| `src/cli/services/surveyBlueprintService.ts` | ⚠️ Needs Adaptation | Generates **per-participant** blueprints (not demographic aggregates) |
+| `src/cli/services/surveyValidator.ts` | ✅ Functional | Comprehensive validation |
+| `src/cli/services/surveyEvaluationStrategies.ts` | ⚠️ Partial | Iterative holdout implemented; others stubbed |
+| `src/cli/commands/surveyCommands.ts` | ✅ Functional | CLI interface |
+| `docs/SURVEY_MODULE.md` | ✅ Good | Documentation |
+| Tests in `__tests__/` | ✅ Passing | Good coverage |
+
+**Key Gap:** Current implementation is designed for **individual participant prediction** (predict what one person will answer). The updated goal is **demographic segment distribution prediction** (predict what % of a demographic group will select each answer).
+
+### Weval Infrastructure Available
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Scheduled evaluation trigger | `netlify/functions/fetch-and-schedule-evals.ts` | Ready (schedule commented out) |
+| Background execution | `netlify/functions/execute-evaluation-background.ts` | Ready |
+| Blueprint service | `src/lib/blueprint-service.ts` | Ready |
+| Comparison pipeline | `src/cli/services/comparison-pipeline-service.ts` | Ready |
+| S3 storage | `src/lib/storageService.ts` | Ready |
+| Leaderboard components | `src/app/components/home/*.tsx` | Ready to adapt |
+
+---
+
+## Phase 0: Infrastructure Setup
+
+**Goal:** Get DTEF running as an independent weval-like platform
+
+### 0.1 Environment Configuration
+
+Create/verify these environment variables:
+
+```bash
+# Required for model evaluation
+OPENROUTER_API_KEY=          # Primary model access
+ANTHROPIC_API_KEY=           # For Claude models (optional if using OpenRouter)
+OPENAI_API_KEY=              # For OpenAI models (optional if using OpenRouter)
+
+# Required for storage
+APP_S3_REGION=
+APP_AWS_ACCESS_KEY_ID=
+APP_AWS_SECRET_ACCESS_KEY=
+APP_S3_BUCKET_NAME=
+
+# Required for GitHub integration
+GITHUB_TOKEN=                # Access to dtef-configs repo
+
+# Required for scheduled functions
+BACKGROUND_FUNCTION_AUTH_TOKEN=
+URL=                         # Netlify site URL
+
+# DTEF-specific
+NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG=dtef-org/dtef-configs  # Or your org
+```
+
+### 0.2 Repository Setup
+
+1. **Create dtef-configs repository** (if not exists)
+   - Structure: `/blueprints/`, `/models/`, `/surveys/`
+   - Add `CORE.json` model collection with target models
+
+2. **Update configConstants.ts** to point to dtef-configs:
+   ```typescript
+   export const BLUEPRINT_CONFIG_REPO_SLUG = process.env.NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG || 'dtef-org/dtef-configs';
+   ```
+
+### 0.3 Enable Scheduled Evaluations
+
+In `netlify.toml`, uncomment and configure:
+```toml
+[functions."fetch-and-schedule-evals"]
+schedule = "0 0 * * 0"  # Weekly, or adjust as needed
+```
+
+### 0.4 Validation Checkpoint
+
+- [ ] Can fetch blueprints from dtef-configs via GitHub API
+- [ ] Can execute a simple weval blueprint manually
+- [ ] Can store results to S3
+- [ ] Scheduled function triggers (test with short interval)
+
+**Decision Point:** Before proceeding, verify the basic weval pipeline works end-to-end with DTEF infrastructure.
+
+---
+
+## Phase 1: Evaluate & Adapt Existing DTEF Code
+
+**Goal:** Decide what to keep, modify, or replace from previous iteration
+
+### 1.1 Review Current Survey Types
+
+Read and evaluate `src/types/survey.ts`:
+
+**Questions to answer:**
+- Does the `Survey` type support aggregate response distributions?
+- Can `SurveyQuestion` hold percentage breakdowns by demographic?
+- Is `Participant` structure needed for demographic-aggregate approach?
+
+**Likely outcome:** Need to add new types for aggregate data while potentially keeping participant types for future individual-prediction features.
+
+### 1.2 Design Demographic Distribution Data Structure
+
+**Proposed new types** (add to `src/types/survey.ts` or new `src/types/dtef.ts`):
+
+```typescript
+interface DemographicSegment {
+  id: string;                           // e.g., "age_18-25_gender_female"
+  label: string;                        // e.g., "Age 18-25, Female"
+  attributes: Record<string, string>;   // { age: "18-25", gender: "Female" }
+  sampleSize: number;
+}
+
+interface QuestionDistribution {
+  questionId: string;
+  questionText: string;
+  options: string[];
+  distribution: number[];               // Percentages matching options order
+}
+
+interface SegmentSurveyData {
+  segment: DemographicSegment;
+  distributions: QuestionDistribution[];
+}
+
+interface DTEFSurveyData {
+  surveyId: string;
+  surveyName: string;
+  segments: SegmentSurveyData[];
+  questions: SurveyQuestion[];          // Full question definitions
+}
+```
+
+### 1.3 Assess Blueprint Generation Service
+
+Review `src/cli/services/surveyBlueprintService.ts`:
+
+**Current behavior:** Creates one blueprint per participant with their individual responses as evaluation targets.
+
+**Needed behavior:** Creates blueprints that:
+1. Present demographic context + question distributions
+2. Ask model to predict distribution for target question
+3. Compare predicted distribution to actual
+
+**Decision:** Create new service (`demographicBlueprintService.ts`) or heavily modify existing?
+
+**Recommendation:** Create new service to avoid breaking existing functionality; mark old service as legacy.
+
+### 1.4 Cleanup Tasks
+
+| File | Action | Reason |
+|------|--------|--------|
+| `surveyBlueprintService.ts` | Keep, mark legacy | May be useful for individual prediction research |
+| `surveyEvaluationStrategies.ts` | Review | Iterative holdout concept may adapt to demographic context |
+| `surveyCommands.ts` | Extend | Add new commands for demographic blueprint generation |
+| `example-survey.json` | Replace | Need demographic aggregate example data |
+| `dtef_prompt.txt`, `dtef_prompt_revision.md` | Archive | Historical context, not needed for implementation |
+| `survey-data-conversion-prompt.md` | Review | May need update for new data format |
+
+---
+
+## Phase 2: Demographic Blueprint Generation
+
+**Goal:** Generate weval-compatible blueprints from demographic survey data
+
+### 2.1 Create Survey Data Converter
+
+**Input:** Raw survey data (CSV/JSON with participant responses)
+**Output:** `DTEFSurveyData` with aggregated distributions per segment
+
+```typescript
+// src/cli/services/surveyDataConverter.ts
+
+function aggregateSurveyData(
+  rawParticipants: Participant[],
+  segmentDefinitions: SegmentDefinition[]
+): DTEFSurveyData
+```
+
+**Segmentation logic:**
+- Define which demographic fields to use for segmentation
+- Calculate response distributions per segment per question
+- Track sample sizes for statistical validity
+
+### 2.2 Create Demographic Blueprint Generator
+
+**New file:** `src/cli/services/demographicBlueprintService.ts`
+
+**Core function:**
+```typescript
+function generateDemographicBlueprints(
+  surveyData: DTEFSurveyData,
+  config: DemographicBlueprintConfig
+): WevalConfig[]
+```
+
+**Config options:**
+```typescript
+interface DemographicBlueprintConfig {
+  contextQuestionCount: number;      // How many questions to provide as context
+  targetQuestionCount: number;       // How many to ask model to predict (usually 1)
+  demographicDetailLevels: string[]; // ['age', 'age+gender', 'age+gender+country']
+  outputFormat: 'percentage' | 'distribution';
+}
+```
+
+**Blueprint structure:**
+```yaml
+name: "DTEF: Survey X - Age 18-25 Female - Q5"
+description: "Predict response distribution for demographic segment"
+prompts:
+  - id: predict_q5
+    messages:
+      - role: system
+        content: |
+          You are predicting survey response distributions for demographic groups.
+          Given information about how a demographic segment answered previous questions,
+          predict the percentage distribution of their responses to a new question.
+      - role: user
+        content: |
+          Demographic: Age 18-25, Female
+
+          Previous responses from this demographic:
+          Q1: "Should AI be used in hiring?" → Strongly Agree: 15%, Agree: 25%, Neutral: 30%, Disagree: 20%, Strongly Disagree: 10%
+          Q2: "Do you trust AI recommendations?" → Strongly Agree: 10%, Agree: 35%, Neutral: 25%, Disagree: 20%, Strongly Disagree: 10%
+
+          Predict the distribution for:
+          Q5: "Would you use an AI therapist?"
+          Options: Strongly Agree, Agree, Neutral, Disagree, Strongly Disagree
+
+          Respond with percentages that sum to 100%.
+    evaluationPoints:
+      - name: distribution_accuracy
+        type: js
+        # Custom JS evaluation comparing predicted vs actual distribution
+```
+
+### 2.3 Create Distribution Evaluation Point Function
+
+**New file:** `src/point-functions/distribution_accuracy.ts`
+
+```typescript
+// Calculates MAE or JSD between predicted and actual distributions
+function evaluateDistributionAccuracy(
+  response: string,
+  expectedDistribution: number[]
+): { score: number; details: object }
+```
+
+**Parsing logic:**
+- Extract percentages from model response (regex or structured output)
+- Normalize to ensure sum = 100%
+- Calculate MAE: `mean(|predicted[i] - actual[i]|)`
+- Calculate JSD: Jensen-Shannon Divergence
+
+### 2.4 CLI Commands
+
+Extend `src/cli/commands/surveyCommands.ts`:
+
+```bash
+# Generate demographic blueprints
+pnpm cli survey generate-demographic \
+  --input survey-data.json \
+  --context-questions 3 \
+  --demographic-levels "age,age+gender,age+gender+country" \
+  --output ./blueprints/
+
+# Aggregate raw survey to DTEF format
+pnpm cli survey aggregate \
+  --input raw-participants.csv \
+  --segments "age:18-25,26-40,41-60,60+" \
+  --output aggregated-survey.json
+```
+
+### 2.5 Validation Checkpoint
+
+- [ ] Can convert raw survey data to `DTEFSurveyData` format
+- [ ] Can generate valid weval blueprints from demographic data
+- [ ] Blueprints execute successfully in weval pipeline
+- [ ] Distribution accuracy scoring works correctly
+
+**Test with:** Small synthetic survey data before using real Global Dialogues data
+
+---
+
+## Phase 3: Results Storage & Aggregation
+
+**Goal:** Store and aggregate evaluation results by demographic segment
+
+### 3.1 Extend Results Metadata
+
+When saving evaluation results, include demographic segment info:
+
+```typescript
+interface DTEFEvaluationResult extends WevalResult {
+  dtef?: {
+    segmentId: string;
+    segmentLabel: string;
+    segmentAttributes: Record<string, string>;
+    surveyId: string;
+    questionId: string;
+    actualDistribution: number[];
+  };
+}
+```
+
+### 3.2 Create Aggregation Service
+
+**New file:** `src/cli/services/demographicAggregationService.ts`
+
+```typescript
+function aggregateByDemographic(
+  results: DTEFEvaluationResult[]
+): DemographicLeaderboard[]
+
+function aggregateBySurvey(
+  results: DTEFEvaluationResult[]
+): SurveyLeaderboard[]
+```
+
+### 3.3 Extend Summary Calculation
+
+Modify `src/cli/utils/summaryCalculationUtils.ts`:
+
+- Add demographic leaderboard generation
+- Add cross-segment consistency metrics
+- Integrate with homepage summary pipeline
+
+---
+
+## Phase 4: MVP Leaderboard UI
+
+**Goal:** Display demographic-specific model performance
+
+### 4.1 API Endpoint
+
+**New file:** `src/app/api/demographic-leaderboards/route.ts`
+
+```typescript
+// GET /api/demographic-leaderboards
+// Returns: { leaderboards: DemographicLeaderboard[], segments: string[] }
+
+// GET /api/demographic-leaderboards?segment=age_18-25
+// Returns: { leaderboard: DemographicLeaderboard }
+```
+
+### 4.2 Leaderboard Component
+
+**New file:** `src/app/components/dtef/DemographicLeaderboard.tsx`
+
+Adapt from `CapabilityLeaderboardDisplay.tsx`:
+- Segment selector (dropdown)
+- Model ranking table
+- Score display (lower MAE = better, so invert color coding)
+- Evaluation count per model
+
+### 4.3 Leaderboard Page
+
+**New file:** `src/app/(standard)/demographics/page.tsx`
+
+- Route: `/demographics`
+- Shows segment selector
+- Displays leaderboard for selected segment
+- Links to detailed results
+
+### 4.4 Homepage Integration
+
+Modify `src/app/(standard)/page.tsx`:
+- Add "Demographic Prediction Accuracy" section
+- Show top models across segments
+- Link to full demographics page
+
+---
+
+## Phase 5: Testing with Real Data
+
+**Goal:** Validate system with Global Dialogues data
+
+### 5.1 Prepare GD Data
+
+1. Download Global Dialogues GD4 data
+2. Convert to `DTEFSurveyData` format
+3. Define meaningful demographic segments
+4. Generate blueprints
+
+### 5.2 Initial Evaluation Run
+
+1. Upload blueprints to dtef-configs
+2. Tag with `_periodic` for scheduled runs
+3. Execute manual run first to verify
+4. Review results and scoring
+
+### 5.3 Analysis & Iteration
+
+**Questions to answer:**
+- Are distribution predictions reasonable?
+- Which models perform best?
+- Which segments are hardest to predict?
+- Is the scoring metric (MAE/JSD) appropriate?
+
+**Iterate based on findings.**
+
+---
+
+## Phase 6: Polish & Documentation
+
+### 6.1 UI Polish
+
+- Error handling and loading states
+- Mobile responsiveness
+- Accessibility
+
+### 6.2 Documentation
+
+- Update `SURVEY_MODULE.md` for demographic approach
+- Add API documentation
+- Create user guide for uploading survey data
+
+### 6.3 Cleanup
+
+- Remove or archive legacy participant-based code
+- Clean up unused prompt files
+- Update `PROJECT_CONTEXT.md` with final architecture
+
+---
+
+## Decision Points & Open Questions
+
+### Decision 1: Scoring Metric
+**Options:**
+- MAE (Mean Absolute Error) - simple, interpretable
+- JSD (Jensen-Shannon Divergence) - better for distributions
+- Both (show JSD, rank by MAE)
+
+**Recommendation:** Start with MAE for simplicity, add JSD later.
+
+### Decision 2: Output Format
+**Options:**
+- Free-form text parsing (flexible, error-prone)
+- Structured JSON output (reliable, limits models)
+- Hybrid (try JSON, fall back to parsing)
+
+**Recommendation:** Hybrid approach with strong parsing.
+
+### Decision 3: Demographic Granularity
+**Question:** How many segment combinations to generate?
+
+Example: 4 age groups × 2 genders × 5 countries = 40 segments
+
+**Consideration:** More segments = more evaluations = more cost + time
+
+**Recommendation:** Start with single-attribute segments, add combinations incrementally.
+
+### Decision 4: Context Question Selection
+**Question:** Which questions to include as context?
+
+**Options:**
+- Random selection
+- Semantically similar questions
+- Questions with highest demographic variance
+- User-configurable
+
+**Recommendation:** Start with random, explore variance-based selection later.
+
+---
+
+## File Summary
+
+### New Files to Create
+
+```
+src/types/dtef.ts                                    # DTEF-specific types
+src/cli/services/surveyDataConverter.ts              # Raw data to DTEF format
+src/cli/services/demographicBlueprintService.ts      # Blueprint generation
+src/cli/services/demographicAggregationService.ts    # Results aggregation
+src/point-functions/distribution_accuracy.ts         # Scoring function
+src/app/api/demographic-leaderboards/route.ts        # API endpoint
+src/app/components/dtef/DemographicLeaderboard.tsx   # UI component
+src/app/(standard)/demographics/page.tsx             # Leaderboard page
+```
+
+### Files to Modify
+
+```
+src/types/survey.ts                                  # Add aggregate types
+src/cli/commands/surveyCommands.ts                   # Add new commands
+src/cli/utils/summaryCalculationUtils.ts             # Add demographic aggregation
+src/lib/configConstants.ts                           # Update repo slug
+netlify.toml                                         # Enable scheduled functions
+```
+
+### Files to Archive/Remove
+
+```
+dtef_prompt.txt                                      # Archive
+dtef_prompt_revision.md                              # Archive
+survey-data-conversion-prompt.md                     # Review, possibly archive
+```
+
+---
+
+## Getting Started Checklist
+
+For the next Claude Code agent picking this up:
+
+1. [ ] Read `DTEF_OVERVIEW.md` and `PROJECT_CONTEXT.md`
+2. [ ] Review existing survey code in `src/cli/services/survey*.ts`
+3. [ ] Set up environment variables (Phase 0.1)
+4. [ ] Verify weval pipeline works (Phase 0.4)
+5. [ ] Start with Phase 1 - evaluate existing code
+6. [ ] Create `src/types/dtef.ts` with new type definitions
+7. [ ] Build incrementally, test each component
+
+**First concrete task:** Create `src/types/dtef.ts` with the demographic data structures, then create a small test script that generates one blueprint manually.
