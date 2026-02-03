@@ -121,23 +121,22 @@ interface DemographicSegment {
   sampleSize: number;
 }
 
-interface QuestionDistribution {
-  questionId: string;
-  questionText: string;
-  options: string[];
-  distribution: number[];               // Percentages matching options order
-}
-
-interface SegmentSurveyData {
-  segment: DemographicSegment;
-  distributions: QuestionDistribution[];
-}
-
+// Normalized structure to avoid duplication
 interface DTEFSurveyData {
   surveyId: string;
   surveyName: string;
-  segments: SegmentSurveyData[];
-  questions: SurveyQuestion[];          // Full question definitions
+  // Map questionId -> Definition
+  questions: Record<string, {
+    text: string;
+    options: string[];
+  }>;
+  // Segments containing response data
+  segments: {
+    id: string; // references segment defined in metadata or inline
+    attributes: Record<string, string>;
+    // Map questionId -> distribution (percentages matching options order)
+    responses: Record<string, number[]>;
+  }[];
 }
 ```
 
@@ -173,28 +172,30 @@ Review `src/cli/services/surveyBlueprintService.ts`:
 
 **Goal:** Generate weval-compatible blueprints from demographic survey data
 
-### 2.1 Create Survey Data Converter
+### 2.1 Survey Data Ingestion & Conversion
 
-**Input:** Raw survey data (CSV/JSON with participant responses)
-**Output:** `DTEFSurveyData` with aggregated distributions per segment
+**Strategy:**
+1. **Strict Schema:** Define the `DTEFSurveyData` JSON schema as the required input format.
+2. **Adapters:** Build specific adapters for known formats (e.g., Global Dialogues).
+3. **LLM Conversion Assistant:** (Future/Parallel) A tool to help users convert arbitrary CSVs to our schema.
 
-```typescript
-// src/cli/services/surveyDataConverter.ts
+**Component 1: Global Dialogues Adapter**
+`src/cli/services/adapters/globalDialoguesAdapter.ts`
+- Specific logic to parse GD-formatted CSV/JSON.
 
-function aggregateSurveyData(
-  rawParticipants: Participant[],
-  segmentDefinitions: SegmentDefinition[]
-): DTEFSurveyData
-```
-
-**Segmentation logic:**
-- Define which demographic fields to use for segmentation
-- Calculate response distributions per segment per question
-- Track sample sizes for statistical validity
+**Component 2: LLM Conversion Pipeline (Experimental)**
+- **Input:** Raw data file + Description
+- **Process:** LLM writes a Python/TS script to map raw data -> `DTEFSurveyData`
+- **Validation:** Run script, validate output against schema.
 
 ### 2.2 Create Demographic Blueprint Generator
 
 **New file:** `src/cli/services/demographicBlueprintService.ts`
+
+**Token Budget Strategy:**
+- **Baseline Limit:** Enforce a strict token limit (e.g., 4096 tokens) for the context window to ensure compatibility with most "Core" models.
+- **Adaptive:** (Future) Allow overriding limit for high-context models.
+- **Mechanism:** Count tokens in context questions; if limit exceeded, reduce `contextQuestionCount`.
 
 **Core function:**
 ```typescript
@@ -241,19 +242,26 @@ prompts:
           Respond with percentages that sum to 100%.
     evaluationPoints:
       - name: distribution_accuracy
-        type: js
-        # Custom JS evaluation comparing predicted vs actual distribution
+        type: distribution_metric  # Custom type, NOT 'js'
+        params:
+           actualDistribution: [12, 28, 30, 22, 8] # Injected ground truth
+           metric: 'mae' # or 'jsd'
 ```
 
-### 2.3 Create Distribution Evaluation Point Function
+### 2.3 Create Distribution Metric Point Function
 
-**New file:** `src/point-functions/distribution_accuracy.ts`
+**New file:** `src/point-functions/distribution_metric.ts`
+**Register in:** `src/point-functions/index.ts`
+
+**Why:** The standard `js` evaluator can't easily access the "ground truth" distribution unless we inject it. A custom evaluator type is cleaner.
 
 ```typescript
 // Calculates MAE or JSD between predicted and actual distributions
-function evaluateDistributionAccuracy(
+// defined in params
+function evaluateDistributionMetric(
   response: string,
-  expectedDistribution: number[]
+  args: { actualDistribution: number[], metric: 'mae' | 'jsd' },
+  context: PointFunctionContext
 ): { score: number; details: object }
 ```
 
@@ -263,23 +271,26 @@ function evaluateDistributionAccuracy(
 - Calculate MAE: `mean(|predicted[i] - actual[i]|)`
 - Calculate JSD: Jensen-Shannon Divergence
 
-### 2.4 CLI Commands
+### 2.4 CLI Commands & Workflow
 
 Extend `src/cli/commands/surveyCommands.ts`:
 
+**Workflow:**
+1. **Generate:** Run CLI to generate YAML files in a local `output/` directory (gitignored).
+2. **Review:** User manually checks a few blueprints.
+3. **Transfer:** Use a helper script to copy valid blueprints to the `dtef-configs` repo (assumed sibling directory).
+
 ```bash
-# Generate demographic blueprints
+# Generate demographic blueprints to local folder
 pnpm cli survey generate-demographic \
   --input survey-data.json \
-  --context-questions 3 \
-  --demographic-levels "age,age+gender,age+gender+country" \
-  --output ./blueprints/
-
-# Aggregate raw survey to DTEF format
-pnpm cli survey aggregate \
-  --input raw-participants.csv \
-  --segments "age:18-25,26-40,41-60,60+" \
-  --output aggregated-survey.json
+  --output ./local-blueprints/
+  
+# Transfer to config repo (if approved)
+pnpm cli survey publish \
+  --source ./local-blueprints/ \
+  --target ../dtef-configs/blueprints/ \
+  --tag "global-dialogues-v1"
 ```
 
 ### 2.5 Validation Checkpoint
@@ -480,10 +491,10 @@ Example: 4 age groups × 2 genders × 5 countries = 40 segments
 
 ```
 src/types/dtef.ts                                    # DTEF-specific types
-src/cli/services/surveyDataConverter.ts              # Raw data to DTEF format
+src/cli/services/adapters/globalDialoguesAdapter.ts  # GD data specific adapter
 src/cli/services/demographicBlueprintService.ts      # Blueprint generation
 src/cli/services/demographicAggregationService.ts    # Results aggregation
-src/point-functions/distribution_accuracy.ts         # Scoring function
+src/point-functions/distribution_metric.ts           # Scoring function (custom type)
 src/app/api/demographic-leaderboards/route.ts        # API endpoint
 src/app/components/dtef/DemographicLeaderboard.tsx   # UI component
 src/app/(standard)/demographics/page.tsx             # Leaderboard page
