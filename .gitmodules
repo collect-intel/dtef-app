@@ -1,0 +1,3 @@
+[submodule "data/global-dialogues"]
+	path = data/global-dialogues
+	url = https://github.com/collect-intel/global-dialogues

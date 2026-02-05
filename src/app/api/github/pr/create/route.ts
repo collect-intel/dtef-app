@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOctokit } from '@/lib/github/github-utils';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
-const UPSTREAM_OWNER = 'weval-org';
-const UPSTREAM_REPO = 'configs';
+const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
 
 export async function POST(req: NextRequest) {
     const octokit = await getOctokit(req);

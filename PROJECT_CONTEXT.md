@@ -116,8 +116,13 @@ Development should be **incremental**:
 
 ## Key Files to Understand
 
-Before making changes, review:
-- `DTEF_OVERVIEW.md` - Full project description
+**Coding agents: start here for task and path clarity:**
+- **`AGENT_ARCHITECTURE.md`** — Agent orientation, file map, conventions, handoff.
+- **`TASK_PLAN.md`** — Detailed tasks, dependencies, status, next focus.
+
+Then review:
+- `DTEF_OVERVIEW.md` — Full project description
+- `DTEF_PROJECT_PLAN.md` — Phases and design
 - Existing weval code for evaluation execution
 - Any existing DTEF-specific code (may be from earlier iteration)
 

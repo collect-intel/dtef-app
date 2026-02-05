@@ -61,7 +61,7 @@ BACKGROUND_FUNCTION_AUTH_TOKEN=
 URL=                         # Netlify site URL
 
 # DTEF-specific
-NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG=dtef-org/dtef-configs  # Or your org
+NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG=collect-intel/dtef-configs  # Or your org
 ```
 
 ### 0.2 Repository Setup
@@ -72,7 +72,7 @@ NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG=dtef-org/dtef-configs  # Or your org
 
 2. **Update configConstants.ts** to point to dtef-configs:
    ```typescript
-   export const BLUEPRINT_CONFIG_REPO_SLUG = process.env.NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG || 'dtef-org/dtef-configs';
+   export const BLUEPRINT_CONFIG_REPO_SLUG = process.env.NEXT_PUBLIC_BLUEPRINT_CONFIG_REPO_SLUG || 'collect-intel/dtef-configs';
    ```
 
 ### 0.3 Enable Scheduled Evaluations
@@ -522,14 +522,17 @@ survey-data-conversion-prompt.md                     # Review, possibly archive
 
 ## Getting Started Checklist
 
-For the next Claude Code agent picking this up:
+**For coding agents:** Use the detailed task plan and agent architecture first:
 
-1. [ ] Read `DTEF_OVERVIEW.md` and `PROJECT_CONTEXT.md`
-2. [ ] Review existing survey code in `src/cli/services/survey*.ts`
-3. [ ] Set up environment variables (Phase 0.1)
-4. [ ] Verify weval pipeline works (Phase 0.4)
-5. [ ] Start with Phase 1 - evaluate existing code
-6. [ ] Create `src/types/dtef.ts` with new type definitions
-7. [ ] Build incrementally, test each component
+1. **Read `AGENT_ARCHITECTURE.md`** — orientation, file map, conventions, handoff.
+2. **Read `TASK_PLAN.md`** — current focus, next task, dependencies, status.
+3. Then use this checklist for high-level alignment:
+   - [ ] Read `DTEF_OVERVIEW.md` and `PROJECT_CONTEXT.md`
+   - [ ] Review existing survey code in `src/cli/services/survey*.ts`
+   - [ ] Set up environment variables (Phase 0.1)
+   - [ ] Verify weval pipeline works (Phase 0.4)
+   - [ ] Start with Phase 1 — evaluate existing code
+   - [ ] Create `src/types/dtef.ts` with new type definitions
+   - [ ] Build incrementally, test each component
 
-**First concrete task:** Create `src/types/dtef.ts` with the demographic data structures, then create a small test script that generates one blueprint manually.
+**First concrete task (from TASK_PLAN):** Complete T0.1–T0.4 if needed, then T1.1–T1.2. Create `src/types/dtef.ts` with the demographic data structures; optionally add a small test script that generates one blueprint manually.

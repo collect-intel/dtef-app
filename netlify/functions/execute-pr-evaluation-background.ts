@@ -15,9 +15,10 @@ import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentr
 import { checkBackgroundFunctionAuth } from '@/lib/background-function-auth';
 import { applyPREvalLimits, checkPREvalLimits } from '@/lib/pr-eval-limiter';
 import { getConfigSummary, saveConfigSummary, updateSummaryDataWithNewRun } from '@/lib/storageService';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
-const UPSTREAM_OWNER = 'weval-org';
-const UPSTREAM_REPO = 'configs';
+const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
 
 const s3Client = new S3Client({
   region: process.env.APP_S3_REGION!,

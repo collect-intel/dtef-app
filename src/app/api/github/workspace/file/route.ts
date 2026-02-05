@@ -1,6 +1,7 @@
-    import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Buffer } from 'buffer';
 import { getOctokit } from '@/lib/github/github-utils';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
 // This is a server-side-only type definition
 interface BlueprintFile {
@@ -100,8 +101,8 @@ export async function POST(req: NextRequest) {
 
     try {
         const [owner, repo] = forkName.split('/');
-        const upstreamOwner = 'weval-org';
-        const upstreamRepo = 'configs';
+        const upstreamOwner = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+        const upstreamRepo = BLUEPRINT_CONFIG_UPSTREAM_REPO;
 
         if (isNew) {
             // Step 1: Sync fork with upstream using GitHub's merge upstream API

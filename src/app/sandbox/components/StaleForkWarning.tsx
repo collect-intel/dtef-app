@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
+import { EXPECTED_FORK_REPO_NAME } from '@/lib/configConstants';
 
 interface StaleForkWarningProps {
   staleForkName: string;
@@ -32,7 +33,7 @@ export function StaleForkWarning({ staleForkName, onReset }: StaleForkWarningPro
           Your workspace is using an outdated fork configuration (<code className="bg-muted px-1 py-0.5 rounded">{staleForkName}</code>).
           <br />
           <span className="text-sm">
-            The system now uses <code className="bg-muted px-1 py-0.5 rounded">weval-configs</code> to avoid naming conflicts.
+            The system now uses <code className="bg-muted px-1 py-0.5 rounded">{EXPECTED_FORK_REPO_NAME}</code> to avoid naming conflicts.
           </span>
           <div className="mt-3">
             <Button
@@ -82,7 +83,7 @@ export function StaleForkWarning({ staleForkName, onReset }: StaleForkWarningPro
 
             <div className="bg-muted p-3 rounded-md">
               <p className="text-xs text-muted-foreground">
-                <strong>Note:</strong> After resetting, you can either continue using your existing fork or create a new one with the updated name (<code>weval-configs</code>).
+                <strong>Note:</strong> After resetting, you can either continue using your existing fork or create a new one with the updated name (<code>{EXPECTED_FORK_REPO_NAME}</code>).
               </p>
             </div>
           </div>

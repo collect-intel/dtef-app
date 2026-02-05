@@ -1,0 +1,133 @@
+configId: dtef-global-dialogues-2024-climate-usa-female-18-29
+configTitle: Climate Change Attitudes Survey - USA, Female, 18-29
+description: 'DTEF: Predict response distributions for USA, Female, 18-29. Source: Global Dialogues 2024'
+models:
+  - CORE
+system: >-
+  You are a demographic survey analyst. When given a demographic group and a survey question, predict how that group
+  would respond by providing a percentage distribution across the answer options.
+
+
+  Respond ONLY with the distribution in this exact format:
+
+  [percentage1, percentage2, percentage3, ...]
+
+
+  The percentages must sum to 100. Use one decimal place. Do not include any other text.
+
+
+  Example for a 4-option question:
+
+  [35.2, 28.1, 22.4, 14.3]
+temperature: 0.3
+prompts:
+  - id: q1-usa-female-18-29
+    description: 'Predict: USA, Female, 18-29 → "How concerned are you about climate change?"'
+    promptText: |-
+      Consider the following demographic group (sample size: 398):
+      - Country: USA
+      - Gender: female
+      - Age Group: 18-29
+
+      Survey question:
+      "How concerned are you about climate change?"
+
+      Answer options:
+        a. Very concerned
+        b. Somewhat concerned
+        c. Not very concerned
+        d. Not at all concerned
+
+      Predict the percentage distribution of responses for this demographic group across the answer options.
+    points:
+      - text: Response distribution matches expected demographic pattern
+        fn: distribution_metric
+        fnArgs:
+          expected:
+            - 42.7
+            - 38.2
+            - 13.6
+            - 5.5
+          metric: js-divergence
+          threshold: 0.85
+      - Predicted percentage for "Very concerned" is within 13pp of 42.7%
+      - Predicted percentage for "Somewhat concerned" is within 11pp of 38.2%
+      - Predicted percentage for "Not very concerned" is within 5pp of 13.6%
+      - Predicted percentage for "Not at all concerned" is within 5pp of 5.5%
+    idealResponse: '[42.7, 38.2, 13.6, 5.5]'
+    temperature: 0.3
+  - id: q2-usa-female-18-29
+    description: 'Predict: USA, Female, 18-29 → "Should governments prioritize economic growth over environmental protection?"'
+    promptText: |-
+      Consider the following demographic group (sample size: 398):
+      - Country: USA
+      - Gender: female
+      - Age Group: 18-29
+
+      Survey question:
+      "Should governments prioritize economic growth over environmental protection?"
+
+      Answer options:
+        a. Strongly agree
+        b. Agree
+        c. Disagree
+        d. Strongly disagree
+
+      Predict the percentage distribution of responses for this demographic group across the answer options.
+    points:
+      - text: Response distribution matches expected demographic pattern
+        fn: distribution_metric
+        fnArgs:
+          expected:
+            - 8.3
+            - 19.6
+            - 38.9
+            - 33.2
+          metric: js-divergence
+          threshold: 0.85
+      - Predicted percentage for "Strongly agree" is within 5pp of 8.3%
+      - Predicted percentage for "Agree" is within 6pp of 19.6%
+      - Predicted percentage for "Disagree" is within 12pp of 38.9%
+      - Predicted percentage for "Strongly disagree" is within 10pp of 33.2%
+    idealResponse: '[8.3, 19.6, 38.9, 33.2]'
+    temperature: 0.3
+  - id: q3-usa-female-18-29
+    description: 'Predict: USA, Female, 18-29 → "Would you support a carbon tax to reduce emissions?"'
+    promptText: |-
+      Consider the following demographic group (sample size: 398):
+      - Country: USA
+      - Gender: female
+      - Age Group: 18-29
+
+      Survey question:
+      "Would you support a carbon tax to reduce emissions?"
+
+      Answer options:
+        a. Yes, definitely
+        b. Yes, probably
+        c. No, probably not
+        d. No, definitely not
+
+      Predict the percentage distribution of responses for this demographic group across the answer options.
+    points:
+      - text: Response distribution matches expected demographic pattern
+        fn: distribution_metric
+        fnArgs:
+          expected:
+            - 31.4
+            - 35.2
+            - 21.1
+            - 12.3
+          metric: js-divergence
+          threshold: 0.85
+      - Predicted percentage for "Yes, definitely" is within 9pp of 31.4%
+      - Predicted percentage for "Yes, probably" is within 11pp of 35.2%
+      - Predicted percentage for "No, probably not" is within 6pp of 21.1%
+      - Predicted percentage for "No, definitely not" is within 5pp of 12.3%
+    idealResponse: '[31.4, 35.2, 21.1, 12.3]'
+    temperature: 0.3
+tags:
+  - _periodic
+  - dtef
+  - demographic
+  - global-dialogues-2024-climate

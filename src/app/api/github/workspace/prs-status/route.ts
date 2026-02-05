@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOctokit } from '@/lib/github/github-utils';
+import {
+    BLUEPRINT_CONFIG_UPSTREAM_OWNER,
+    BLUEPRINT_CONFIG_UPSTREAM_REPO,
+    BLUEPRINT_CONFIG_REPO_SLUG,
+} from '@/lib/configConstants';
 
 export async function GET(req: NextRequest) {
     const octokit = await getOctokit(req);
@@ -12,7 +17,7 @@ export async function GET(req: NextRequest) {
         const userLogin = userResponse.data.login;
 
         const searchResponse = await octokit.request('GET /search/issues', {
-            q: `repo:weval-org/configs is:pr author:${userLogin}`,
+            q: `repo:${BLUEPRINT_CONFIG_REPO_SLUG} is:pr author:${userLogin}`,
             per_page: 100, // Assuming a user won't have more than 100 PRs
         });
 
@@ -28,8 +33,8 @@ export async function GET(req: NextRequest) {
         for (const pr of prs) {
             const pullNumber = pr.number;
             const filesResponse = await octokit.pulls.listFiles({
-                owner: 'weval-org',
-                repo: 'configs',
+                owner: BLUEPRINT_CONFIG_UPSTREAM_OWNER,
+                repo: BLUEPRINT_CONFIG_UPSTREAM_REPO,
                 pull_number: pullNumber,
             });
 

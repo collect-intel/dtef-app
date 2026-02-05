@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Icon from '@/components/ui/icon';
+import { BLUEPRINT_CONFIG_REPO_SLUG, EXPECTED_FORK_REPO_NAME } from '@/lib/configConstants';
 
 type WorkspaceState =
   | { type: 'not_logged_in' }
@@ -180,8 +181,8 @@ export function WorkspaceManagementModal({
                   This creates a fork where your blueprints will be saved. Required for GitHub features.
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground pl-2">
-                  <li>Creates a fork of <code className="text-xs bg-background px-1 py-0.5 rounded">weval-org/configs</code></li>
-                  <li>Fork will be named <code className="text-xs bg-background px-1 py-0.5 rounded">weval-configs</code></li>
+                  <li>Creates a fork of <code className="text-xs bg-background px-1 py-0.5 rounded">{BLUEPRINT_CONFIG_REPO_SLUG}</code></li>
+                  <li>Fork will be named <code className="text-xs bg-background px-1 py-0.5 rounded">{EXPECTED_FORK_REPO_NAME}</code></li>
                   <li>Initializes your blueprint directory</li>
                   <li>Enables saving blueprints to GitHub</li>
                 </ul>

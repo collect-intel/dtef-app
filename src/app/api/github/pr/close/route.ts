@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOctokit } from '@/lib/github/github-utils';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
 export async function POST(req: NextRequest) {
     const octokit = await getOctokit(req);
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
         }
 
         const response = await octokit.pulls.update({
-            owner: 'weval-org',
-            repo: 'configs',
+            owner: BLUEPRINT_CONFIG_UPSTREAM_OWNER,
+            repo: BLUEPRINT_CONFIG_UPSTREAM_REPO,
             pull_number: prNumber,
             state: 'closed',
         });

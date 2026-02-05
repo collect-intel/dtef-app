@@ -3,10 +3,10 @@
 import { useState, useCallback } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { BlueprintFile, PRStatus, ActiveBlueprint } from './useWorkspace';
+import { EXPECTED_FORK_REPO_NAME } from '@/lib/configConstants';
 
 const GITHUB_FILES_CACHE_KEY = 'sandboxV2_github_files_cache';
 const PR_STATUSES_CACHE_KEY = 'sandboxV2_pr_statuses_cache';
-const EXPECTED_FORK_REPO_NAME = 'weval-configs';
 
 /**
  * Workspace state detection for granular error messages

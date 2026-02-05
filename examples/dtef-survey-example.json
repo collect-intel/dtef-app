@@ -1,0 +1,145 @@
+{
+  "surveyId": "global-dialogues-2024-climate",
+  "surveyName": "Climate Change Attitudes Survey",
+  "description": "Survey measuring attitudes toward climate change policies across demographic groups",
+  "source": "Global Dialogues 2024",
+  "questions": {
+    "q1": {
+      "text": "How concerned are you about climate change?",
+      "type": "single-select",
+      "options": ["Very concerned", "Somewhat concerned", "Not very concerned", "Not at all concerned"]
+    },
+    "q2": {
+      "text": "Should governments prioritize economic growth over environmental protection?",
+      "type": "single-select",
+      "options": ["Strongly agree", "Agree", "Disagree", "Strongly disagree"]
+    },
+    "q3": {
+      "text": "Would you support a carbon tax to reduce emissions?",
+      "type": "single-select",
+      "options": ["Yes, definitely", "Yes, probably", "No, probably not", "No, definitely not"]
+    }
+  },
+  "segments": [
+    {
+      "id": "usa-male-18-29",
+      "label": "USA, Male, 18-29",
+      "attributes": {
+        "country": "USA",
+        "gender": "male",
+        "ageGroup": "18-29"
+      },
+      "sampleSize": 342,
+      "responses": [
+        {
+          "questionId": "q1",
+          "distribution": [28.4, 35.7, 22.5, 13.4]
+        },
+        {
+          "questionId": "q2",
+          "distribution": [15.2, 28.9, 32.5, 23.4]
+        },
+        {
+          "questionId": "q3",
+          "distribution": [18.7, 29.5, 31.6, 20.2]
+        }
+      ]
+    },
+    {
+      "id": "usa-female-18-29",
+      "label": "USA, Female, 18-29",
+      "attributes": {
+        "country": "USA",
+        "gender": "female",
+        "ageGroup": "18-29"
+      },
+      "sampleSize": 398,
+      "responses": [
+        {
+          "questionId": "q1",
+          "distribution": [42.7, 38.2, 13.6, 5.5]
+        },
+        {
+          "questionId": "q2",
+          "distribution": [8.3, 19.6, 38.9, 33.2]
+        },
+        {
+          "questionId": "q3",
+          "distribution": [31.4, 35.2, 21.1, 12.3]
+        }
+      ]
+    },
+    {
+      "id": "usa-male-50-plus",
+      "label": "USA, Male, 50+",
+      "attributes": {
+        "country": "USA",
+        "gender": "male",
+        "ageGroup": "50+"
+      },
+      "sampleSize": 287,
+      "responses": [
+        {
+          "questionId": "q1",
+          "distribution": [18.5, 28.9, 31.4, 21.2]
+        },
+        {
+          "questionId": "q2",
+          "distribution": [22.6, 35.9, 26.8, 14.7]
+        },
+        {
+          "questionId": "q3",
+          "distribution": [12.5, 23.4, 34.8, 29.3]
+        }
+      ]
+    },
+    {
+      "id": "germany-female-30-49",
+      "label": "Germany, Female, 30-49",
+      "attributes": {
+        "country": "Germany",
+        "gender": "female",
+        "ageGroup": "30-49"
+      },
+      "sampleSize": 456,
+      "responses": [
+        {
+          "questionId": "q1",
+          "distribution": [52.4, 34.6, 9.2, 3.8]
+        },
+        {
+          "questionId": "q2",
+          "distribution": [5.7, 14.3, 41.2, 38.8]
+        },
+        {
+          "questionId": "q3",
+          "distribution": [45.2, 32.7, 14.5, 7.6]
+        }
+      ]
+    },
+    {
+      "id": "india-male-18-29",
+      "label": "India, Male, 18-29",
+      "attributes": {
+        "country": "India",
+        "gender": "male",
+        "ageGroup": "18-29"
+      },
+      "sampleSize": 512,
+      "responses": [
+        {
+          "questionId": "q1",
+          "distribution": [38.5, 42.2, 14.1, 5.2]
+        },
+        {
+          "questionId": "q2",
+          "distribution": [18.4, 31.6, 29.3, 20.7]
+        },
+        {
+          "questionId": "q3",
+          "distribution": [22.1, 38.5, 26.2, 13.2]
+        }
+      ]
+    }
+  ]
+}

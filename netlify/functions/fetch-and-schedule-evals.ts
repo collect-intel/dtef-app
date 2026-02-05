@@ -10,10 +10,12 @@ import { generateBlueprintIdFromPath } from "@/app/utils/blueprintIdUtils";
 import { getLogger } from "@/utils/logger";
 import { initSentry, captureError, setContext, flushSentry } from "@/utils/sentry";
 import { callBackgroundFunction } from "@/lib/background-function-client";
+import { BLUEPRINT_CONFIG_REPO_SLUG } from "@/lib/configConstants";
 
-const EVAL_CONFIGS_REPO_API_URL = "https://api.github.com/repos/weval/configs/contents/blueprints";
-const MODEL_COLLECTIONS_REPO_API_URL_BASE = "https://api.github.com/repos/weval/configs/contents/models";
-const REPO_COMMITS_API_URL = "https://api.github.com/repos/weval/configs/commits/main";
+const GITHUB_API_BASE = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}`;
+const EVAL_CONFIGS_REPO_API_URL = `${GITHUB_API_BASE}/contents/blueprints`;
+const MODEL_COLLECTIONS_REPO_API_URL_BASE = `${GITHUB_API_BASE}/contents/models`;
+const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
 const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
@@ -53,7 +55,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       const commitResponse = await axios.get(REPO_COMMITS_API_URL, { headers: githubHeaders });
       latestCommitSha = commitResponse.data.sha;
       if (latestCommitSha) {
-        logger.info(`Fetched latest commit SHA for weval/configs@main: ${latestCommitSha}`);
+        logger.info(`Fetched latest commit SHA for ${BLUEPRINT_CONFIG_REPO_SLUG}@main: ${latestCommitSha}`);
       } else {
         logger.warn(`Could not determine latest commit SHA from API response.`);
       }
@@ -62,7 +64,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       captureError(commitError, { context: 'fetch-commit-sha' });
     }
 
-    const treeApiUrl = `https://api.github.com/repos/weval/configs/git/trees/main?recursive=1`;
+    const treeApiUrl = `${GITHUB_API_BASE}/git/trees/main?recursive=1`;
     logger.info(`Fetching file tree from: ${treeApiUrl}`);
     const treeResponse = await axios.get(treeApiUrl, { headers: githubHeaders });
 

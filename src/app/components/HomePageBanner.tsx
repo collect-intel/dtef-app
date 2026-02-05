@@ -28,7 +28,7 @@ export default function HomePageBanner() {
               <h2 className="text-2xl font-semibold text-foreground dark:text-slate-100">Evaluate What Matters</h2>
             </div>
             <p className="text-sm text-foreground/80 dark:text-muted-foreground leading-relaxed flex-grow mb-4">
-              Most AI benchmarks test what's easy, not what's important. Weval lets you build deep, qualitative evaluations for everything from niche professional domains to the everyday traits we all care about—like safety, honesty, and helpfulness.
+              Can AI faithfully represent the views of diverse communities? DTEF measures how accurately models predict survey response distributions across demographic groups—testing whether AI can serve as a reliable proxy for real human perspectives.
             </p>
             <div className="mt-auto pt-4 border-t border-border/30 dark:border-border/30">
               <a

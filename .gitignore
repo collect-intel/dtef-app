@@ -43,6 +43,7 @@ yarn-error.log*
 
 # Environment files
 .env
+.env.local
 .env.development
 backend/.env
 backend/.env.development
@@ -51,6 +52,7 @@ backend/venv
 
 # Keep templates
 !.env.template
+!.env.local.example
 !.env.development.template
 !backend/.env.template
 !backend/.env.development.template

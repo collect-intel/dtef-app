@@ -24,6 +24,8 @@
     "test:preference": "tsx src/cli/preference-test.ts",
     "test:self-preference": "tsx src/cli/self-preference-test.ts",
     "cli": "tsx --no-cache -r dotenv/config src/cli/index.ts",
+    "validate:env": "tsx -r dotenv/config scripts/validate-env.ts",
+    "test:infra": "tsx -r dotenv/config scripts/test-infrastructure.ts",
     "cli:generate-pain-points": "pnpm cli generate-pain-points",
     "cli:annotate-pain-points": "pnpm cli annotate-pain-points",
     "cli:generate-regressions": "pnpm cli generate-regressions",

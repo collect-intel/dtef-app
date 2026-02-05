@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessToken } from '@/lib/github/auth-utils';
 import { Buffer } from 'buffer';
+import {
+    BLUEPRINT_CONFIG_UPSTREAM_OWNER,
+    BLUEPRINT_CONFIG_UPSTREAM_REPO,
+    BLUEPRINT_CONFIG_REPO_SLUG,
+    EXPECTED_FORK_REPO_NAME,
+} from '@/lib/configConstants';
 
-const UPSTREAM_OWNER = 'weval-org';
-const UPSTREAM_REPO_NAME = 'configs';
-const UPSTREAM_REPO_FULL_NAME = `${UPSTREAM_OWNER}/${UPSTREAM_REPO_NAME}`;
-const DEFAULT_FORK_NAME = 'weval-configs';
+const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+const UPSTREAM_REPO_NAME = BLUEPRINT_CONFIG_UPSTREAM_REPO;
+const UPSTREAM_REPO_FULL_NAME = BLUEPRINT_CONFIG_REPO_SLUG;
+const DEFAULT_FORK_NAME = EXPECTED_FORK_REPO_NAME;
 
 async function githubApiRequest(endpoint: string, token: string, options: RequestInit = {}) {
     const response = await fetch(`https://api.github.com${endpoint}`, {

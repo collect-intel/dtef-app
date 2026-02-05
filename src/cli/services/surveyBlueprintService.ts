@@ -9,6 +9,11 @@ import {
 import { WevalConfig, WevalPromptConfig } from '@/types/shared';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * @deprecated This service generates per-participant blueprints.
+ * For demographic aggregate blueprints, use DemographicBlueprintService instead.
+ * This class is preserved for potential future individual-prediction features.
+ */
 export class SurveyBlueprintService {
     /**
      * Generate Weval blueprints from survey data

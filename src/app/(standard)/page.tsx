@@ -188,6 +188,26 @@ export default async function HomePage() {
             </section>
           )}
 
+          {/* Demographics Section */}
+          <section className="bg-card/60 dark:bg-slate-800/30 border border-border/40 rounded-xl p-6 md:p-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                  Demographic Prediction Accuracy
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  How well do AI models predict survey response distributions across demographic groups?
+                </p>
+              </div>
+              <Link
+                href="/demographics"
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
+              >
+                View Details →
+              </Link>
+            </div>
+          </section>
+
           {featuredConfigs.length > 0 ? (
             <>
               <hr className="my-8 md:my-12 border-border/70 dark:border-slate-700/50 w-3/4 mx-auto" />

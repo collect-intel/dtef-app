@@ -299,6 +299,28 @@ export interface WevalResult {
     excludedModels?: string[];
     executiveSummary?: ExecutiveSummary;
     article?: WevalArticle;
+
+    /** DTEF demographic evaluation metadata (present only for DTEF blueprints) */
+    dtefMetadata?: DTEFResultMetadata;
+}
+
+/**
+ * DTEF-specific metadata attached to evaluation results.
+ * Contains demographic segment info and distribution prediction data.
+ */
+export interface DTEFResultMetadata {
+    /** Survey ID this evaluation belongs to */
+    surveyId: string;
+    /** Demographic segment IDs evaluated */
+    segmentIds: string[];
+    /** Segment labels for display */
+    segmentLabels?: string[];
+    /** Segment attributes for aggregation */
+    segmentAttributes?: Record<string, string>;
+    /** Ground truth distributions by promptId */
+    groundTruthDistributions?: Record<string, number[]>;
+    /** Whether this result has been aggregated across segments */
+    isAggregated?: boolean;
 }
 
 // New structured executive summary types

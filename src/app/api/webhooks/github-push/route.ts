@@ -5,11 +5,12 @@ import { callBackgroundFunction } from '@/lib/background-function-client';
 import { webhookIPLimiter, webhookGlobalLimiter } from '@/lib/webhook-rate-limiter';
 import { generateConfigContentHash } from '@/lib/hash-utils';
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
 const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const UPSTREAM_OWNER = 'weval-org';
-const UPSTREAM_REPO = 'configs';
+const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
 const MAIN_BRANCH = 'main';
 
 const s3Client = new S3Client({

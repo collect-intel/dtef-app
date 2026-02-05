@@ -7,10 +7,11 @@ import { prEvaluationLimiter, webhookIPLimiter, webhookGlobalLimiter } from '@/l
 import { checkPREvalLimits, formatLimitViolations, PR_EVAL_LIMITS } from '@/lib/pr-eval-limiter';
 import { validateReservedPrefixes } from '@/lib/blueprint-parser';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
+import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
 
 const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
-const UPSTREAM_OWNER = 'weval-org';
-const UPSTREAM_REPO = 'configs';
+const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
+const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
 const MAX_BLUEPRINTS_PER_PR = 3;
 const MAX_BLUEPRINT_SIZE_KB = 500; // 500KB max
 
