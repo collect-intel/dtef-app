@@ -91,8 +91,8 @@ async function postCompletionComment(
     if (!octokit) {
       logAuthConfig(); // Only log if we had to create a new instance
     }
-  const resultsUrl = `https://weval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
-  const analysisUrl = configId ? `https://weval.org/analysis/${configId}` : null;
+  const resultsUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
+  const analysisUrl = configId ? `https://digitaltwinseval.org/analysis/${configId}` : null;
 
   let commentBody: string;
 
@@ -364,7 +364,7 @@ export const handler: BackgroundHandler = async (event) => {
 
     // Finalize: update status and post comment
     const completedAt = new Date().toISOString();
-    const resultUrl = `https://weval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
+    const resultUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
 
     await Promise.all([
       // Update final status

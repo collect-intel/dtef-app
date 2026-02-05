@@ -23,22 +23,22 @@ import { processBlueprintSummaries } from '@/app/utils/blueprintSummaryUtils';
 import Link from 'next/link';
 import Icon from '@/components/ui/icon';
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://weval.org');
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://digitaltwinseval.org');
 
 export const metadata: Metadata = {
-  title: 'Weval - The Open Platform for AI Evaluation',
-  description: 'An open-source framework for creating, sharing, and running a collaborative library of AI model evaluations. Test what matters to you.',
+  title: 'DTEF - Digital Twin Evaluation Framework',
+  description: 'An open-source framework for measuring how accurately AI models predict demographic survey response distributions. Testing whether AI can faithfully represent diverse perspectives.',
   openGraph: {
-    title: 'Weval - The Open Platform for AI Evaluation',
-    description: 'Create, share, and run a massive, collaborative library of AI model evaluations. Like a Wikipedia for benchmarks, Weval empowers anyone to test what matters to them.',
+    title: 'DTEF - Digital Twin Evaluation Framework',
+    description: 'Measuring how accurately AI models predict demographic survey response distributions across age, gender, region, and more.',
     url: appUrl,
-    siteName: 'Weval',
+    siteName: 'DTEF',
     images: [
       {
         url: `${appUrl}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: "Weval - Open AI Evaluation Platform",
+        alt: "DTEF - Digital Twin Evaluation Framework",
       },
     ],
     locale: 'en_US',
@@ -46,8 +46,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Weval - The Open Platform for AI Evaluation',
-    description: 'Create, share, and run a massive, collaborative library of AI model evaluations. Test what matters to you.',
+    title: 'DTEF - Digital Twin Evaluation Framework',
+    description: 'Measuring how accurately AI models predict demographic survey response distributions. Testing whether AI can faithfully represent diverse perspectives.',
     images: [`${appUrl}/opengraph-image`],
   },
 };
@@ -235,7 +235,7 @@ export default async function HomePage() {
               </h2>
               <p className="text-muted-foreground dark:text-slate-400 text-sm sm:text-base max-w-lg mx-auto mb-6">
                 It looks like you haven't run any evaluation blueprints yet. Use the CLI to generate results, and they will appear here.
-                Explore example blueprints or contribute your own at the <a href={`${BLUEPRINT_CONFIG_REPO_URL}/tree/main/blueprints`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Weval Blueprints repository</a>.
+                Explore example blueprints or contribute your own at the <a href={`${BLUEPRINT_CONFIG_REPO_URL}/tree/main/blueprints`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">DTEF Blueprints repository</a>.
               </p>
               <div className="mt-4 text-xs text-muted-foreground/80 dark:text-slate-500/80 bg-muted dark:bg-slate-700/50 p-3 rounded-md w-full max-w-md">
                   <span className="font-semibold">Example command:</span>
@@ -248,7 +248,7 @@ export default async function HomePage() {
           
           <div className="text-center pt-6 pb-4">
             <p className="text-sm text-muted-foreground">
-              Weval is an open source project from the <Link href="https://cip.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Collective Intelligence Project</Link>.
+              DTEF is an open source project from the <Link href="https://cip.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Collective Intelligence Project</Link>.
             </p>
           </div>
         </div>

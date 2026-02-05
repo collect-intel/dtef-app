@@ -485,7 +485,7 @@ export async function POST(req: NextRequest) {
     // Build status comment
     const statusLines = blueprintsToEvaluate.map(({ file, limitInfo }, index) => {
       const result = results[index];
-      const statusUrl = `https://weval.org/pr-eval/${prNumber}/${encodeURIComponent(file.filename)}`;
+      const statusUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(file.filename)}`;
 
       if (result.success) {
         let line = `- ✅ \`${file.filename}\` - [View Status](${statusUrl})`;

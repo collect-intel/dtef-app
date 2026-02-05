@@ -2,61 +2,74 @@ import React from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
-import { APP_REPO_URL } from '@/lib/configConstants';
+import { APP_REPO_URL, BLUEPRINT_CONFIG_REPO_URL } from '@/lib/configConstants';
 
 export const metadata = {
-  title: 'What is an Eval? | Weval',
-  description: 'Understanding evaluations: how domain experts can translate their expertise into systematic tests that make AI better for everyone.',
+  title: 'What is a Digital Twin Evaluation? | DTEF',
+  description: 'Understanding digital twin evaluations: how DTEF measures whether AI models can accurately predict demographic survey response distributions.',
 };
 
 export default function WhatIsAnEvalPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        
+
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-4">What is an Eval?</h1>
+          <h1 className="text-4xl font-bold mb-4">What is a Digital Twin Evaluation?</h1>
         </div>
 
-        {/* Definition - Lead with the answer */}
+        {/* Definition */}
         <section className="mb-12">
           <Card className="p-6 bg-primary/5 border-primary/20">
             <p className="text-lg text-foreground leading-relaxed">
-              An <strong>eval</strong> (short for "evaluation") is a structured test you create to check whether AI models behave the way they should in a specific domain. It's how we translate real human knowledge, expertise and informed expectations into criteria that AI models can be measured against.
+              A <strong>digital twin evaluation</strong> tests whether an AI model can accurately predict how real people from specific demographic groups would respond to survey questions. It measures the gap between AI-generated predictions and actual human survey data—revealing where AI faithfully represents diverse perspectives and where it falls short.
             </p>
           </Card>
         </section>
 
-        {/* The Problem - Why this matters */}
+        {/* What is a "digital twin"? */}
         <section className="mb-16">
           <h2 className="text-2xl font-semibold mb-6 flex items-center">
-            <Icon name="alert-circle" className="w-6 h-6 mr-3 text-primary" />
-            Why The Weval Platform Exists
+            <Icon name="users" className="w-6 h-6 mr-3 text-primary" />
+            What is a "Digital Twin"?
           </h2>
           <div className="prose prose-lg dark:prose-invert max-w-none">
             <p className="text-foreground/90 leading-relaxed mb-4">
-              Imagine a family physician, Dr. Sharma, working in Mumbai. When she enters symptoms for a patient experiencing joint pain, fatigue, and slight hair loss, her clinic's AI chatbot suggests malnutrition and sanitation-related infections. Dr. Sharma is puzzled—the patient has good nutrition and hygiene. Why didn't the AI consider typical autoimmune conditions? Why was its assumption based on outdated stereotypes?
+              In engineering, a "digital twin" is a virtual replica of a physical system. In the context of AI and public opinion, a <strong>digital twin</strong> is an AI model tasked with simulating the perspectives, beliefs, and response patterns of a specific group of people.
             </p>
             <p className="text-foreground/90 leading-relaxed mb-4">
-              Or take Peter, teaching seventh graders in rural Montana. His district's AI assistant suggests lesson plans with field trips to museums hours away and prioritizes rote memorization over interactive learning. As an experienced teacher, Peter knows this won't work for his students.
+              For example, you might ask an AI: "How would women aged 18-24 in urban areas respond to this question about AI regulation?" If the model can produce a response distribution that closely matches how that group <em>actually</em> responded in a real survey, it's functioning as an accurate digital twin for that segment.
             </p>
             <div className="my-6 pl-6 pr-6 py-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-l-4 border-primary rounded-r-lg shadow-sm">
               <p className="text-foreground font-semibold leading-relaxed m-0">
-                AI labs can't reasonably test whether AI works for every Mumbai clinic or Montana classroom from their lab in San Francisco.
+                The question isn't whether AI <em>can</em> simulate human perspectives—it already claims to. The question is whether those simulations are accurate and equitable across all groups.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* What is an "evaluation"? */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-semibold mb-6 flex items-center">
+            <Icon name="scale" className="w-6 h-6 mr-3 text-primary" />
+            What is an "Evaluation"?
+          </h2>
+          <div className="prose prose-lg dark:prose-invert max-w-none">
             <p className="text-foreground/90 leading-relaxed mb-4">
-              Dr. Sharma knows what questions to ask and what a competent diagnosis should include. Peter knows what makes an effective lesson plan for rural students. An eval is how they make that knowledge systematic and testable. <strong>But the methods of doing this have been very limited for non-engineers or people unfamiliar with the way AI is built.</strong> Thus we made Weval.
+              An <strong>evaluation</strong> (or "eval") is a structured, reproducible test that measures a specific capability of an AI model. Rather than asking "Is this AI good?", an eval asks a precise question like "Can this model predict the response distribution of rural men aged 45-64 on questions about technology governance?"
+            </p>
+            <p className="text-foreground/90 leading-relaxed">
+              Evaluations produce quantitative scores—making it possible to compare models, track changes over time, and identify systematic gaps.
             </p>
           </div>
         </section>
 
-        {/* How It Works */}
+        {/* How DTEF Works */}
         <section className="mb-16">
           <h2 className="text-2xl font-semibold mb-6 flex items-center">
             <Icon name="layers" className="w-6 h-6 mr-3 text-primary" />
-            How It Works: From Your Expertise to Evidence
+            How DTEF Works
           </h2>
 
           <div className="space-y-6">
@@ -67,19 +80,10 @@ export default function WhatIsAnEvalPage() {
                   1
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2">Start with what you know</h3>
+                  <h3 className="text-lg font-semibold mb-2">Start with real survey data</h3>
                   <p className="text-foreground/80">
-                    You have lived experience and expertise. You know when AI gets it wrong, and you can describe what "right" looks like in your context.
+                    DTEF uses responses from large-scale demographic surveys—like <a href="https://github.com/collect-intel/global-dialogues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Global Dialogues</a>—where thousands of people across dozens of demographic segments have answered questions about technology, governance, and society.
                   </p>
-                  <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-muted">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      A good way to start is with our conversational interface, where you can describe your experience with AI and we'll help you turn it into a structured eval.
-                    </p>
-                    <Link href="/story" className="inline-flex items-center text-sm text-primary hover:underline font-medium">
-                      Try the conversational builder
-                      <Icon name="arrow-right" className="w-4 h-4 ml-1" />
-                    </Link>
-                  </div>
                 </div>
               </div>
             </Card>
@@ -91,15 +95,10 @@ export default function WhatIsAnEvalPage() {
                   2
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2">Define your criteria</h3>
-                  <p className="text-foreground/80 mb-3">
-                    Write questions or scenarios for AI to respond to. Then describe what good answers should include (and what they shouldn't).
+                  <h3 className="text-lg font-semibold mb-2">Generate evaluation blueprints</h3>
+                  <p className="text-foreground/80">
+                    The DTEF CLI transforms survey data into structured blueprints. Each blueprint contains prompts that ask AI models to predict how a specific demographic segment (e.g., "women aged 25-34 in urban areas") would distribute their responses across the answer options for each survey question.
                   </p>
-                  <div className="bg-muted/50 p-4 rounded-md text-sm">
-                    <p className="font-medium mb-2">Example from Dr. Sharma:</p>
-                    <p className="text-muted-foreground mb-2"><strong>Scenario:</strong> "A 45-year-old woman presents with joint pain, fatigue, and hair loss..."</p>
-                    <p className="text-muted-foreground"><strong>Criteria:</strong> Good answers should consider autoimmune conditions and avoid stereotypical assumptions about hygiene or nutrition based on location.</p>
-                  </div>
                 </div>
               </div>
             </Card>
@@ -111,9 +110,9 @@ export default function WhatIsAnEvalPage() {
                   3
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2">Weval runs the test</h3>
+                  <h3 className="text-lg font-semibold mb-2">AI models make predictions</h3>
                   <p className="text-foreground/80">
-                    Our platform automatically runs your questions across dozens of AI models (GPT, Claude, Gemini, and more), collecting their responses. You don't need to know how to code or access each API.
+                    Multiple AI models (GPT, Claude, Gemini, Llama, and more) are prompted with each blueprint. Each model predicts the percentage of the demographic group that would choose each answer option—producing a predicted response distribution.
                   </p>
                 </div>
               </div>
@@ -126,9 +125,9 @@ export default function WhatIsAnEvalPage() {
                   4
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2">Get systematic evidence</h3>
+                  <h3 className="text-lg font-semibold mb-2">Score against ground truth</h3>
                   <p className="text-foreground/80">
-                    Each model's response is scored against your criteria using a combination of automated checks and AI-powered judges. You get clear scores showing which models meet your standards and which don't.
+                    Predicted distributions are compared to actual survey responses using distribution metrics like Jensen-Shannon divergence, cosine similarity, and earth mover's distance. This produces transparent, quantitative accuracy scores for every model-segment-question combination.
                   </p>
                 </div>
               </div>
@@ -141,9 +140,9 @@ export default function WhatIsAnEvalPage() {
                   5
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2">Create impact at scale</h3>
+                  <h3 className="text-lg font-semibold mb-2">Track and compare</h3>
                   <p className="text-foreground/80">
-                    Share your results privately, or contribute them to Weval's public library. When hundreds of experts create evals, we build collective evidence that developers, regulators, and users can't ignore.
+                    Results are aggregated into leaderboards showing which models best represent which groups. Evaluations re-run automatically, so you can track how model accuracy changes over time as models are updated.
                   </p>
                 </div>
               </div>
@@ -154,179 +153,110 @@ export default function WhatIsAnEvalPage() {
         {/* Why This Matters */}
         <section className="mb-16">
           <h2 className="text-2xl font-semibold mb-6 flex items-center">
-            <Icon name="users" className="w-6 h-6 mr-3 text-primary" />
+            <Icon name="alert-circle" className="w-6 h-6 mr-3 text-primary" />
             Why This Matters
           </h2>
-          
+
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-3 flex items-center">
                 <Icon name="shield" className="w-5 h-5 mr-2 text-primary" />
-                For Individual Experts
+                Representativeness
               </h3>
               <p className="text-foreground/80">
-                A single eval provides a crucial snapshot. When a cardiologist flags how AI overlooks heart conditions in women, or a pediatrician shows how models fail to recognize stunted growth, they build better understanding of the systems influencing lives every day.
+                AI is increasingly used to simulate public opinion, inform policy decisions, and personalize services. If models systematically misrepresent certain demographic groups, those groups are effectively silenced in AI-mediated decisions.
               </p>
             </Card>
 
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-3 flex items-center">
                 <Icon name="globe" className="w-5 h-5 mr-2 text-primary" />
-                For Collective Change
+                Equity
               </h3>
               <p className="text-foreground/80">
-                When aggregated with hundreds of other expert-created evals, we see that problems aren't edge cases—they're endemic. This collective intelligence provides a detailed map of AI's weaknesses that creates real accountability.
+                DTEF reveals whether AI accuracy varies across demographic groups. A model might predict urban young adult responses well but fail for rural elderly populations—a disparity that's invisible without systematic measurement.
               </p>
             </Card>
-          </div>
-        </section>
 
-        {/* Examples */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-semibold mb-6 flex items-center">
-            <Icon name="book-open" className="w-6 h-6 mr-3 text-primary" />
-            Real Examples from Our Library
-          </h2>
-          
-          <div className="space-y-4">
-            <Link href="/analysis/homework-int-help-heuristics/919a1807afd4ec60/2025-08-09T02-18-24-413Z" className="block">
-              <Card className="p-5 hover:shadow-lg transition-shadow h-full">
-                <h3 className="font-semibold mb-2 text-foreground">Student Homework Help Heuristics</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Tests whether AI acts as a Socratic tutor that facilitates learning rather than providing direct answers. Evaluates cross-disciplinary support, affective responses to student emotions, and handling of difficult scenarios like impatient students demanding answers.
-                </p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center">
-                    <Icon name="tag" className="w-4 h-4 mr-1" />
-                    <span>Education, Instruction Following</span>
-                  </div>
-                  <span className="font-medium">63.4% avg. score</span>
-                </div>
-              </Card>
-            </Link>
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-3 flex items-center">
+                <Icon name="check-circle" className="w-5 h-5 mr-2 text-primary" />
+                Trust
+              </h3>
+              <p className="text-foreground/80">
+                Before relying on AI to represent human perspectives, we need evidence that it actually can. DTEF provides that evidence—or reveals where trust is not yet warranted.
+              </p>
+            </Card>
 
-            <Link href="/analysis/sri-lanka-citizen-compendium-factum/0885a9697761716f/2025-08-26T01-24-13-151Z" className="block">
-              <Card className="p-5 hover:shadow-lg transition-shadow h-full">
-                <h3 className="font-semibold mb-2 text-foreground">Sri Lanka Contextual Prompts</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Evaluates AI's ability to provide accurate, evidence-based information on civic, historical, social, and health topics specific to Sri Lanka—from the Civil War and ethnic relations to public health challenges like CKDu, voting procedures, and legal recourse for online harassment.
-                </p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center">
-                    <Icon name="tag" className="w-4 h-4 mr-1" />
-                    <span>Regional Knowledge, Public Health</span>
-                  </div>
-                  <span className="font-medium">49.5% avg. score</span>
-                </div>
-              </Card>
-            </Link>
-
-            <Link href="/analysis/stanford-hai-mental-health-safety-eval/aa8a14a89477916a/2025-09-03T09-00-58-954Z" className="block">
-              <Card className="p-5 hover:shadow-lg transition-shadow h-full">
-                <h3 className="font-semibold mb-2 text-foreground">Mental Health Safety in Crisis Scenarios</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Based on Stanford HAI research, tests whether AI responds appropriately to critical mental health scenarios involving delusions, suicidal ideation, and mania—checking for stigmatizing responses and inappropriate enabling of dangerous behaviors.
-                </p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center">
-                    <Icon name="tag" className="w-4 h-4 mr-1" />
-                    <span>Safety, Mental Health</span>
-                  </div>
-                  <span className="font-medium">72.7% avg. score</span>
-                </div>
-              </Card>
-            </Link>
-
-            <Link href="/analysis/brazil-pix-consumer-protection/8524f43ce846871e/2025-08-25T04-35-19-258Z" className="block">
-              <Card className="p-5 hover:shadow-lg transition-shadow h-full">
-                <h3 className="font-semibold mb-2 text-foreground">Brazil PIX: Consumer Protection & Fraud Prevention</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Tests AI's ability to provide safe, accurate guidance on Brazil's PIX instant payment system—covering transaction finality, official fraud recourse mechanisms, social engineering scams, and security features specific to Brazilian financial infrastructure.
-                </p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center">
-                    <Icon name="tag" className="w-4 h-4 mr-1" />
-                    <span>Regional Knowledge, Consumer Protection</span>
-                  </div>
-                  <span className="font-medium">65.4% avg. score</span>
-                </div>
-              </Card>
-            </Link>
-          </div>
-
-          <div className="mt-6 text-center">
-            <Link href="/" className="text-sm text-primary hover:underline">
-              Browse all evaluations on the homepage →
-            </Link>
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-3 flex items-center">
+                <Icon name="trending-up" className="w-5 h-5 mr-2 text-primary" />
+                Accountability
+              </h3>
+              <p className="text-foreground/80">
+                By producing transparent, reproducible scores, DTEF creates accountability for model developers. When results show a model performs poorly for specific groups, there's clear evidence driving improvement.
+              </p>
+            </Card>
           </div>
         </section>
 
         {/* CTA Section */}
         <section className="mb-8">
           <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <h2 className="text-2xl font-semibold mb-4 text-center">Ready to Create Your First Eval?</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-center">Explore DTEF</h2>
             <p className="text-center text-foreground/80 mb-8 max-w-2xl mx-auto">
-              Whether you're a teacher, nurse, policymaker, researcher, or anyone with expertise and lived experience guiding  strong opinions in how AI should behave, your knowledge matters.
+              DTEF is fully open source. Browse evaluation results, read the methodology, or contribute survey data to expand the framework's coverage.
             </p>
-            
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              {/* Story - Conversational approach */}
-              <div className="flex flex-col">
-                <div className="flex-1 mb-4">
-                  <h3 className="font-semibold text-lg mb-2 flex items-center">
-                    <Icon name="message-square" className="w-5 h-5 mr-2 text-primary" />
-                    Tell Your Story
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Not sure where to start? Have a conversation about your experience with AI. We'll help you turn it into a structured eval.
-                  </p>
-                  <div className="mt-3 text-xs text-muted-foreground flex items-center">
-                    <Icon name="sparkles" className="w-4 h-4 mr-1" />
-                    <span>Guided & conversational • Best for beginners</span>
-                  </div>
-                </div>
+
+            <div className="grid md:grid-cols-3 gap-6 mb-6">
+              <div className="flex flex-col items-center text-center">
+                <Icon name="book-open" className="w-8 h-8 mb-3 text-primary" />
+                <h3 className="font-semibold mb-2">View Results</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Browse the leaderboard and see how models perform across demographic groups.
+                </p>
                 <Link
-                  href="/story"
-                  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors shadow-md hover:shadow-lg"
+                  href="/"
+                  className="inline-flex items-center text-sm text-primary hover:underline font-medium"
                 >
-                  <Icon name="message-square" className="w-5 h-5 mr-2" />
-                  Start Conversation
+                  Go to Homepage
+                  <Icon name="arrow-right" className="w-4 h-4 ml-1" />
                 </Link>
               </div>
 
-              {/* Sandbox - Direct builder */}
-              <div className="flex flex-col">
-                <div className="flex-1 mb-4">
-                  <h3 className="font-semibold text-lg mb-2 flex items-center">
-                    <Icon name="edit-3" className="w-5 h-5 mr-2 text-primary" />
-                    Use Sandbox Studio
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Know exactly what you want to test? Jump straight into our visual builder with full control over prompts and rubrics.
-                  </p>
-                  <div className="mt-3 text-xs text-muted-foreground flex items-center">
-                    <Icon name="sliders-horizontal" className="w-4 h-4 mr-1" />
-                    <span>Direct builder • More control • No coding required</span>
-                  </div>
-                </div>
-                <Link
-                  href="/sandbox"
-                  className="inline-flex items-center justify-center px-6 py-3 border border-primary/50 text-base font-medium rounded-md text-foreground bg-background hover:bg-accent hover:border-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              <div className="flex flex-col items-center text-center">
+                <Icon name="file-text" className="w-8 h-8 mb-3 text-primary" />
+                <h3 className="font-semibold mb-2">Read the Methodology</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Understand how evaluations are structured, scored, and interpreted.
+                </p>
+                <a
+                  href={`${APP_REPO_URL}/blob/main/docs/METHODOLOGY.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm text-primary hover:underline font-medium"
                 >
-                  <Icon name="edit-3" className="w-5 h-5 mr-2" />
-                  Open Sandbox
-                </Link>
+                  Methodology Doc
+                  <Icon name="arrow-right" className="w-4 h-4 ml-1" />
+                </a>
               </div>
-            </div>
 
-            <div className="text-center pt-4 border-t border-border/50">
-              <Link
-                href="/"
-                className="inline-flex items-center text-sm text-primary hover:underline"
-              >
-                <Icon name="book-open" className="w-4 h-4 mr-1" />
-                Or browse existing evals for inspiration
-              </Link>
+              <div className="flex flex-col items-center text-center">
+                <Icon name="git-branch" className="w-8 h-8 mb-3 text-primary" />
+                <h3 className="font-semibold mb-2">Contribute</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Submit survey data or evaluation blueprints to the public repository.
+                </p>
+                <a
+                  href={BLUEPRINT_CONFIG_REPO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm text-primary hover:underline font-medium"
+                >
+                  Blueprint Repository
+                  <Icon name="arrow-right" className="w-4 h-4 ml-1" />
+                </a>
+              </div>
             </div>
           </Card>
         </section>
@@ -334,4 +264,3 @@ export default function WhatIsAnEvalPage() {
     </div>
   );
 }
-

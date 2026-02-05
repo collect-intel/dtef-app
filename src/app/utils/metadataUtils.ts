@@ -35,8 +35,8 @@ export async function generateAnalysisPageMetadata(
       'Search Params (resolved):', resolvedSearchParams // Log resolved searchParams for debugging if needed
     );
     return {
-      title: 'Weval Analysis',
-      description: 'Detailed AI model performance analysis by Weval. Parameters missing or invalid.',
+      title: 'DTEF Analysis',
+      description: 'Detailed AI model performance analysis by DTEF. Parameters missing or invalid.',
     };
   }
 
@@ -50,7 +50,7 @@ export async function generateAnalysisPageMetadata(
   const description = `Detailed analysis for Blueprint '${inferredTitle}' (Version: ${runLabel.substring(0,12)}...), executed on ${new Date(fromSafeTimestamp(timestamp)).toLocaleDateString()}`;
   
   // Consistent appUrl definition
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://weval.org');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://digitaltwinseval.org');
   console.log('[metadataUtils] appUrl for analysis page:', appUrl);
 
   // Construct image URL carefully, pointing to the opengraph-image route for the specific analysis page.

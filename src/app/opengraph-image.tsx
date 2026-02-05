@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 
 // Image metadata
-export const alt = 'Weval - Measuring AI\'s fitness';
+export const alt = 'DTEF - Digital Twin Evaluation Framework';
 export const size = {
   width: 1200,
   height: 630,
@@ -13,7 +13,7 @@ export const contentType = 'image/png';
 
 // Image generation
 export default async function Image() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://weval.org');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://digitaltwinseval.org');
 
   const geistRegularFontData = fetch(
     new URL('/fonts/Geist-Regular.ttf', appUrl)
@@ -46,13 +46,13 @@ export default async function Image() {
         {/* You could add your logo here if you have it as an SVG or can fetch it */}
         {/* <img src={...logo_url} width="100" height="100" /> */}
         <div style={{ marginTop: 20, fontSize: 80, fontWeight: 700 /* Use numeric weight for bold */, fontFamily: '"GeistBold"' }}>
-          Weval
+          DTEF
         </div>
         <div style={{ marginTop: 30, fontSize: 42, color: '#E0E0E0', lineHeight: 1.4, fontFamily: '"GeistRegular"' }}>
-          Open AI Evaluation Platform
+          Digital Twin Evaluation Framework
         </div>
         <div style={{ position: 'absolute', bottom: 30, fontSize: 24, color: '#A0A0A0', fontFamily: '"GeistRegular"' }}>
-          weval.org
+          digitaltwinseval.org
         </div>
       </div>
     ),

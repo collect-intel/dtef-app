@@ -219,7 +219,7 @@ describe('POST /api/pairs/config/[configId]/start-generation', () => {
   });
 
   it('should construct correct function URL in production', async () => {
-    process.env.URL = 'https://weval.org';
+    process.env.URL = 'https://digitaltwinseval.org';
 
     mockedPairwiseService.getGenerationStatus.mockResolvedValue(null);
     mockedPairwiseService.updateGenerationStatus.mockResolvedValue();
@@ -231,7 +231,7 @@ describe('POST /api/pairs/config/[configId]/start-generation', () => {
     await POST(req, { params: Promise.resolve({ configId: 'test-config' }) });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://weval.org/.netlify/functions/generate-pairs-background',
+      'https://digitaltwinseval.org/.netlify/functions/generate-pairs-background',
       expect.any(Object)
     );
   });

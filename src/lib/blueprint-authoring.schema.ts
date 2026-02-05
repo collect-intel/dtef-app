@@ -3,7 +3,7 @@
 
 export const BlueprintAuthoringSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'https://weval.org/schemas/blueprint-authoring/v1.json',
+  $id: 'https://digitaltwinseval.org/schemas/blueprint-authoring/v1.json',
   title: 'Weval Blueprint (Authoring)',
   type: ['object', 'array'],
   oneOf: [

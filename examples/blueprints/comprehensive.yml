@@ -5,7 +5,7 @@ description: |
   prompt weights, citations, and intentional successes/failures.
 author:
   name: "Weval Team"
-  url: "https://weval.org"
+  url: "https://digitaltwinseval.org"
 reference:
   title: "Weval: A Comprehensive Framework for LLM Evaluation"
   url: "https://arxiv.org/abs/2024.example"

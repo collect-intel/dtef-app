@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
   
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://weval.org';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitaltwinseval.org';
   const title = `Performance Summary for ${displayName}`;
   const description = `Detailed evaluation results, performance metrics, strengths, and weaknesses for the ${displayName} model based on ${summary.overallStats.totalRuns} runs across ${summary.overallStats.totalBlueprints} blueprints.`;
 

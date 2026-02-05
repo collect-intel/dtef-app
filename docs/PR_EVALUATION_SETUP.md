@@ -45,7 +45,7 @@ Weval uses a **three-layer validation and evaluation system**:
 2. **Auto-trims if needed:** Max 10 prompts, CORE models only, 2 temps, 2 systems
 3. Runs evaluation against trimmed configuration
 4. Posts status updates as GitHub comments
-5. Displays real-time progress at `https://weval.org/pr-eval/{pr-number}/{blueprint-path}`
+5. Displays real-time progress at `https://digitaltwinseval.org/pr-eval/{pr-number}/{blueprint-path}`
 
 **Cost limits:**
 - Max 100 total responses per PR evaluation
@@ -135,7 +135,7 @@ You need **two webhooks** for the full workflow:
 1. Go to `https://github.com/weval-org/configs/settings/hooks`
 2. Click "Add webhook"
 3. Configure:
-   - **Payload URL**: `https://weval.org/api/webhooks/github-pr`
+   - **Payload URL**: `https://digitaltwinseval.org/api/webhooks/github-pr`
    - **Content type**: `application/json`
    - **Secret**: (paste the secret from step 1)
    - **Events**: Select "Pull requests" only
@@ -146,7 +146,7 @@ You need **two webhooks** for the full workflow:
 
 1. Click "Add webhook" again
 2. Configure:
-   - **Payload URL**: `https://weval.org/api/webhooks/github-push`
+   - **Payload URL**: `https://digitaltwinseval.org/api/webhooks/github-push`
    - **Content type**: `application/json`
    - **Secret**: (same secret as above)
    - **Events**: Select "Pushes" only
@@ -163,7 +163,7 @@ You need **two webhooks** for the full workflow:
 2. Click "New GitHub App"
 3. Configure:
    - **Name:** `Weval Evaluator` (or similar)
-   - **Homepage URL:** `https://weval.org`
+   - **Homepage URL:** `https://digitaltwinseval.org`
    - **Webhook URL:** Leave blank (we use custom webhooks)
    - **Permissions:**
      - Repository permissions → Issues: **Read & Write**
@@ -252,7 +252,7 @@ OPENAI_API_KEY=sk-your_openai_key
 OPENROUTER_API_KEY=sk-or-your_openrouter_key
 
 # App URL
-NEXT_PUBLIC_APP_URL=https://weval.org
+NEXT_PUBLIC_APP_URL=https://digitaltwinseval.org
 ```
 
 **Important Notes:**

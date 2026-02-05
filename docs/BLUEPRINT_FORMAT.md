@@ -1344,7 +1344,7 @@ For production blueprints, always include descriptive IDs for each prompt:
 - Be **specific**: `paris-capital-spelling` not `geography-test`
 - Include **context** when helpful: `udhr-article19-privacy` not just `privacy`
 
-**Sandbox exception:** When using the [Sandbox Studio](https://weval.org/sandbox) for rapid experimentation, prompt IDs are optional and will be auto-generated. This keeps the experimentation workflow frictionless.
+**Sandbox exception:** When using the [Sandbox Studio](https://digitaltwinseval.org/sandbox) for rapid experimentation, prompt IDs are optional and will be auto-generated. This keeps the experimentation workflow frictionless.
 
 ### Use Negative Functions Instead of `should_not`
 
