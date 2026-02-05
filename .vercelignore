@@ -1,0 +1,6 @@
+data/
+scripts/
+tools/
+*.test.ts
+*.test.tsx
+jest.config.*
