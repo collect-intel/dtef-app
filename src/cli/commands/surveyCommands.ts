@@ -10,10 +10,21 @@ import { IterativeProfileHoldoutConfig } from '@/types/surveyEvaluationStrategie
 import { WevalConfig } from '@/types/shared';
 import chalk from 'chalk';
 
+/**
+ * @deprecated This module is deprecated in DTEF.
+ *
+ * The `survey` CLI commands were part of the original Weval platform and generate
+ * per-participant prediction blueprints. DTEF instead uses the `dtef` commands
+ * (see dtef-commands.ts) which generate demographic-aggregate blueprints that
+ * measure how accurately AI models predict survey response distributions across
+ * demographic groups.
+ *
+ * Use `pnpm cli dtef generate` instead of `pnpm cli survey generate`.
+ */
 export function registerSurveyCommands(program: Command) {
     const surveyCommand = program
         .command('survey')
-        .description('Commands for working with survey data and blueprint generation');
+        .description('[DEPRECATED] Legacy Weval survey commands. Use "dtef" commands for DTEF.');
 
     surveyCommand
         .command('generate')

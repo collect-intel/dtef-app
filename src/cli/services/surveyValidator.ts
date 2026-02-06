@@ -6,6 +6,13 @@ export interface ValidationIssue {
     details?: any;
 }
 
+/**
+ * @deprecated This validator is for the legacy per-participant survey format.
+ *
+ * For DTEF demographic survey validation, use the validation in dtef-commands.ts
+ * which validates DTEFSurveyData format instead. This class is preserved for
+ * backward compatibility with the legacy `survey` CLI commands.
+ */
 export class SurveyValidator {
     private issues: ValidationIssue[] = [];
     

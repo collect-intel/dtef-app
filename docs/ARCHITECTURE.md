@@ -1,6 +1,8 @@
-# Weval Architecture and Data Flow
+# Architecture and Data Flow
 
-This document provides a comprehensive overview of the Weval architecture, detailing the distinct workflows that power the platform and the core components that drive evaluation.
+> **Note:** DTEF (Digital Twin Evaluation Framework) is built on the Weval evaluation platform. This document describes the core architecture that powers both systems. While DTEF adds demographic distribution evaluation capabilities, the underlying infrastructure—blueprint processing, storage, CLI, and web dashboard—is inherited from Weval.
+
+This document provides a comprehensive overview of the platform architecture, detailing the distinct workflows that power the system and the core components that drive evaluation.
 
 The system is designed around two primary use cases:
 1.  **The Automated "Public Commons" Workflow**: A continuous integration pipeline that automatically evaluates community-contributed blueprints and updates the public `digitaltwinseval.org` website.
@@ -17,7 +19,7 @@ This workflow describes how community contributions are automatically evaluated 
 ```mermaid
 graph TD
     subgraph "Contribution"
-        A[("fa:fa-user Contributor")] -- Proposes Blueprint --> B{{"fa:fa-github weval/configs<br>GitHub Repo"}}
+        A[("fa:fa-user Contributor")] -- Proposes Blueprint --> B{{"fa:fa-github dtef/configs<br>GitHub Repo"}}
     end
 
     subgraph "Automated Evaluation (Netlify)"
@@ -155,7 +157,7 @@ graph TD;
 
 ### Automated Workflow Components
 These components power the public `digitaltwinseval.org` platform.
--   **`fn: fetch-and-schedule-evals`**: A Netlify cron job that runs weekly. It scans the `weval/configs` repository for new or updated blueprints with the `_periodic` tag and triggers evaluation runs for them.
+-   **`fn: fetch-and-schedule-evals`**: A Netlify cron job that runs weekly. It scans the configs repository for new or updated blueprints with the `_periodic` tag and triggers evaluation runs for them.
 -   **`fn: execute-evaluation-background`**: The Netlify background function that performs the actual evaluation for the public site. It calls the core services and is responsible for creating both the raw result file and updating the aggregate summary files in S3.
 
 ### Interactive Workflow Components

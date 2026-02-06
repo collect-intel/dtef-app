@@ -72,7 +72,7 @@ const AggregateStatsDisplay: React.FC<AggregateStatsDisplayProps> = ({ stats }) 
               <p className="flex items-start">
                 <Icon name="info" className="w-4 h-4 mr-2 text-primary flex-shrink-0" />
                 <span>
-                  <strong>Note on Leaderboard:</strong> Only models that have participated in at least {MIN_CONFIGS_FOR_LEADERBOARD} unique evaluation blueprints are shown. This leaderboard serves ONLY as a commentary on the types of competencies expressed in the blueprints on <strong style={{ textDecoration: 'underline' }}>this deployment</strong> of Weval. It is not a comprehensive or representative sample of all models or skills.
+                  <strong>Note on Leaderboard:</strong> Only models that have participated in at least {MIN_CONFIGS_FOR_LEADERBOARD} unique evaluation blueprints are shown. This leaderboard serves ONLY as a commentary on the types of competencies expressed in the blueprints on <strong style={{ textDecoration: 'underline' }}>this deployment</strong> of DTEF. It is not a comprehensive or representative sample of all models or skills.
                 </span>
               </p>
               <p className="flex items-start">

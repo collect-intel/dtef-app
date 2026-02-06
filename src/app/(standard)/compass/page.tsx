@@ -1,10 +1,14 @@
-import Compass2ClientPage from './client';
-import type { Metadata } from 'next';
+import DeprecatedFeature from '@/app/components/DeprecatedFeature';
 
-export const metadata: Metadata = {
-  title: 'AI Personality Compass',
+export const metadata = {
+  title: 'Deprecated - AI Personality Compass',
 };
 
-export default function Compass2Page() {
-  return <Compass2ClientPage />;
+export default function CompassPage() {
+  return (
+    <DeprecatedFeature
+      featureName="AI Personality Compass"
+      description="The AI personality compass visualization was part of the original Weval research platform. DTEF focuses on demographic survey distribution evaluation instead."
+    />
+  );
 }

@@ -1,8 +1,10 @@
-# Weval Blueprint Format
+# Blueprint Format
 
-This document provides a comprehensive guide to creating evaluation blueprints for the Weval suite. Blueprints are configuration files that define a set of prompts, models to test, and the criteria for evaluating the models' responses.
+> **Note:** DTEF (Digital Twin Evaluation Framework) is built on the Weval blueprint infrastructure. This document describes the core blueprint format used by both systems. DTEF extends this format with demographic-specific fields for distribution evaluation, but all standard blueprint features documented here remain supported.
 
-All blueprints contributed to the public repository at [github.com/weval-org/configs](https://github.com/weval-org/configs) are dedicated to the public domain via Creative Commons Zero (CC0).
+This document provides a comprehensive guide to creating evaluation blueprints. Blueprints are configuration files that define a set of prompts, models to test, and the criteria for evaluating the models' responses.
+
+All blueprints contributed to the public repository at [github.com/collect-intel/dtef-configs](https://github.com/collect-intel/dtef-configs) are dedicated to the public domain via Creative Commons Zero (CC0).
 
 While the system maintains support for a legacy JSON format, the recommended and most user-friendly format is **YAML**.
 

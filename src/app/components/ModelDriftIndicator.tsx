@@ -28,7 +28,7 @@ const ModelDriftIndicator: React.FC<ModelDriftIndicatorProps> = ({ driftInfo }) 
         <Icon name="info" className="w-5 h-5 mr-3 text-sky-500 flex-shrink-0 mt-0.5" />
         <div>
           <span>No significant performance variance detected for any model across identical test runs (same parameters, &gt;= 1 day apart). I.e. no model regressions detected.</span>
-          <p className="text-xs text-muted-foreground/80 mt-1">This suggests model behavior, as measured by Hybrid Score, has remained consistent for repeated evaluations in your dataset. Note: it can be normal for model aliases to not point to the same underlying model, but it is fair to expect that the type of fundamental knowledge that Weval tests for should be consistent.</p>
+          <p className="text-xs text-muted-foreground/80 mt-1">This suggests model behavior, as measured by Hybrid Score, has remained consistent for repeated evaluations in your dataset. Note: it can be normal for model aliases to not point to the same underlying model, but it is fair to expect that the type of fundamental knowledge that DTEF tests for should be consistent.</p>
         </div>
       </div>
     );
@@ -80,7 +80,7 @@ const ModelDriftIndicator: React.FC<ModelDriftIndicatorProps> = ({ driftInfo }) 
             <ul className="list-disc pl-4 mt-1 space-y-0.5">
               <li>An unannounced update to the model by the provider (the most common cause of "drift").</li>
               <li>Changes to the provider's safety filters, which can affect how the model responds.</li>
-              <li><strong>Note:</strong> To provide a reliable signal, Weval's drift detection is carefully controlled. It only considers runs where the models being tested had a <code className="text-xs">temperature</code> of 0, and it uses judge models that are also set to temperature 0 for scoring.</li>
+              <li><strong>Note:</strong> To provide a reliable signal, DTEF's drift detection is carefully controlled. It only considers runs where the models being tested had a <code className="text-xs">temperature</code> of 0, and it uses judge models that are also set to temperature 0 for scoring.</li>
             </ul>
             <p className="mt-2">
               A significant shift warrants investigation to understand if a model's capabilities or safety behavior have changed. To investigate, click the link above and compare the model's responses and coverage scores between the oldest and newest runs.

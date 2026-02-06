@@ -49,7 +49,7 @@ const BrowseAllBlueprintsSection = ({
         <div className="text-center py-10 bg-card/50 dark:bg-card/40 rounded-lg shadow-md">
           <Icon name="package-search" className="w-12 h-12 mx-auto mb-4 text-muted-foreground dark:text-muted-foreground" />
           <p className="text-lg text-muted-foreground dark:text-muted-foreground">No evaluation blueprints found.</p>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">Contribute blueprints to the <a href={`${BLUEPRINT_CONFIG_REPO_URL}/tree/main/blueprints`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Weval Blueprints repository</a>.</p>
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">Contribute blueprints to the <a href={`${BLUEPRINT_CONFIG_REPO_URL}/tree/main/blueprints`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">DTEF Blueprints repository</a>.</p>
         </div>
       ) : (
         <div className="space-y-5 md:space-y-6">

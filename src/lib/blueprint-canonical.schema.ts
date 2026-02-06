@@ -6,7 +6,7 @@
 export const BlueprintCanonicalSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://digitaltwinseval.org/schemas/blueprint-canonical/v1.json',
-  title: 'Weval Blueprint (Canonical Normalized)',
+  title: 'DTEF Blueprint (Canonical Normalized)',
   type: 'object',
   properties: {
     id: { type: 'string' },

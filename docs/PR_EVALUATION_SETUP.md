@@ -1,6 +1,8 @@
 # Automated Evaluation Setup Guide
 
-This guide explains the complete automation system for blueprint evaluations in the `weval-org/configs` repository.
+> **Note:** DTEF (Digital Twin Evaluation Framework) is built on the Weval evaluation platform. This document describes the automated PR evaluation system inherited from Weval for the configs repository.
+
+This guide explains the complete automation system for blueprint evaluations in the configs repository.
 
 ## Overview
 
@@ -132,7 +134,7 @@ You need **two webhooks** for the full workflow:
 
 #### Webhook 1: Pull Requests (Staging)
 
-1. Go to `https://github.com/weval-org/configs/settings/hooks`
+1. Go to your configs repository settings → Webhooks
 2. Click "Add webhook"
 3. Configure:
    - **Payload URL**: `https://digitaltwinseval.org/api/webhooks/github-pr`
@@ -159,10 +161,10 @@ You need **two webhooks** for the full workflow:
 
 #### Create GitHub App
 
-1. Go to `https://github.com/organizations/weval-org/settings/apps`
+1. Go to your organization settings → Developer settings → GitHub Apps
 2. Click "New GitHub App"
 3. Configure:
-   - **Name:** `Weval Evaluator` (or similar)
+   - **Name:** `DTEF Evaluator` (or similar)
    - **Homepage URL:** `https://digitaltwinseval.org`
    - **Webhook URL:** Leave blank (we use custom webhooks)
    - **Permissions:**
@@ -171,7 +173,7 @@ You need **two webhooks** for the full workflow:
    - Uncheck "Active" under Webhook (we handle webhooks separately)
 4. Click "Create GitHub App"
 5. Generate a private key (downloads a `.pem` file)
-6. Install the app on the `weval-org/configs` repository
+6. Install the app on your configs repository
 7. Note the **App ID** and **Installation ID**
 
 #### Store Private Key in AWS Secrets Manager (Recommended for Production)
@@ -182,7 +184,7 @@ You need **two webhooks** for the full workflow:
 ```bash
 # Store the private key in AWS Secrets Manager
 aws secretsmanager create-secret \
-  --name weval/github-app-private-key \
+  --name dtef/github-app-private-key \
   --description "Weval GitHub App private key" \
   --secret-string file://your-private-key.pem \
   --region us-east-1
@@ -191,7 +193,7 @@ aws secretsmanager create-secret \
 **Step 2: Set Netlify Environment Variable**
 ```bash
 # Instead of storing the full key, just store the secret name
-GITHUB_APP_PRIVATE_KEY_SECRET_NAME=weval/github-app-private-key
+GITHUB_APP_PRIVATE_KEY_SECRET_NAME=dtef/github-app-private-key
 ```
 
 The application will automatically fetch the key from Secrets Manager at runtime using your existing AWS credentials.
@@ -262,7 +264,7 @@ NEXT_PUBLIC_APP_URL=https://digitaltwinseval.org
 
 ### 5. Test the Setup
 
-1. Create a test PR to `weval-org/configs` with a blueprint in:
+1. Create a test PR to the configs repository with a blueprint in:
    ```
    blueprints/users/{your-github-username}/test-blueprint.yml
    ```
@@ -365,7 +367,7 @@ export const PR_EVAL_LIMITS: PREvalLimits = {
 
 1. **Fork the repository**:
    ```bash
-   gh repo fork weval-org/configs
+   gh repo fork collect-intel/dtef-configs
    ```
 
 2. **Create a branch**:
@@ -497,7 +499,7 @@ Common errors and solutions:
 
 ### Webhook not triggering
 
-1. Check webhook delivery: `https://github.com/weval-org/configs/settings/hooks`
+1. Check webhook delivery in your configs repository settings → Webhooks
 2. Click on the webhook → "Recent Deliveries"
 3. Check for failures and response codes
 
@@ -638,7 +640,7 @@ pnpm cli scan-unrun-blueprints --run --github-token ghp_your_token
 
 ### How It Works
 
-1. **Fetches all blueprints** from `weval-org/configs` repository
+1. **Fetches all blueprints** from the configs repository
 2. **Calculates content hash** for each blueprint
 3. **Checks S3** for existing results: `live/blueprints/{configId}/{hash}_comparison.json`
 4. **Lists unrun blueprints** that have no matching results
@@ -684,7 +686,7 @@ Total blueprints: 150
 ### Scenario 1: New Contributor Adds Blueprint
 
 ```
-1. Alice forks weval-org/configs
+1. Alice forks the configs repository
 2. Alice creates blueprints/users/alice/medical-qa.yml
 3. Alice opens PR #123
 4. ⚡ PR webhook triggers → Validation → Evaluation
@@ -756,5 +758,5 @@ Potential improvements:
 
 ---
 
-**Last Updated**: 2025-01-09
-**Maintainer**: Weval Team
+**Last Updated**: 2026-02-06
+**Maintainer**: DTEF Team

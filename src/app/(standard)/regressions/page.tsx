@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { RegressionsPageClient } from './RegressionsPageClient';
 
 export const metadata: Metadata = {
-  title: 'Model Regressions - Weval',
+  title: 'Model Regressions - DTEF',
   description: 'Track performance regressions across model versions and releases',
 };
 

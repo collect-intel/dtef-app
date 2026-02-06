@@ -1,6 +1,8 @@
 # Sandbox & Workshops: Technical Guide
 
-This document provides a comprehensive overview of the architecture, implementation details, and design philosophy for Weval's two ephemeral evaluation environments: **Sandbox** and **Workshops**.
+> **Note:** DTEF (Digital Twin Evaluation Framework) is built on the Weval evaluation platform. This document describes the Sandbox and Workshops features inherited from Weval. These ephemeral evaluation environments remain available in DTEF for blueprint testing and collaborative evaluation building.
+
+This document provides a comprehensive overview of the architecture, implementation details, and design philosophy for the two ephemeral evaluation environments: **Sandbox** and **Workshops**.
 
 ## Table of Contents
 
@@ -22,7 +24,7 @@ Weval has three distinct types of evaluation runs, each serving a different purp
 1. **Production Runs** (via `run-config` or cron)
    - Official platform benchmarks
    - Stored in `live/blueprints/{configId}/`
-   - Version-controlled in `weval-org/configs` repository
+   - Version-controlled in configs repository
    - Scheduled/triggered runs for monitoring AI behavior over time
 
 2. **Sandbox Runs** (individual, ephemeral)
@@ -92,7 +94,7 @@ The Sandbox is an interactive, browser-based environment designed for creating, 
 
 #### GitHub Integration (Authenticated Users)
 
-- **Automatic Forking**: Auto-forks `weval-org/configs` on first login
+- **Automatic Forking**: Auto-forks the configs repository on first login
 - **Branch-Based File Management**: Each proposal gets its own `proposal/*` feature branch
 - **Propose Changes**: Create pull requests to public library
 - **PR Status Tracking**: UI shows PR status (open, closed, merged)
@@ -789,6 +791,6 @@ Both features generate ephemeral data that should be periodically cleaned:
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-10-09
-**Authors**: Claude Code (generated), James (reviewed)
+**Document Version**: 1.2
+**Last Updated**: 2026-02-06
+**Authors**: Claude Code (generated), James (reviewed), DTEF Team

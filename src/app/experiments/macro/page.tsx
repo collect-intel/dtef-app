@@ -1,16 +1,14 @@
-'use client';
+import DeprecatedFeature from '@/app/components/DeprecatedFeature';
 
-import React from 'react';
-import MacroViewer from '@/app/experiments/macro/components/MacroViewer';
+export const metadata = {
+  title: 'Deprecated - Macro Canvas',
+};
 
 export default function MacroPage() {
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-2">Macro Canvas</h1>
-      <p className="text-sm text-muted-foreground mb-4">Zoom and pan. Hover shows the mapped config/prompt/model/point.</p>
-      <MacroViewer />
-    </div>
+    <DeprecatedFeature
+      featureName="Macro Canvas"
+      description="The macro visualization canvas was part of the original Weval research platform for exploring evaluation data at scale. DTEF focuses on demographic survey distribution evaluation instead."
+    />
   );
 }
-
-

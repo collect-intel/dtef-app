@@ -1,14 +1,14 @@
-import PainPointsClientPage from './ClientPage';
+import DeprecatedFeature from '@/app/components/DeprecatedFeature';
 
 export const metadata = {
-  title: 'Pain Points',
-  description: 'A summary of the most significant model failures.',
+  title: 'Deprecated - Pain Points',
 };
 
 export default function PainPointsPage() {
   return (
-    <div className="container mx-auto p-4">
-      <PainPointsClientPage />
-    </div>
+    <DeprecatedFeature
+      featureName="Pain Points Analysis"
+      description="The pain points analysis was part of the original Weval research platform for summarizing model failures. DTEF focuses on demographic survey distribution evaluation instead."
+    />
   );
 }

@@ -6,8 +6,8 @@ import { prettifyTag, normalizeTag } from '@/app/utils/tagUtils';
 import { SiteHeader } from '@/app/components/SiteHeader';
 
 export const metadata: Metadata = {
-  title: 'All Tags - Weval',
-  description: 'Browse all evaluation categories and tags used across Weval blueprints.',
+  title: 'All Tags - DTEF',
+  description: 'Browse all evaluation categories and tags used across DTEF blueprints.',
 };
 
 export default async function TagsPage() {

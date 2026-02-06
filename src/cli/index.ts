@@ -101,9 +101,9 @@ getConfig();
 const cli = new Command();
 
 cli
-  .name('weval-cli')
-  .description('CLI tools for Weval, a platform for qualitative and semantic evaluation of language models.')
-  .version('0.8.0');
+  .name('dtef-cli')
+  .description('CLI tools for DTEF (Digital Twin Evaluation Framework) - measuring AI alignment with human perspectives through demographic survey distribution evaluation.')
+  .version('0.9.0');
 
 // Register commands
 cli.addCommand(runConfigCommand);

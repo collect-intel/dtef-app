@@ -7,8 +7,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NavigationEvents } from '@/app/components/NavigationEvents';
 
 export const metadata = {
-  title: 'Weval',
-  description: 'An open-source framework for evaluation.',
+  title: 'DTEF',
+  description: 'Digital Twin Evaluation Framework - measuring AI alignment with human perspectives.',
 };
 
 export const viewport = {

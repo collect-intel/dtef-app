@@ -9,7 +9,12 @@ import { WevalConfig, WevalPromptConfig } from '@/types/shared';
 import { SurveyBlueprintService } from './surveyBlueprintService';
 
 /**
- * Service for generating survey evaluations using different strategies
+ * @deprecated This service generates per-participant evaluation strategies.
+ *
+ * For DTEF demographic distribution evaluation, use the demographicBlueprintService
+ * and demographicAggregationService instead. These strategies test individual
+ * participant prediction accuracy, while DTEF measures distribution accuracy
+ * across demographic segments.
  */
 export class SurveyEvaluationStrategies {
     

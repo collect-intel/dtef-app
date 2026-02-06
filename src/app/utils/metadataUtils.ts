@@ -63,13 +63,13 @@ export async function generateAnalysisPageMetadata(
       title: pageTitle,
       description: description,
       url: `${appUrl}/analysis/${configId}/${runLabel}/${timestamp}`,
-      siteName: 'Weval',
+      siteName: 'DTEF',
       images: [
         {
           url: imageUrl,
           width: 1200,
           height: 630,
-          alt: `Open Graph image for Weval analysis of ${inferredTitle}`,
+          alt: `Open Graph image for DTEF analysis of ${inferredTitle}`,
         },
       ],
       locale: 'en_US',

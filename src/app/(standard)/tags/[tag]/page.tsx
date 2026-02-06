@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: { params: Promise<{ tag: stri
   const { tag } = await params;
   const tagName = decodeURIComponent(tag);
   return {
-    title: `Blueprints tagged "${tagName}" - Weval`,
-    description: `Browse all evaluation blueprints on Weval tagged with "${tagName}".`,
+    title: `Blueprints tagged "${tagName}" - DTEF`,
+    description: `Browse all evaluation blueprints on DTEF tagged with "${tagName}".`,
   };
 }
 

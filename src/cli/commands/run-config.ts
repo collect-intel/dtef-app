@@ -910,7 +910,7 @@ async function runBlueprint(config: ComparisonConfig, options: RunOptions & { fi
             loggerInstance.info('Skipping summary file updates.');
         }
 
-        await loggerInstance.info('Weval run_config command finished successfully.');
+        await loggerInstance.info('DTEF run_config command finished successfully.');
 
         if (options.demoStdout && newResultData) {
             // Emit a compact JSON payload of the result to stdout
@@ -930,7 +930,7 @@ async function runBlueprint(config: ComparisonConfig, options: RunOptions & { fi
         }
     } catch (error: any) {
         const logger = getConfig()?.logger || console;
-        logger.error(`Top-level error in Weval run command: ${error.message}`);
+        logger.error(`Top-level error in DTEF run command: ${error.message}`);
         if (process.env.DEBUG && error.stack) {
             logger.error(`Overall stack trace: ${error.stack}`);
         }
@@ -946,7 +946,7 @@ async function runBlueprint(config: ComparisonConfig, options: RunOptions & { fi
 
 async function actionLocal(options: { config?: string, fixtures?: string, fixturesStrict?: boolean } & RunOptions) {
     const { logger: loggerInstance } = getConfig();
-    loggerInstance.info(`Weval 'run-config local' CLI started. Options received: ${JSON.stringify(options)}`);
+    loggerInstance.info(`DTEF 'run-config local' CLI started. Options received: ${JSON.stringify(options)}`);
     
     try {
         // Check if config path is missing and prompt for it
@@ -976,7 +976,7 @@ async function actionLocal(options: { config?: string, fixtures?: string, fixtur
 
 async function actionGitHub(options: { name?: string, fixtures?: string, fixturesStrict?: boolean } & RunOptions) {
     const { logger: loggerInstance } = getConfig();
-    loggerInstance.info(`Weval 'run-config github' CLI started. Options received: ${JSON.stringify(options)}`);
+    loggerInstance.info(`DTEF 'run-config github' CLI started. Options received: ${JSON.stringify(options)}`);
     
     try {
         // Check if name is missing and prompt for it

@@ -130,7 +130,7 @@ export function createErrorReport(
 function formatErrorReport(report: Omit<ErrorReport, 'formattedReport'>): string {
   const lines: string[] = [
     '═══════════════════════════════════════',
-    '   WEVAL SANDBOX ERROR REPORT',
+    '   DTEF SANDBOX ERROR REPORT',
     '═══════════════════════════════════════',
     '',
     `Error ID: ${report.errorId}`,
@@ -205,7 +205,7 @@ function formatErrorReport(report: Omit<ErrorReport, 'formattedReport'>): string
 
   lines.push('');
   lines.push('═══════════════════════════════════════');
-  lines.push('Please email this report to: support@weval.ai');
+  lines.push('Please report issues at: https://github.com/collect-intel/dtef-app/issues');
   lines.push('═══════════════════════════════════════');
 
   return lines.join('\n');

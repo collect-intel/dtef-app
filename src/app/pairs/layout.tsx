@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'AI Comparison Pairs | Weval',
+  title: 'AI Comparison Pairs | DTEF',
   description: 'Help evaluate AI by comparing model responses side by side',
 };
 

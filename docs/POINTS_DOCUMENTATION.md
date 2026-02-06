@@ -1,6 +1,8 @@
-# Understanding the `should` System
+# Understanding the `should` System (Rubric-Based Evaluation)
 
-This document provides a detailed breakdown of the `should` system (formerly `points` and `expect`), which is the core of Weval's rubric-based evaluation capabilities. It explains how to define evaluation criteria in a blueprint and how the codebase processes them to generate a final score.
+> **Note:** DTEF (Digital Twin Evaluation Framework) is built on the Weval evaluation platform. This document describes Weval's rubric-based evaluation system using `should`/`should_not` blocks. While DTEF primarily uses distribution metrics (`distribution_metric.ts`) for demographic alignment evaluation, the rubric system documented here remains available for hybrid evaluation approaches.
+
+This document provides a detailed breakdown of the `should` system (formerly `points` and `expect`), which is the core of rubric-based evaluation capabilities. It explains how to define evaluation criteria in a blueprint and how the codebase processes them to generate a final score.
 
 > 📘 **For blueprint authoring guidance:** See [BLUEPRINT_FORMAT.md](./BLUEPRINT_FORMAT.md) for the complete specification, including:
 > - How to avoid common pitfalls like single-element nested arrays
@@ -159,7 +161,7 @@ When you run an evaluation, here is the step-by-step journey your `should` defin
 
 The process starts in one of two places:
 *   **Local CLI**: `src/cli/commands/run-config.ts` reads the specified blueprint file (e.g., `my-blueprint.yml`).
-*   **Deployed System**: `netlify/functions/fetch-and-schedule-evals.ts` fetches the raw content of blueprint files from the `weval/configs` GitHub repository.
+*   **Deployed System**: `netlify/functions/fetch-and-schedule-evals.ts` fetches the raw content of blueprint files from the configs GitHub repository.
 
 #### Step 2: Parsing and Normalization (`blueprint-parser.ts`)
 
