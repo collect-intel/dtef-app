@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
+  // Externalize heavy packages from server bundle to reduce Netlify function size
+  serverExternalPackages: [
+    'd3',
+    'reactflow',
+    '@codemirror/lang-yaml',
+    '@uiw/codemirror-theme-github',
+    '@uiw/react-codemirror',
+    'elkjs',
+    'wtf_wikipedia',
+    'wtf-plugin-summary',
+  ],
   webpack(config, { isServer }) {
     config.module.rules.push({
       test: /\.(ico|png|svg)$/,
