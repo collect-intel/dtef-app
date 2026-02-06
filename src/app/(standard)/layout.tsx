@@ -1,3 +1,6 @@
+// Force dynamic rendering for all routes in this layout to reduce build memory
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { SiteFooter } from '@/app/components/SiteFooter';
 import { SiteHeader } from '@/app/components/SiteHeader';
