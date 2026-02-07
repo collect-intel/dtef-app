@@ -76,6 +76,9 @@ google-cloud-*
 # Local Netlify folder
 .netlify
 
+# Build artifacts / generated output
+/output
+
 # Temporary and generated files
 ___*
 *___

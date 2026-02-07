@@ -1,0 +1,1683 @@
+{
+  "surveyId": "global-dialogues-gd2",
+  "surveyName": "Global Dialogues GD2",
+  "description": "Cross-national survey on public perspectives about AI from the GD2 round of Global Dialogues. Conducted via AI-moderated dialogue sessions on Remesh.ai with participants recruited through Prolific.",
+  "source": "Global Dialogues GD2 (https://github.com/collect-intel/global-dialogues)",
+  "questions": {
+    "80e40224-43ef-440c-b8ca-6138a862e509": {
+      "text": "Overall, would you say the increased use of artificial intelligence (AI) in daily life makes you feel…",
+      "type": "single-select",
+      "options": [
+        "More excited than concerned",
+        "Equally concerned and excited",
+        "More concerned than excited"
+      ]
+    },
+    "71118755-4bbd-490e-a64d-fd88e68588bf": {
+      "text": "Do you feel you were able to fully express your views on your culture, your values, and what you want for the future in this conversation? (through what you responded and how you voted)",
+      "type": "single-select",
+      "options": [
+        "Yes – I was able to fully express my views on these topics",
+        "Mostly – I was able to mostly express my views on these topics, but did not have the chance to express a few things.",
+        "Somewhat – I was able to somewhat express my views on these topics, but did not have the chance to express many things.",
+        "No – I was unable to express my views on these topics, and did not have the chance to express most things."
+      ]
+    },
+    "0341ab84-47fe-48de-9277-8119617d35a9": {
+      "text": "Do you feel like you understand yourself better after participating in this conversation?",
+      "type": "single-select",
+      "options": [
+        "Yes",
+        "Maybe a little",
+        "No"
+      ]
+    }
+  },
+  "segments": [
+    {
+      "id": "ageGroup:18-25",
+      "label": "18-25",
+      "attributes": {
+        "ageGroup": "18-25"
+      },
+      "sampleSize": 330,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            32.4,
+            56.4,
+            11.2
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.8,
+            28.5,
+            4.7,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            57,
+            39.7,
+            3.2
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ageGroup:26-35",
+      "label": "26-35",
+      "attributes": {
+        "ageGroup": "26-35"
+      },
+      "sampleSize": 481,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            31,
+            57.4,
+            11.6
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            65.4,
+            29.2,
+            5.4,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            56.8,
+            34.4,
+            8.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ageGroup:36-45",
+      "label": "36-45",
+      "attributes": {
+        "ageGroup": "36-45"
+      },
+      "sampleSize": 187,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            39.6,
+            47.1,
+            13.4
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            62.7,
+            34,
+            2.6,
+            0.7
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            47.7,
+            39.9,
+            12.4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ageGroup:46-55",
+      "label": "46-55",
+      "attributes": {
+        "ageGroup": "46-55"
+      },
+      "sampleSize": 93,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            43,
+            51.6,
+            5.4
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.2,
+            28.6,
+            5.2,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            45.5,
+            40.3,
+            14.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ageGroup:56-65",
+      "label": "56-65",
+      "attributes": {
+        "ageGroup": "56-65"
+      },
+      "sampleSize": 22,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            27.3,
+            50,
+            22.7
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            55,
+            35,
+            10,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            45,
+            35,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gender:female",
+      "label": "Female",
+      "attributes": {
+        "gender": "Female"
+      },
+      "sampleSize": 565,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            28.5,
+            58.8,
+            12.7
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            63.1,
+            32.1,
+            4.9,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            52,
+            37.8,
+            10.2
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gender:male",
+      "label": "Male",
+      "attributes": {
+        "gender": "Male"
+      },
+      "sampleSize": 540,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            38.7,
+            51.1,
+            10.2
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            67.4,
+            27.7,
+            4.7,
+            0.2
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            57,
+            37.3,
+            5.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environment:rural",
+      "label": "Rural",
+      "attributes": {
+        "environment": "Rural"
+      },
+      "sampleSize": 79,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            40.5,
+            54.4,
+            5.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            64.2,
+            29.9,
+            6,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            49.3,
+            38.8,
+            11.9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environment:suburban",
+      "label": "Suburban",
+      "attributes": {
+        "environment": "Suburban"
+      },
+      "sampleSize": 291,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            29.2,
+            57,
+            13.7
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.5,
+            30.6,
+            2.9,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            53.9,
+            38.4,
+            7.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environment:urban",
+      "label": "Urban",
+      "attributes": {
+        "environment": "Urban"
+      },
+      "sampleSize": 750,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            34.5,
+            53.9,
+            11.6
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            64.8,
+            29.6,
+            5.4,
+            0.2
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            54.6,
+            37,
+            8.5
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aiConcern:equally-concerned-and-excited",
+      "label": "Equally concerned and excited",
+      "attributes": {
+        "aiConcern": "Equally concerned and excited"
+      },
+      "sampleSize": 613,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            0,
+            100,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            64.2,
+            30.9,
+            5,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            54.7,
+            39,
+            6.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aiConcern:more-concerned-than-excited",
+      "label": "More concerned than excited",
+      "attributes": {
+        "aiConcern": "More concerned than excited"
+      },
+      "sampleSize": 131,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            0,
+            0,
+            100
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            59,
+            34.3,
+            6.7,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            37.1,
+            44.8,
+            18.1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aiConcern:more-excited-than-concerned",
+      "label": "More excited than concerned",
+      "attributes": {
+        "aiConcern": "More excited than concerned"
+      },
+      "sampleSize": 376,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            100,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            68.8,
+            26.9,
+            4,
+            0.3
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            58.4,
+            32.7,
+            8.9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:buddhism",
+      "label": "Buddhism",
+      "attributes": {
+        "religion": "Buddhism"
+      },
+      "sampleSize": 28,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            57.1,
+            32.1,
+            10.7
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            34.8,
+            52.2,
+            8.7,
+            4.3
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            56.5,
+            39.1,
+            4.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:christianity",
+      "label": "Christianity",
+      "attributes": {
+        "religion": "Christianity"
+      },
+      "sampleSize": 400,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            35,
+            54,
+            11
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            76.6,
+            21.3,
+            2.1,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            63.9,
+            30.5,
+            5.6
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:hinduism",
+      "label": "Hinduism",
+      "attributes": {
+        "religion": "Hinduism"
+      },
+      "sampleSize": 146,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            29.5,
+            62.3,
+            8.2
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            57.3,
+            39.5,
+            3.2,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            71.8,
+            26.6,
+            1.6
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:i-do-not-identify-with-any-religious-group-or-faith",
+      "label": "I do not identify with any religious group or faith",
+      "attributes": {
+        "religion": "I do not identify with any religious group or faith"
+      },
+      "sampleSize": 302,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            34.1,
+            52.3,
+            13.6
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            57.8,
+            34.3,
+            8,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            28.7,
+            53.4,
+            17.9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:islam",
+      "label": "Islam",
+      "attributes": {
+        "religion": "Islam"
+      },
+      "sampleSize": 182,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            30.8,
+            57.7,
+            11.5
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66,
+            27.5,
+            6.5,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            63.4,
+            33.3,
+            3.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:judaism",
+      "label": "Judaism",
+      "attributes": {
+        "religion": "Judaism"
+      },
+      "sampleSize": 31,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            32.3,
+            48.4,
+            19.4
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            50,
+            40.9,
+            9.1,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            31.8,
+            45.5,
+            22.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "religion:other-religious-group",
+      "label": "Other religious group",
+      "attributes": {
+        "religion": "Other religious group"
+      },
+      "sampleSize": 25,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            28,
+            60,
+            12
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            57.1,
+            42.9,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            52.4,
+            33.3,
+            14.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:australia",
+      "label": "Australia",
+      "attributes": {
+        "country": "Australia"
+      },
+      "sampleSize": 14,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            50,
+            42.9,
+            7.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            54.5,
+            45.5,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            54.5,
+            18.2,
+            27.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:bangladesh",
+      "label": "Bangladesh",
+      "attributes": {
+        "country": "Bangladesh"
+      },
+      "sampleSize": 16,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            18.8,
+            75,
+            6.3
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            57.1,
+            42.9,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            42.9,
+            57.1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:brazil",
+      "label": "Brazil",
+      "attributes": {
+        "country": "Brazil"
+      },
+      "sampleSize": 35,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            54.3,
+            37.1,
+            8.6
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            67.7,
+            32.3,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            64.5,
+            29,
+            6.5
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:canada",
+      "label": "Canada",
+      "attributes": {
+        "country": "Canada"
+      },
+      "sampleSize": 31,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            45.2,
+            41.9,
+            12.9
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            44.4,
+            48.1,
+            7.4,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            48.1,
+            48.1,
+            3.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:chile",
+      "label": "Chile",
+      "attributes": {
+        "country": "Chile"
+      },
+      "sampleSize": 48,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            41.7,
+            50,
+            8.3
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            76.2,
+            19,
+            4.8,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            31,
+            52.4,
+            16.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:china",
+      "label": "China",
+      "attributes": {
+        "country": "China"
+      },
+      "sampleSize": 47,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            46.8,
+            53.2,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            31.6,
+            52.6,
+            15.8,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            36.8,
+            55.3,
+            7.9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:egypt",
+      "label": "Egypt",
+      "attributes": {
+        "country": "Egypt"
+      },
+      "sampleSize": 11,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            36.4,
+            36.4,
+            27.3
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            90,
+            0,
+            10,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            60,
+            40,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:france",
+      "label": "France",
+      "attributes": {
+        "country": "France"
+      },
+      "sampleSize": 13,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            23.1,
+            53.8,
+            23.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            58.3,
+            33.3,
+            8.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            16.7,
+            58.3,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:germany",
+      "label": "Germany",
+      "attributes": {
+        "country": "Germany"
+      },
+      "sampleSize": 18,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            38.9,
+            50,
+            11.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.7,
+            16.7,
+            16.7,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            16.7,
+            72.2,
+            11.1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:india",
+      "label": "India",
+      "attributes": {
+        "country": "India"
+      },
+      "sampleSize": 209,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            28.7,
+            60.8,
+            10.5
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            61.5,
+            35.2,
+            3.4,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            68.7,
+            28.5,
+            2.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:indonesia",
+      "label": "Indonesia",
+      "attributes": {
+        "country": "Indonesia"
+      },
+      "sampleSize": 40,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            42.5,
+            47.5,
+            10
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            52.9,
+            41.2,
+            5.9,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            64.7,
+            32.4,
+            2.9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:israel",
+      "label": "Israel",
+      "attributes": {
+        "country": "Israel"
+      },
+      "sampleSize": 43,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            41.9,
+            41.9,
+            16.3
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            53.6,
+            39.3,
+            7.1,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            25,
+            50,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:italy",
+      "label": "Italy",
+      "attributes": {
+        "country": "Italy"
+      },
+      "sampleSize": 13,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            38.5,
+            30.8,
+            30.8
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            83.3,
+            16.7,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            16.7,
+            75,
+            8.3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:japan",
+      "label": "Japan",
+      "attributes": {
+        "country": "Japan"
+      },
+      "sampleSize": 14,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            42.9,
+            57.1,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            50,
+            41.7,
+            8.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            41.7,
+            41.7,
+            16.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:kazakhstan",
+      "label": "Kazakhstan",
+      "attributes": {
+        "country": "Kazakhstan"
+      },
+      "sampleSize": 19,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            31.6,
+            31.6,
+            36.8
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            52.9,
+            47.1,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            23.5,
+            64.7,
+            11.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:kenya",
+      "label": "Kenya",
+      "attributes": {
+        "country": "Kenya"
+      },
+      "sampleSize": 177,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            22.6,
+            70.1,
+            7.3
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            82.8,
+            15.9,
+            1.4,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            83.4,
+            15.9,
+            0.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:korea-south",
+      "label": "Korea South",
+      "attributes": {
+        "country": "Korea South"
+      },
+      "sampleSize": 17,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            47.1,
+            41.2,
+            11.8
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            50,
+            41.7,
+            8.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            33.3,
+            50,
+            16.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:mexico",
+      "label": "Mexico",
+      "attributes": {
+        "country": "Mexico"
+      },
+      "sampleSize": 23,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            30.4,
+            43.5,
+            26.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            72.2,
+            27.8,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            50,
+            44.4,
+            5.6
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:morocco",
+      "label": "Morocco",
+      "attributes": {
+        "country": "Morocco"
+      },
+      "sampleSize": 13,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            38.5,
+            61.5,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            83.3,
+            8.3,
+            8.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            83.3,
+            16.7,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:pakistan",
+      "label": "Pakistan",
+      "attributes": {
+        "country": "Pakistan"
+      },
+      "sampleSize": 23,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            17.4,
+            60.9,
+            21.7
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            46.7,
+            40,
+            13.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            46.7,
+            46.7,
+            6.7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:philippines",
+      "label": "Philippines",
+      "attributes": {
+        "country": "Philippines"
+      },
+      "sampleSize": 19,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            26.3,
+            63.2,
+            10.5
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.7,
+            33.3,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            73.3,
+            26.7,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:russian-federation",
+      "label": "Russian Federation",
+      "attributes": {
+        "country": "Russian Federation"
+      },
+      "sampleSize": 10,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            30,
+            60,
+            10
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            70,
+            30,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            30,
+            50,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:slovakia",
+      "label": "Slovakia",
+      "attributes": {
+        "country": "Slovakia"
+      },
+      "sampleSize": 11,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            18.2,
+            63.6,
+            18.2
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            60,
+            40,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            20,
+            40,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:south-africa",
+      "label": "South Africa",
+      "attributes": {
+        "country": "South Africa"
+      },
+      "sampleSize": 13,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            46.2,
+            53.8,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            72.7,
+            27.3,
+            0,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            63.6,
+            36.4,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:turkey",
+      "label": "Turkey",
+      "attributes": {
+        "country": "Turkey"
+      },
+      "sampleSize": 10,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            30,
+            70,
+            0
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            66.7,
+            16.7,
+            16.7,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            83.3,
+            16.7,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:united-kingdom",
+      "label": "United Kingdom",
+      "attributes": {
+        "country": "United Kingdom"
+      },
+      "sampleSize": 47,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            36.2,
+            46.8,
+            17
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            65.8,
+            28.9,
+            5.3,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            36.8,
+            52.6,
+            10.5
+          ]
+        }
+      ]
+    },
+    {
+      "id": "country:united-states",
+      "label": "United States",
+      "attributes": {
+        "country": "United States"
+      },
+      "sampleSize": 72,
+      "responses": [
+        {
+          "questionId": "80e40224-43ef-440c-b8ca-6138a862e509",
+          "distribution": [
+            25,
+            56.9,
+            18.1
+          ]
+        },
+        {
+          "questionId": "71118755-4bbd-490e-a64d-fd88e68588bf",
+          "distribution": [
+            80,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "questionId": "0341ab84-47fe-48de-9277-8119617d35a9",
+          "distribution": [
+            40,
+            43.3,
+            16.7
+          ]
+        }
+      ]
+    }
+  ]
+}
