@@ -20,7 +20,7 @@ export const BLUEPRINTS_API_URL = `https://api.github.com/repos/${BLUEPRINT_CONF
 const GITHUB_RAW_CONTENT_HEADERS = { 'Accept': 'application/vnd.github.v3.raw' };
 
 /**
- * Fetches a blueprint's content and metadata from the weval/configs GitHub repository by name.
+ * Fetches a blueprint's content and metadata from the configs GitHub repository by name.
  * It will try fetching .yml, .yaml, and .json extensions.
  * @param blueprintName The name of the blueprint (e.g., "my-blueprint").
  * @param githubToken Optional GitHub token for authenticated requests.
@@ -98,7 +98,7 @@ export async function fetchBlueprintContentByName(
 
 /**
  * Lists and fetches all blueprint files inside a given directory (relative to the `blueprints/` root)
- * from the weval/configs GitHub repository.
+ * from the configs GitHub repository.
  *
  * Example: dirName = "foo" or "audits/foo" will match files under
  * blueprints/foo/** and blueprints/audits/foo/** with extensions yml|yaml|json.
@@ -176,7 +176,7 @@ export async function fetchBlueprintsInDirectory(
 }
 
 /**
- * Fetches a model collection (a JSON array of model strings) from the weval/configs GitHub repository.
+ * Fetches a model collection (a JSON array of model strings) from the configs GitHub repository.
  * @param collectionName The name of the collection (e.g., "CORE"), which corresponds to a file like "CORE.json".
  * @param githubToken Optional GitHub token for authenticated requests.
  * @param logger Optional logger instance.

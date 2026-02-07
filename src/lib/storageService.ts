@@ -192,7 +192,7 @@ const SEARCH_INDEX_FILENAME = 'search-index.json';
 const MANIFEST_FILENAME = 'manifest.json';
 const AUTOBACKUP_PREFIX = 'autobackup-before-restore-';
 
-const CACHE_DIR = path.join(os.tmpdir(), 'weval_run_cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'dtef_run_cache');
 
 // Helper to create a safe filename from a model ID
 function getSafeModelId(modelId: string): string {
@@ -567,15 +567,15 @@ function extractWorkshopId(configId: string): string {
 
 /**
  * Build paths for workshop runs.
- * Workshop storage: live/workshop/runs/{workshopId}/{wevalId}/_comparison.json
- * The runBase parameter for workshops is just the wevalId.
+ * Workshop storage: live/workshop/runs/{workshopId}/{evalId}/_comparison.json
+ * The runBase parameter for workshops is just the evalId.
  */
-function workshopPaths(configId: string, wevalId: string, relative: string = '_comparison.json') {
+function workshopPaths(configId: string, evalId: string, relative: string = '_comparison.json') {
   const workshopId = extractWorkshopId(configId);
   // Workshop runs don't use artefacts, everything is in _comparison.json
-  const s3Key = path.join(LIVE_DIR, 'workshop', 'runs', workshopId, wevalId, relative);
+  const s3Key = path.join(LIVE_DIR, 'workshop', 'runs', workshopId, evalId, relative);
   const localPath = path.join(RESULTS_DIR, s3Key);
-  const cachePath = path.join(CACHE_DIR, 'workshop', workshopId, wevalId, relative);
+  const cachePath = path.join(CACHE_DIR, 'workshop', workshopId, evalId, relative);
   return { s3Key, localPath, cachePath };
 }
 
@@ -654,11 +654,11 @@ async function readJsonFromStorage(configId: string, runBase: string, relative: 
  * Fetch the lightweight core.json artefact if present; otherwise fall back to legacy _comparison.json.
  */
 export async function getCoreResult(configId: string, runLabel: string, timestamp: string): Promise<any | null> {
-  // Workshop runs: use wevalId directly, no artefacts
+  // Workshop runs: use evalId directly, no artefacts
   if (isWorkshopRun(configId)) {
-    const wevalId = runLabel; // For workshops, runLabel is the wevalId
-    console.log(`[StorageService] getCoreResult → workshop run ${configId}/${wevalId}, reading _comparison.json`);
-    const workshopData = await readJsonFromStorage(configId, wevalId, '_comparison.json');
+    const evalId = runLabel; // For workshops, runLabel is the evalId
+    console.log(`[StorageService] getCoreResult → workshop run ${configId}/${evalId}, reading _comparison.json`);
+    const workshopData = await readJsonFromStorage(configId, evalId, '_comparison.json');
     if (workshopData) {
       console.log(`[StorageService] getCoreResult → workshop data found (promptIds: ${workshopData.promptIds?.length || 0}, models: ${workshopData.effectiveModels?.length || 0})`);
     }
@@ -686,8 +686,8 @@ export async function getCoreResult(configId: string, runLabel: string, timestam
 export async function getCoverageResult(configId: string, runLabel: string, timestamp: string, promptId: string, modelId: string): Promise<any | null> {
   // Workshop runs: read from _comparison.json
   if (isWorkshopRun(configId)) {
-    const wevalId = runLabel;
-    const workshopData = await readJsonFromStorage(configId, wevalId, '_comparison.json');
+    const evalId = runLabel;
+    const workshopData = await readJsonFromStorage(configId, evalId, '_comparison.json');
     return workshopData?.evaluationResults?.llmCoverageScores?.[promptId]?.[modelId] || null;
   }
 
@@ -707,8 +707,8 @@ export async function getCoverageResult(configId: string, runLabel: string, time
 export async function getPromptResponses(configId: string, runLabel: string, timestamp: string, promptId: string): Promise<Record<string,string> | null> {
   // Workshop runs: read from _comparison.json
   if (isWorkshopRun(configId)) {
-    const wevalId = runLabel;
-    const workshopData = await readJsonFromStorage(configId, wevalId, '_comparison.json');
+    const evalId = runLabel;
+    const workshopData = await readJsonFromStorage(configId, evalId, '_comparison.json');
     if (workshopData?.allFinalAssistantResponses) {
       const decodedPromptId = decodeURIComponent(promptId);
       return workshopData.allFinalAssistantResponses[decodedPromptId] || null;

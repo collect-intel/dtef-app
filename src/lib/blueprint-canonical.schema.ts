@@ -1,4 +1,4 @@
-// Canonical (normalized) schema for Weval blueprints.
+// Canonical (normalized) schema for evaluation blueprints.
 // This describes the post-normalization shape produced by parseAndNormalizeBlueprint.
 // Keep permissive where runtime permits (e.g., assistant content can be null),
 // but prefer strict names (no aliases like promptText/idealResponse here).

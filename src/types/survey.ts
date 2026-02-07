@@ -1,5 +1,5 @@
 /**
- * Survey data structure types for generating Weval Blueprints
+ * Survey data structure types for generating evaluation blueprints
  */
 
 export type QuestionType = 'single-select' | 'multi-select' | 'open-ended' | 'text-content';

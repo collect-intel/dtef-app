@@ -131,11 +131,11 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     // --- End Custom Model Registration ---
 
     const skipSummary = (config as any).skipExecutiveSummary === true;
-    const evalMethods = (config as any)._weval_api_defaults_applied
+    const evalMethods = (config as any)._api_defaults_applied
       ? ['llm-coverage']
       : ['embedding', 'llm-coverage'];
 
-    if ((config as any)._weval_api_defaults_applied) {
+    if ((config as any)._api_defaults_applied) {
       logger.info('API defaults applied: forcing llm-coverage and skipping executive summary.');
     }
 

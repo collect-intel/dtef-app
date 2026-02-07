@@ -15,13 +15,10 @@ export default function HomePageBanner() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center my-10 py-2">
             <h1 className="text-4xl font-bold mb-4">Measuring How Well AI Represents Real Human Perspectives</h1>
-            {/* <p className="max-w-4xl mx-auto text-base sm:text-xl text-foreground/80 dark:text-muted-foreground leading-relaxed">
-            Weval is a collaborative platform to build and share context-specific, nuanced AI evaluations. 
-            </p> */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-          {/* Card 1: Why Weval? */}
+          {/* Card 1: Evaluate What Matters */}
           <div className="bg-card/40 dark:bg-card/40 backdrop-blur-sm p-6 rounded-lg shadow-lg ring-1 ring-border/50 dark:ring-border/50 flex flex-col h-full">
             <div className="flex items-center mb-4">
               <Icon name="scale" className="w-8 h-8 mr-4 text-primary" />

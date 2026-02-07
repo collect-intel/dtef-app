@@ -40,7 +40,7 @@ interface AnalysisProviderProps {
     isSandbox?: boolean;
     sandboxId?: string;
     workshopId?: string;
-    wevalId?: string;
+    evalId?: string;
     children: React.ReactNode;
 }
 
@@ -63,7 +63,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
     isSandbox: isSandboxFromProps,
     sandboxId: sandboxIdFromProps,
     workshopId: workshopIdFromProps,
-    wevalId: wevalIdFromProps,
+    evalId: evalIdFromProps,
     children
 }) => {
     const [latchedInitialData] = useState(initialData);
@@ -512,7 +512,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
         isSandbox,
         sandboxId: sandboxIdFromProps,
         workshopId: workshopIdFromProps,
-        wevalId: wevalIdFromProps,
+        evalId: evalIdFromProps,
         normalizedExecutiveSummary,
         modelPerformanceModal,
         openModelPerformanceModal,
@@ -552,7 +552,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
         canonicalModels, analysisStats, modelEvaluationModal, openModelEvaluationDetailModal,
         closeModelEvaluationDetailModal, resolvedTheme, permutationSensitivityMap,
         promptTextsForMacroTable, currentPromptId, pageTitle, breadcrumbItems, summaryStats,
-        isSandbox, sandboxIdFromProps, workshopIdFromProps, wevalIdFromProps, normalizedExecutiveSummary, modelPerformanceModal,
+        isSandbox, sandboxIdFromProps, workshopIdFromProps, evalIdFromProps, normalizedExecutiveSummary, modelPerformanceModal,
         openModelPerformanceModal, closeModelPerformanceModal, similarityModal, openSimilarityModal, closeSimilarityModal, promptDetailModal,
         openPromptDetailModal, closePromptDetailModal, lazyResponseData, promptSimilarityModal, openPromptSimilarityModal, closePromptSimilarityModal,
         semanticCellModal, openSemanticCellModal, closeSemanticCellModal

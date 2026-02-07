@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         console.log(`[API RUN] No models provided in blueprint. Defaulting to ${defaultModels.length} models.`);
         config.models = defaultModels;
         
-        (config as any)._weval_api_defaults_applied = true;
+        (config as any)._api_defaults_applied = true;
         (config as any).skipExecutiveSummary = true;
         
         if (!config.evaluationConfig) {

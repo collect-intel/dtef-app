@@ -236,7 +236,7 @@ export const handler: BackgroundHandler = async (event) => {
       config.models = ['CORE'];
     }
 
-    // Resolve model collections (e.g., "CORE" -> actual model IDs from weval-org/configs)
+    // Resolve model collections (e.g., "CORE" -> actual model IDs from configs repo)
     logger.info(`Resolving model collections for PR #${prNumber}...`);
     config = await resolveModelsInConfig(config, process.env.GITHUB_TOKEN, logger as SimpleLogger);
     logger.info(`Models after resolution: ${config.models?.length || 0} models - [${(config.models || []).slice(0, 5).join(', ')}${config.models && config.models.length > 5 ? '...' : ''}]`);

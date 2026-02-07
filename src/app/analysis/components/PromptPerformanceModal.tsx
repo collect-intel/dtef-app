@@ -45,7 +45,7 @@ const PromptPerformanceModal: React.FC = () => {
     useEffect(() => {
         if (!promptId) return;
         try {
-            const key = `weval_prompt_performance_expanded_${promptId}`;
+            const key = `dtef_prompt_performance_expanded_${promptId}`;
             const stored = localStorage.getItem(key);
             setIsPromptDetailsExpanded(stored ? stored === '1' : false);
         } catch {}
@@ -56,7 +56,7 @@ const PromptPerformanceModal: React.FC = () => {
         setIsPromptDetailsExpanded(next);
         try {
             if (promptId) {
-                const key = `weval_prompt_performance_expanded_${promptId}`;
+                const key = `dtef_prompt_performance_expanded_${promptId}`;
                 localStorage.setItem(key, next ? '1' : '0');
             }
         } catch {}

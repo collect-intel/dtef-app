@@ -71,7 +71,7 @@ export interface AnalysisContextType {
     isSandbox: boolean;
     sandboxId?: string;
     workshopId?: string;
-    wevalId?: string;
+    evalId?: string;
     normalizedExecutiveSummary: string | null;
 
     // For ModelPerformanceModal

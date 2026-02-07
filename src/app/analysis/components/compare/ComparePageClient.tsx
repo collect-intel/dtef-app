@@ -443,7 +443,7 @@ const ModelResponseCell = ({
 };
 
 export const ComparePageClient: React.FC = () => {
-    const { data, pageTitle, breadcrumbItems, isSandbox, configId, runLabel, timestamp, sandboxId, workshopId, wevalId, fetchModalResponseBatch, openModelEvaluationDetailModal, currentPromptId } = useAnalysis();
+    const { data, pageTitle, breadcrumbItems, isSandbox, configId, runLabel, timestamp, sandboxId, workshopId, evalId, fetchModalResponseBatch, openModelEvaluationDetailModal, currentPromptId } = useAnalysis();
     const [loadingQueue, setLoadingQueue] = useState(() => new Set<string>());
     const [overlayMode, setOverlayMode] = useState(false);
 
@@ -549,13 +549,13 @@ export const ComparePageClient: React.FC = () => {
     }
 
     // Determine the back link - if workshop, link to workshop results; if sandbox, link to sandbox results; otherwise standard analysis
-    const backLink = workshopId && wevalId
-        ? `/workshop/${workshopId}/weval/${wevalId}`
+    const backLink = workshopId && evalId
+        ? `/workshop/${workshopId}/eval/${evalId}`
         : sandboxId
         ? `/sandbox/results/${sandboxId}`
         : `/analysis/${configId}/${runLabel}/${timestamp}`;
 
-    const backLinkText = workshopId && wevalId
+    const backLinkText = workshopId && evalId
         ? 'Back to Workshop Results'
         : sandboxId
         ? 'Back to Results'

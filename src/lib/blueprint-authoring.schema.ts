@@ -1,4 +1,4 @@
-// Authoring schema (permissive) for Weval blueprints.
+// Authoring schema (permissive) for evaluation blueprints.
 // Accepts YAML/JSON authoring variants and aliases; still encourages canonical names.
 
 export const BlueprintAuthoringSchema = {
