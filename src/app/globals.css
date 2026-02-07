@@ -22,34 +22,34 @@
 
 @layer base {
   :root {
-    --background: 42 63% 94%;
-    --foreground: 330 3% 19%;
-    --muted: 0 0% 100%; /* Derived from surface */
-    --muted-foreground: 330 3% 49%; /* Derived from foreground */
-    --popover: 0 0% 100%; /* Same as surface */
-    --popover-foreground: 330 3% 19%; /* Same as foreground */
-    --card: 0 0% 100%; /* Same as surface */
-    --card-foreground: 330 3% 19%; /* Same as foreground */
-    --border: 0 0% 85%; /* Derived from surface */
-    --input: 0 0% 85%; /* Derived from surface */
-    --primary: 167 59% 22%;
+    --background: 150 10% 92%;
+    --foreground: 160 6% 16%;
+    --muted: 150 5% 97%; /* Derived from surface */
+    --muted-foreground: 160 5% 45%; /* Derived from foreground */
+    --popover: 150 5% 99%; /* Same as surface */
+    --popover-foreground: 160 6% 16%; /* Same as foreground */
+    --card: 150 5% 99%; /* Same as surface */
+    --card-foreground: 160 6% 16%; /* Same as foreground */
+    --border: 150 5% 84%; /* Derived from surface */
+    --input: 150 5% 84%; /* Derived from surface */
+    --primary: 152 50% 26%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 95%; /* Same as muted */
-    --secondary-foreground: 330 3% 19%; /* Same as foreground */
-    --accent: 52 69.2% 87.3%;
-    --accent-foreground: 330 3% 19%; /* Same as foreground */
+    --secondary: 150 5% 95%; /* Same as muted */
+    --secondary-foreground: 160 6% 16%; /* Same as foreground */
+    --accent: 38 60% 82%;
+    --accent-foreground: 160 6% 16%; /* Same as foreground */
     --exciting: 320 80% 58%;
     --exciting-foreground: 0 0% 100%;
     --destructive: 8 86% 60%;
     --destructive-foreground: 0 0% 100%;
-    --ring:  167 59% 22%; /* Same as primary */
+    --ring: 152 50% 26%; /* Same as primary */
     --radius: 0.5rem;
-    
+
     /* Custom variables */
-    --header: 47 60% 97%;
-    --surface: 0 0% 100%;
+    --header: 150 12% 96%;
+    --surface: 150 5% 99%;
     --highlight-warning: 46 100% 63.1%;
-    --highlight-warning-foreground: 330 3% 19%;
+    --highlight-warning-foreground: 160 6% 16%;
 
     /* Default chart/highlight colors (can be customized) */
     --chart-1: 220 70% 50%;
@@ -58,23 +58,23 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
     --highlight-info: 200 90% 45%;
-    --highlight-success: 167 59% 22%;
+    --highlight-success: 152 50% 26%;
     --highlight-success-foreground: 0 0% 100%;
     --highlight-error: 8 86% 60%; /* Same as destructive */
     --highlight-error-foreground: 0 0% 100%;
 
     /* Custom Slate Palette */
-    --slate-50: 0 0% 98%;
-    --slate-100: 0 0% 96.5%;
-    --slate-200: 0 0% 91%;
-    --slate-300: 0 0% 83.5%;
-    --slate-400: 0 0% 65%;
-    --slate-500: 0 0% 47%;
-    --slate-600: 0 0% 34%;
-    --slate-700: 0 0% 26.5%;
-    --slate-800: 0 0% 17.5%;
-    --slate-900: 0 0% 11%;
-    --slate-950: 0 0% 5%;
+    --slate-50: 150 5% 98%;
+    --slate-100: 150 5% 96.5%;
+    --slate-200: 150 5% 91%;
+    --slate-300: 150 5% 83.5%;
+    --slate-400: 150 5% 65%;
+    --slate-500: 150 5% 47%;
+    --slate-600: 150 5% 34%;
+    --slate-700: 150 5% 26.5%;
+    --slate-800: 150 5% 17.5%;
+    --slate-900: 150 5% 11%;
+    --slate-950: 150 5% 5%;
 
     /* Coverage Grade Colors - Light Theme OLD OLD OLD */
     /* --coverage-unmet: 0 75% 60%;
@@ -113,33 +113,33 @@
   }
 
   .dark {
-    --background: 330 3% 19%; /* Inverted from light foreground */
-    --foreground: 45 61% 94%; /* Warm cream color #F9F4E6 */
-    --muted: 330 3% 24%; /* Derived from dark background */
-    --muted-foreground: 45 61% 84%; /* Derived from warm foreground */
-    --popover: 330 3% 24%; /* Same as dark surface */
-    --popover-foreground: 45 61% 94%; /* Same as dark foreground */
-    --card: 330 3% 24%; /* Same as dark surface */
-    --card-foreground: 45 61% 94%; /* Same as dark foreground */
-    --border: 330 3% 29%; /* Derived from dark background */
-    --input: 330 3% 29%; /* Derived from dark background */
-    --primary: 166 75% 73%;
-    --primary-foreground: 340 100% 11.4%;
-    --secondary: 330 3% 24%; /* Same as dark muted */
-    --secondary-foreground: 45 61% 94%; /* Same as dark foreground */
-    --accent: 52 69.2% 87.3%; /* Same as light accent */
-    --accent-foreground: 330 3% 19%; /* Dark text for light accent background */
+    --background: 160 8% 15%; /* Deep forest dark */
+    --foreground: 80 15% 92%; /* Warm cream-sage */
+    --muted: 160 8% 20%; /* Derived from dark background */
+    --muted-foreground: 80 10% 75%; /* Derived from foreground */
+    --popover: 160 8% 20%; /* Same as dark surface */
+    --popover-foreground: 80 15% 92%; /* Same as dark foreground */
+    --card: 160 8% 20%; /* Same as dark surface */
+    --card-foreground: 80 15% 92%; /* Same as dark foreground */
+    --border: 160 6% 25%; /* Derived from dark background */
+    --input: 160 6% 25%; /* Derived from dark background */
+    --primary: 150 55% 65%;
+    --primary-foreground: 160 100% 8%;
+    --secondary: 160 8% 20%; /* Same as dark muted */
+    --secondary-foreground: 80 15% 92%; /* Same as dark foreground */
+    --accent: 38 60% 82%; /* Same as light accent */
+    --accent-foreground: 160 8% 15%; /* Dark text for light accent background */
     --exciting: 320 75% 65%;
     --exciting-foreground: 0 0% 100%;
     --destructive: 8 86% 60%; /* Same as light destructive */
     --destructive-foreground: 0 0% 100%;
-    --ring: 166 75% 30%; /* Derived from dark primary */
+    --ring: 150 55% 30%; /* Derived from dark primary */
 
     /* Custom variables */
-    --header: 330 3% 22%; /* Derived from dark background */
-    --surface: 330 3% 24%; /* Derived from dark background */
+    --header: 160 8% 17%; /* Derived from dark background */
+    --surface: 160 8% 20%; /* Derived from dark background */
     --highlight-warning: 46 100% 63.1%; /* Same as light warning */
-    --highlight-warning-foreground: 330 3% 19%;
+    --highlight-warning-foreground: 160 6% 16%;
 
     /* Default chart/highlight colors (can be customized) */
     --chart-1: 217 91% 60%;
@@ -148,23 +148,23 @@
     --chart-4: 270 80% 65%;
     --chart-5: 348 83% 60%;
     --highlight-info: 205 90% 55%;
-    --highlight-success: 167 59% 45%;
-    --highlight-success-foreground: 167 60% 10%;
+    --highlight-success: 150 55% 45%;
+    --highlight-success-foreground: 150 60% 10%;
     --highlight-error: 8 86% 60%; /* Same as destructive */
     --highlight-error-foreground: 0 0% 100%;
 
     /* Custom Slate Palette */
-    --slate-50: 330 3% 98%;
-    --slate-100: 330 3% 96.5%;
-    --slate-200: 330 3% 91%;
-    --slate-300: 330 3% 83.5%;
-    --slate-400: 330 3% 65%;
-    --slate-500: 330 3% 47%;
-    --slate-600: 330 3% 34%;
-    --slate-700: 330 3% 26.5%;
-    --slate-800: 330 3% 17.5%;
-    --slate-900: 330 3% 11%;
-    --slate-950: 330 3% 5%;
+    --slate-50: 160 5% 98%;
+    --slate-100: 160 5% 96.5%;
+    --slate-200: 160 5% 91%;
+    --slate-300: 160 5% 83.5%;
+    --slate-400: 160 5% 65%;
+    --slate-500: 160 5% 47%;
+    --slate-600: 160 5% 34%;
+    --slate-700: 160 5% 26.5%;
+    --slate-800: 160 5% 17.5%;
+    --slate-900: 160 5% 11%;
+    --slate-950: 160 5% 5%;
 
     /* Coverage Grade Colors - Dark Theme OLD OLD OLD */
     /* --coverage-unmet: 0 70% 50%;
