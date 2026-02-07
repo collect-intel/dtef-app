@@ -85,3 +85,6 @@ ___*
 # Sentry
 .sentryclirc
 *.sentry-build-info
+
+# Playwright MCP
+.playwright-mcp
