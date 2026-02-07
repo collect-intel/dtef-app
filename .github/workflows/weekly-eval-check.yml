@@ -1,0 +1,15 @@
+name: Weekly Evaluation Check
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Sunday midnight UTC
+  workflow_dispatch: {}    # Manual trigger button
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger evaluation check
+        run: |
+          curl -sf -X POST \
+            -H "X-Background-Function-Auth-Token: ${{ secrets.BACKGROUND_FUNCTION_AUTH_TOKEN }}" \
+            "${{ secrets.RAILWAY_APP_URL }}/api/internal/fetch-and-schedule-evals"

@@ -130,7 +130,6 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.0.5",
-    "@netlify/functions": "^4.1.15",
     "@next/bundle-analyzer": "^15.5.12",
     "@sentry/cli": "^2.57.0",
     "@tailwindcss/postcss": "^4.1.11",

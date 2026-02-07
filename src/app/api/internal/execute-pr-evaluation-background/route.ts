@@ -1,5 +1,6 @@
-import type { BackgroundHandler } from '@netlify/functions';
+import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { checkBackgroundAuth } from '@/lib/background-function-auth';
 import { getAuthenticatedOctokit, logAuthConfig } from '@/lib/github-auth';
 import { parseAndNormalizeBlueprint } from '@/lib/blueprint-parser';
 import { resolveModelsInConfig, SimpleLogger } from '@/lib/blueprint-service';
@@ -9,13 +10,13 @@ import { normalizeTag } from '@/app/utils/tagUtils';
 import { configure } from '@/cli/config';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
-import { cleanupTmpCache } from '@/lib/cache-service';
 import { getLogger, Logger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
-import { checkBackgroundFunctionAuth } from '@/lib/background-function-auth';
 import { applyPREvalLimits, checkPREvalLimits } from '@/lib/pr-eval-limiter';
 import { getConfigSummary, saveConfigSummary, updateSummaryDataWithNewRun } from '@/lib/storageService';
 import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
+
+export const maxDuration = 300;
 
 const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
 const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
@@ -28,10 +29,6 @@ const s3Client = new S3Client({
   },
 });
 
-/**
- * Sanitize blueprint path for PR evaluation storage/ID
- * blueprints/users/alice/my-blueprint.yml -> alice-my-blueprint
- */
 function sanitizeBlueprintPath(blueprintPath: string): string {
   return blueprintPath
     .replace(/^blueprints\/users\//, '')
@@ -39,27 +36,16 @@ function sanitizeBlueprintPath(blueprintPath: string): string {
     .replace(/\//g, '-');
 }
 
-/**
- * Generate PR-specific config ID using reserved _pr_ prefix
- * Format: _pr_{prNumber}_{sanitized}
- * Example: _pr_123_alice-my-blueprint
- */
 function generatePRConfigId(prNumber: number, blueprintPath: string): string {
   const sanitized = sanitizeBlueprintPath(blueprintPath);
   return `_pr_${prNumber}_${sanitized}`;
 }
 
-/**
- * Generate storage path for PR evaluation
- */
 function getPRStoragePath(prNumber: number, blueprintPath: string): string {
   const sanitized = sanitizeBlueprintPath(blueprintPath);
   return `live/pr-evals/${prNumber}/${sanitized}`;
 }
 
-/**
- * Status updater for PR evaluations
- */
 const getStatusUpdater = (basePath: string, runId: string, logger: Logger) => {
   return async (status: string, message: string, extraData: object = {}) => {
     logger.info(`Updating status for ${runId}: ${status} - ${message}`, extraData);
@@ -73,9 +59,6 @@ const getStatusUpdater = (basePath: string, runId: string, logger: Logger) => {
   };
 };
 
-/**
- * Post completion comment to PR
- */
 async function postCompletionComment(
   prNumber: number,
   blueprintPath: string,
@@ -86,30 +69,29 @@ async function postCompletionComment(
   octokit?: Awaited<ReturnType<typeof getAuthenticatedOctokit>>
 ): Promise<void> {
   try {
-    // Use provided octokit instance or create new one (fallback for error cases)
     const octokitInstance = octokit || await getAuthenticatedOctokit();
     if (!octokit) {
-      logAuthConfig(); // Only log if we had to create a new instance
+      logAuthConfig();
     }
-  const resultsUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
-  const analysisUrl = configId ? `https://digitaltwinseval.org/analysis/${configId}` : null;
+    const resultsUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
+    const analysisUrl = configId ? `https://digitaltwinseval.org/analysis/${configId}` : null;
 
-  let commentBody: string;
+    let commentBody: string;
 
-  if (success) {
-    commentBody =
-      `✅ **Evaluation complete for \`${blueprintPath}\`**\n\n` +
-      `[View evaluation status →](${resultsUrl})` +
-      (analysisUrl ? ` | [**View full analysis →**](${analysisUrl})` : '') +
-      `\n\n` +
-      `The blueprint has been successfully evaluated against all configured models.`;
-  } else {
-    commentBody =
-      `❌ **Evaluation failed for \`${blueprintPath}\`**\n\n` +
-      `[View status →](${resultsUrl})\n\n` +
-      `Error: ${error || 'Unknown error'}\n\n` +
-      `Please check the blueprint syntax and try again.`;
-  }
+    if (success) {
+      commentBody =
+        `✅ **Evaluation complete for \`${blueprintPath}\`**\n\n` +
+        `[View evaluation status →](${resultsUrl})` +
+        (analysisUrl ? ` | [**View full analysis →**](${analysisUrl})` : '') +
+        `\n\n` +
+        `The blueprint has been successfully evaluated against all configured models.`;
+    } else {
+      commentBody =
+        `❌ **Evaluation failed for \`${blueprintPath}\`**\n\n` +
+        `[View status →](${resultsUrl})\n\n` +
+        `Error: ${error || 'Unknown error'}\n\n` +
+        `Please check the blueprint syntax and try again.`;
+    }
 
     await octokitInstance.issues.createComment({
       owner: UPSTREAM_OWNER,
@@ -123,34 +105,21 @@ async function postCompletionComment(
   }
 }
 
-export const handler: BackgroundHandler = async (event) => {
-  // Initialize Sentry
+async function runPRPipeline(body: any) {
   initSentry('execute-pr-evaluation-background');
 
-  // Check authentication
-  const authError = checkBackgroundFunctionAuth(event);
-  if (authError) {
-    console.error('[PR Eval] Authentication failed:', authError);
-    await flushSentry();
-    return;
-  }
-
-  const body = event.body ? JSON.parse(event.body) : {};
   const { runId, prNumber, blueprintPath, blueprintContent, commitSha, author } = body;
 
-  // Set Sentry context
   setContext('prEvaluation', {
     runId,
     prNumber,
     blueprintPath,
     commitSha,
     author,
-    netlifyContext: event.headers?.['x-nf-request-id'],
   });
 
   const logger = await getLogger(`pr-eval:${prNumber}:${runId}`);
 
-  // Configure CLI
   configure({
     errorHandler: (error: Error) => {
       logger.error(`CLI Error: ${error.message}`, error);
@@ -166,8 +135,6 @@ export const handler: BackgroundHandler = async (event) => {
     }
   });
 
-  logger.info(`CLI configured for PR #${prNumber} evaluation`);
-
   if (!runId || !prNumber || !blueprintPath || !blueprintContent) {
     const errorMsg = 'Missing required parameters';
     logger.error(errorMsg, { runId, prNumber, blueprintPath });
@@ -176,10 +143,6 @@ export const handler: BackgroundHandler = async (event) => {
     return;
   }
 
-  // Clean up /tmp cache
-  cleanupTmpCache(100);
-
-  // Determine storage path
   const basePath = getPRStoragePath(prNumber, blueprintPath);
   const updateStatus = getStatusUpdater(basePath, runId, logger);
 
@@ -214,50 +177,39 @@ export const handler: BackgroundHandler = async (event) => {
     await updateStatus('validating', 'Validating blueprint structure...');
     let config = parseAndNormalizeBlueprint(blueprintContent, 'yaml');
 
-    // Generate PR-specific config ID using reserved _pr_ prefix
-    // Format: _pr_{prNumber}_{sanitized}
-    // This allows the analysis page to detect PR evaluations and route to correct storage
     if (config.id) {
-      logger.warn(`Blueprint '${blueprintPath}' contains deprecated 'id' field ('${config.id}'). This will be ignored and replaced with PR-specific ID.`);
+      logger.warn(`Blueprint '${blueprintPath}' contains deprecated 'id' field ('${config.id}'). Replacing with PR-specific ID.`);
     }
     const prConfigId = generatePRConfigId(prNumber, blueprintPath);
-    logger.info(`Generated PR config ID: '${prConfigId}' for PR #${prNumber}, path: '${blueprintPath}'`);
+    logger.info(`Generated PR config ID: '${prConfigId}'`);
     config.id = prConfigId;
 
-    // Use ID as title if title is missing
     if (!config.title) {
-      logger.info(`'title' not found in blueprint. Using derived ID as title: '${config.id}'`);
       config.title = config.id;
     }
 
-    // Set default model collection if none specified
     if (!config.models || config.models.length === 0) {
-      logger.info('No models specified in blueprint. Defaulting to CORE collection for PR evaluation.');
+      logger.info('No models specified. Defaulting to CORE collection for PR evaluation.');
       config.models = ['CORE'];
     }
 
-    // Resolve model collections (e.g., "CORE" -> actual model IDs from configs repo)
     logger.info(`Resolving model collections for PR #${prNumber}...`);
     config = await resolveModelsInConfig(config, process.env.GITHUB_TOKEN, logger as SimpleLogger);
-    logger.info(`Models after resolution: ${config.models?.length || 0} models - [${(config.models || []).slice(0, 5).join(', ')}${config.models && config.models.length > 5 ? '...' : ''}]`);
+    logger.info(`Models after resolution: ${config.models?.length || 0} models`);
 
-    // Verify we have models after resolution
     if (!config.models || config.models.length === 0) {
-      throw new Error('No models available after resolution. Cannot proceed with evaluation.');
+      throw new Error('No models available after resolution.');
     }
 
-    // Apply PR evaluation limits (trim if needed)
+    // Apply PR evaluation limits
     const githubToken = process.env.GITHUB_TOKEN;
     const limitCheck = await checkPREvalLimits(config, githubToken);
 
     if (!limitCheck.allowed) {
       logger.info(`Blueprint exceeds PR limits. Applying limits...`);
-      logger.info(`Original: ${config.prompts?.length || 0} prompts, ${config.models?.length || 0} models`);
-
       config = await applyPREvalLimits(config, githubToken);
-
       logger.info(`After limits: ${config.prompts?.length || 0} prompts, ${config.models?.length || 0} models`);
-      await updateStatus('validating', `Blueprint trimmed to fit PR evaluation limits (${config.prompts?.length || 0} prompts, ${config.models?.length || 0} models)`);
+      await updateStatus('validating', `Blueprint trimmed to fit PR evaluation limits`);
     }
 
     // Register custom models
@@ -270,9 +222,8 @@ export const handler: BackgroundHandler = async (event) => {
     // Sanitize system prompts
     if (Array.isArray(config.system)) {
       if (config.systems && config.systems.length > 0) {
-        logger.warn(`Both 'system' (as an array) and 'systems' are defined. Using 'systems'.`);
+        logger.warn(`Both 'system' (as array) and 'systems' defined. Using 'systems'.`);
       } else {
-        logger.info(`Found 'system' field is an array. Treating it as 'systems' array.`);
         config.systems = config.system;
       }
       config.system = undefined;
@@ -281,11 +232,7 @@ export const handler: BackgroundHandler = async (event) => {
     // Normalize tags
     if (config.tags) {
       const originalTags = [...config.tags];
-      const normalizedTags = [...new Set(originalTags.map(tag => normalizeTag(tag)).filter(tag => tag))];
-      config.tags = normalizedTags;
-      if (originalTags.length !== normalizedTags.length) {
-        logger.info(`Normalized tags from ${originalTags.length} to ${normalizedTags.length}.`);
-      }
+      config.tags = [...new Set(originalTags.map(tag => normalizeTag(tag)).filter(tag => tag))];
     }
 
     // Add PR-specific tags
@@ -297,13 +244,11 @@ export const handler: BackgroundHandler = async (event) => {
     logger.info(`Starting evaluation for blueprint: ${config.id || 'unnamed'}`);
     logger.info(`Models: ${config.models?.length || 0}, Prompts: ${config.prompts?.length || 0}`);
 
-    // Use the standard evaluation pipeline (same as regular evaluations)
-    const evalMethods: EvaluationMethod[] = ['llm-coverage']; // Skip embedding for PR evals
+    const evalMethods: EvaluationMethod[] = ['llm-coverage'];
     const runLabel = `pr-${prNumber}`;
 
     await updateStatus('running_pipeline', 'Starting evaluation pipeline...');
 
-    // Progress callback for generation and evaluation phases
     const progressCallback = async (completed: number, total: number): Promise<void> => {
       try {
         await updateStatus('running_pipeline', `Processing... (${completed}/${total})`, {
@@ -314,33 +259,31 @@ export const handler: BackgroundHandler = async (event) => {
       }
     };
 
-    // Execute pipeline with custom storage path for PR evaluations
     const { data: finalOutput, fileName } = await executeComparisonPipeline(
       config,
       runLabel,
       evalMethods,
       logger,
-      undefined, // existingResponsesMap
-      undefined, // forcePointwiseKeyEval
-      false, // useCache - don't cache PR eval responses
-      commitSha, // Include commit SHA
-      undefined, // blueprintFileName
-      false, // requireExecutiveSummary
-      true, // skipExecutiveSummary - skip for PR evals (faster)
-      undefined, // genOptions
-      undefined, // prefilledCoverage
-      undefined, // fixturesCtx
-      false, // noSave - let pipeline handle optimized artifact saving
-      progressCallback, // Progress updates for generation and evaluation
-      basePath, // customBasePath - save to pr-evals/ location with full artifact structure
+      undefined,
+      undefined,
+      false,
+      commitSha,
+      undefined,
+      false,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      progressCallback,
+      basePath,
     );
 
-    logger.info(`Pipeline complete. Evaluation finished with optimized artifact structure.`);
+    logger.info(`Pipeline complete.`);
 
     await updateStatus('saving', 'Finalizing...');
 
-    // Update config summary using shared abstraction (same as run-config.ts)
-    logger.info('Updating config summary for analysis page...');
+    // Update config summary
     try {
       const existingConfigSummary = await getConfigSummary(prConfigId);
       const existingConfigsArray = existingConfigSummary ? [existingConfigSummary] : null;
@@ -354,34 +297,26 @@ export const handler: BackgroundHandler = async (event) => {
       logger.info(`Config summary saved for ${prConfigId}`);
     } catch (summaryError: any) {
       logger.error(`Failed to update config summary: ${summaryError.message}`);
-      // Non-fatal - evaluation completed successfully even if summary fails
     }
 
-    // Pre-authenticate GitHub for comment posting (avoids re-fetching from Secrets Manager)
+    // Post completion comment
     logger.info('Pre-authenticating GitHub for final operations...');
     const octokit = await getAuthenticatedOctokit();
     logAuthConfig();
 
-    // Finalize: update status and post comment
     const completedAt = new Date().toISOString();
     const resultUrl = `https://digitaltwinseval.org/pr-eval/${prNumber}/${encodeURIComponent(blueprintPath)}`;
 
     await Promise.all([
-      // Update final status
-      updateStatus('complete', 'Evaluation complete!', {
-        completedAt,
-        resultUrl,
-      }),
-
-      // Post success comment to PR with analysis link (reusing authenticated octokit instance)
+      updateStatus('complete', 'Evaluation complete!', { completedAt, resultUrl }),
       postCompletionComment(prNumber, blueprintPath, true, basePath, prConfigId, undefined, octokit),
     ]);
 
-    logger.info(`✅ PR evaluation complete for ${blueprintPath}`);
+    logger.info(`PR evaluation complete for ${blueprintPath}`);
     await flushSentry();
 
   } catch (error: any) {
-    logger.error(`❌ PR evaluation failed:`, error);
+    logger.error(`PR evaluation failed:`, error);
     captureError(error, { runId, prNumber, blueprintPath });
 
     try {
@@ -390,8 +325,6 @@ export const handler: BackgroundHandler = async (event) => {
         stack: error.stack,
         failedAt: new Date().toISOString(),
       });
-
-      // Post failure comment to PR
       await postCompletionComment(prNumber, blueprintPath, false, basePath, error.message);
     } catch (statusError: any) {
       logger.error('Failed to update error status:', statusError);
@@ -399,4 +332,24 @@ export const handler: BackgroundHandler = async (event) => {
 
     await flushSentry();
   }
-};
+}
+
+export async function POST(req: NextRequest) {
+  const authError = checkBackgroundAuth(req);
+  if (authError) return authError;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON in request body.' }, { status: 400 });
+  }
+
+  // Fire and forget
+  runPRPipeline(body).catch(err => {
+    console.error('[execute-pr-evaluation-background] Error:', err);
+    captureError(err);
+  });
+
+  return NextResponse.json({ message: 'Accepted' }, { status: 202 });
+}

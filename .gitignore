@@ -73,8 +73,6 @@ next-env.d.ts
 .env.test
 .cursorignore
 google-cloud-*
-# Local Netlify folder
-.netlify
 
 # Build artifacts / generated output
 /output

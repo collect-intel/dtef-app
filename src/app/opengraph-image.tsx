@@ -13,7 +13,7 @@ export const contentType = 'image/png';
 
 // Image generation
 export default async function Image() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8888' : 'https://digitaltwinseval.org');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3172' : 'https://digitaltwinseval.org');
 
   const geistRegularFontData = fetch(
     new URL('/fonts/Geist-Regular.ttf', appUrl)
