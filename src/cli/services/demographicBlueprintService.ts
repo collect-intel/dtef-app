@@ -285,7 +285,6 @@ export class DemographicBlueprintService {
 
         // Primary point: overall distribution similarity
         points.push({
-            text: `Response distribution matches expected demographic pattern`,
             fn: 'distribution_metric',
             fnArgs: {
                 expected: expectedDistribution,
