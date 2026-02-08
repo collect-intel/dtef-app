@@ -419,7 +419,6 @@ reference:
         test.each([
             ['Invalid JSON syntax', `{"id": "json-fail", "prompts": [}`, 'json', 'Failed to parse JSON blueprint'],
             ['Empty YAML file', ``, 'yaml', 'YAML blueprint is empty or contains only null documents.'],
-            ['Point with text and fn', `- prompt: p\n  should:\n    - point: "t"\n      fn: "f"`, 'yaml', "Point cannot have both 'text' and 'fn' defined"],
             ['Malformed shorthand message', `- prompt: p\n  messages:\n    - { user: "u", assistant: "a" }`, 'yaml', 'Each message in the shorthand format must have exactly one key'],
             ['Invalid multiplier value', `- prompt: p\n  should:\n    - point: "bad weight"\n      weight: 101`, 'yaml', 'Point multiplier must be a number between 0.1 and 10'],
             ['Invalid point format', `- prompt: p\n  should:\n    - 123`, 'yaml', 'Point must be a string, array, or object'],

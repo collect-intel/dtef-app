@@ -182,9 +182,8 @@ function _normalizePointArray(pointsArray: any[], promptId: string | undefined):
         }
 
         // --- Validation and Cleanup for single points ---
-        if (newPoint.fn && newPoint.text) {
-            throw new Error(`Invalid point in prompt '${promptId}': Point cannot have both 'text' and 'fn' defined. Found: ${JSON.stringify(exp)}`);
-        }
+        // When both text and fn are present, fn takes precedence for evaluation;
+        // text is kept as a human-readable label (used for displayText downstream).
         if (!newPoint.fn && !newPoint.text) {
              throw new Error(`Invalid point object in prompt '${promptId}': Point must define 'text', a function ('fn' or '$...'), or a 'Point: Citation' pair. Found: ${JSON.stringify(exp)}`);
         }

@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (fetchConfigError: any) {
-        logger.error(`Error fetching or processing blueprint file ${file.path}`, fetchConfigError);
+        logger.error(`Error fetching or processing blueprint file ${file.path}: ${fetchConfigError?.message || fetchConfigError}`, fetchConfigError?.stack);
         captureError(fetchConfigError, { file: file.path });
       }
     }
