@@ -13,6 +13,7 @@ import { normalizeTag } from '@/app/utils/tagUtils';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
 import { resolveModelsInConfig } from '@/lib/blueprint-service';
+import { configure } from '@/cli/config';
 import { getLogger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
 
@@ -24,6 +25,20 @@ async function runPipeline(requestPayload: any) {
   const requestId = crypto.randomUUID();
   const logger = await getLogger(`eval:bg:${requestId}`);
   logger.info('Background evaluation started.');
+
+  // Initialize CLI config (required before pipeline can call getConfig())
+  configure({
+    errorHandler: (err: Error) => {
+      logger.error(`error: ${err?.message || err}`, err);
+      captureError(err);
+    },
+    logger: {
+      info: (msg: string) => logger.info(msg),
+      warn: (msg: string) => logger.warn(msg),
+      error: (msg: string) => logger.error(msg),
+      success: (msg: string) => logger.info(msg),
+    },
+  });
 
   const config = requestPayload.config as ComparisonConfig;
   const commitSha = requestPayload.commitSha as string | undefined;
