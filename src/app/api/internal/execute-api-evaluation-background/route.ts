@@ -8,6 +8,7 @@ import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
 import { trackStatus } from '@/lib/status-tracker';
 import { configure } from '@/cli/config';
 import { ComparisonConfig, EvaluationMethod } from '@/cli/types/cli_types';
+import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { getLogger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
 
@@ -84,6 +85,10 @@ async function runAPIPipeline(requestPayload: { runId: string; config: Compariso
     const runLabel = contentHash;
 
     logger.info(`Executing pipeline for runId: ${runId} with derived configId: ${configIdForStorage} and runLabel: ${runLabel}`);
+
+    // Resolve model group placeholders (e.g. QUICK → individual model IDs)
+    const resolvedConfig = await resolveModelsInConfig(config, process.env.GITHUB_TOKEN, logger as any);
+    Object.assign(config, resolvedConfig);
 
     // Custom Model Registration
     const customModelDefs = config.models.filter(m => typeof m === 'object') as CustomModelDefinition[];

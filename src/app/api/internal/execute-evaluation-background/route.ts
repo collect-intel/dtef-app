@@ -12,6 +12,7 @@ import { populatePairwiseQueue } from '@/cli/services/pairwise-task-queue-servic
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
+import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { getLogger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
 
@@ -48,6 +49,11 @@ async function runPipeline(requestPayload: any) {
   const currentId = config.id;
   const currentTitle = config.title || config.id;
   logger.info(`Executing evaluation for Blueprint ID: ${currentId}, Title: ${currentTitle}`);
+
+  // Resolve model group placeholders (e.g. QUICK → individual model IDs)
+  const githubToken = process.env.GITHUB_TOKEN;
+  const resolvedConfig = await resolveModelsInConfig(config, githubToken, logger as any);
+  Object.assign(config, resolvedConfig);
 
   // Custom Model Registration
   const customModelDefs = config.models.filter(m => typeof m === 'object') as CustomModelDefinition[];
