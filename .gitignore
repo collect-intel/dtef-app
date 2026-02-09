@@ -86,3 +86,6 @@ ___*
 
 # Playwright MCP
 .playwright-mcp
+
+# Sentry Config File
+.env.sentry-build-plugin
