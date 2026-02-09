@@ -13,6 +13,7 @@ import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { configure } from '@/cli/config';
 import { getLogger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
+import { enqueueEvaluation, getQueueStatus } from '@/lib/evaluation-queue';
 
 export const maxDuration = 300; // 5 minutes max for Railway
 
@@ -145,11 +146,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing config in request body.' }, { status: 400 });
   }
 
-  // Fire and forget
-  runPipeline(body).catch(err => {
-    console.error('[execute-evaluation-background] Error:', err);
-    captureError(err);
-  });
+  const configId = body.config.id || 'unknown';
 
-  return NextResponse.json({ message: 'Accepted' }, { status: 202 });
+  // Enqueue with concurrency limiting (max 3 concurrent evaluations)
+  const { position, queueLength } = enqueueEvaluation(configId, () =>
+    runPipeline(body).catch(err => {
+      console.error(`[execute-evaluation-background] Error for ${configId}:`, err);
+      captureError(err);
+    })
+  );
+
+  const status = getQueueStatus();
+  return NextResponse.json({
+    message: 'Accepted',
+    queue: { position, active: status.active, queued: status.queued },
+  }, { status: 202 });
 }
