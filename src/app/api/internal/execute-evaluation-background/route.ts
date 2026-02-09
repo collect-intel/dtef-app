@@ -5,10 +5,7 @@ import { generateConfigContentHash } from '@/lib/hash-utils';
 import { ComparisonConfig, EvaluationMethod } from '@/cli/types/cli_types';
 import { getResultByFileName } from '@/lib/storageService';
 import { ComparisonDataV2 as FetchedComparisonData } from '@/app/utils/types';
-import path from 'path';
-import { calculateHeadlineStats, calculatePotentialModelDrift } from '@/cli/utils/summaryCalculationUtils';
 import { actionBackfillSummary } from '@/cli/commands/backfill-summary';
-import { populatePairwiseQueue } from '@/cli/services/pairwise-task-queue-service';
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
@@ -92,7 +89,7 @@ async function runPipeline(requestPayload: any) {
   logger.info(`Executing pipeline with evalMethods: ${evalMethods.join(', ')} and cache enabled.`);
 
   const pipelineConfig = { ...config, models: modelIdsToRun };
-  const pipelineOutputKey = await executeComparisonPipeline(
+  const { fileName } = await executeComparisonPipeline(
     pipelineConfig,
     runLabel,
     evalMethods,
@@ -104,23 +101,21 @@ async function runPipeline(requestPayload: any) {
   );
 
   let newResultData: FetchedComparisonData | null = null;
-  let actualResultFileName: string | null = null;
 
-  if (pipelineOutputKey && typeof pipelineOutputKey === 'string') {
-    actualResultFileName = path.basename(pipelineOutputKey);
-    newResultData = await getResultByFileName(currentId, actualResultFileName) as FetchedComparisonData;
+  if (fileName) {
+    newResultData = await getResultByFileName(currentId, fileName) as FetchedComparisonData;
 
     if (!newResultData) {
-      logger.error(`Pipeline completed, result saved to: ${pipelineOutputKey}, but failed to fetch the saved data for summary update.`);
+      logger.error(`Pipeline completed, result saved as: ${fileName}, but failed to fetch the saved data for summary update.`);
     } else {
-      logger.info(`Pipeline completed successfully for ${currentId}. Result Key: ${pipelineOutputKey}.`);
+      logger.info(`Pipeline completed successfully for ${currentId}. Result file: ${fileName}.`);
     }
   } else {
-    logger.error(`Pipeline completed for ${currentId}, but no valid output path/key was returned.`);
+    throw new Error(`Pipeline execution for ${currentId} did not yield a valid output file.`);
   }
 
   // Update summaries if we have results
-  if (newResultData && actualResultFileName && process.env.STORAGE_PROVIDER === 's3') {
+  if (newResultData && process.env.STORAGE_PROVIDER === 's3') {
     try {
       logger.info('New evaluation run completed. Triggering full summary backfill...');
       await actionBackfillSummary({ verbose: false, dryRun: false });
@@ -131,11 +126,7 @@ async function runPipeline(requestPayload: any) {
     }
   }
 
-  if (!pipelineOutputKey) {
-    throw new Error(`Pipeline execution for ${currentId} did not yield a valid output path/key.`);
-  }
-
-  logger.info(`Pipeline tasks completed for ${currentId}. Output: ${pipelineOutputKey}`);
+  logger.info(`Pipeline tasks completed for ${currentId}. Output: ${fileName}`);
   await flushSentry();
 }
 
