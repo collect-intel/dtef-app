@@ -682,12 +682,13 @@ describe('LLMCoverageEvaluator', () => {
             ]));
         });
 
-        it('should throw an error for a point with both `text` and `fn`', async () => {
-            const input = createMockEvaluationInput('prompt-invalid', [
-                { text: 'some text', fn: 'contains', arg: 'word' }
+        it('should treat point with both `text` and `fn` as a function point with text as display label', async () => {
+            const input = createMockEvaluationInput('prompt-text-fn', [
+                { text: 'Display label', fn: 'contains', arg: 'word' }
             ]);
-            await expect(evaluator.evaluate([input])).rejects.toThrow(
-                "Point object cannot have both 'text' and a function ('fn' or idiomatic). Prompt ID: 'prompt-invalid'"
+            const results = await evaluator.evaluate([input]);
+            expect(results[0].scores[0]).toEqual(
+                expect.objectContaining({ keyPointText: 'Display label', isFunction: true })
             );
         });
 

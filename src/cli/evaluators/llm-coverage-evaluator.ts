@@ -163,11 +163,27 @@ export class LLMCoverageEvaluator implements Evaluator {
                         const standardKeys = ['text', 'fn', 'fnArgs', 'arg', 'multiplier', 'citation'];
                         const idiomaticFnName = Object.keys(rest).find(k => !standardKeys.includes(k) && k.startsWith('$'));
 
-                        if (text && (fn || idiomaticFnName)) {
-                            throw new Error(`Point object cannot have both 'text' and a function ('fn' or idiomatic). Prompt ID: '${promptId}'`);
-                        }
+                        if (fn || idiomaticFnName) {
+                            // When both text and fn are present, fn takes precedence; text is used as display label
+                            const fnName = fn || (idiomaticFnName ? idiomaticFnName.substring(1) : undefined);
+                            if (!fnName) {
+                                throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(nestedPoint)}`);
+                            }
 
-                        if (text) {
+                            const effectiveFnArgs = fnArgs ?? arg ?? (idiomaticFnName ? (nestedPoint as any)[idiomaticFnName] : undefined);
+                            const displayLabel = text || `Function: ${fnName}(${JSON.stringify(effectiveFnArgs)})`;
+                            normalizedPoints.push({
+                                id: displayLabel,
+                                displayText: displayLabel,
+                                multiplier: multiplier ?? 1,
+                                citation,
+                                isFunction: true,
+                                functionName: fnName,
+                                functionArgs: effectiveFnArgs,
+                                isInverted,
+                                pathId,
+                            });
+                        } else if (text) {
                             normalizedPoints.push({
                                 id: text,
                                 displayText: text,
@@ -179,24 +195,7 @@ export class LLMCoverageEvaluator implements Evaluator {
                                 pathId,
                             });
                         } else {
-                            const fnName = fn || (idiomaticFnName ? idiomaticFnName.substring(1) : undefined);
-                            if (!fnName) {
-                                throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(nestedPoint)}`);
-                            }
-
-                            const effectiveFnArgs = fnArgs ?? arg ?? (idiomaticFnName ? (nestedPoint as any)[idiomaticFnName] : undefined);
-                            const displayText = `Function: ${fnName}(${JSON.stringify(effectiveFnArgs)})`;
-                            normalizedPoints.push({
-                                id: displayText,
-                                displayText: displayText,
-                                multiplier: multiplier ?? 1,
-                                citation,
-                                isFunction: true,
-                                functionName: fnName,
-                                functionArgs: effectiveFnArgs,
-                                isInverted,
-                                pathId,
-                            });
+                            throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(nestedPoint)}`);
                         }
                     } else {
                         throw new Error(`Invalid nested point definition found in prompt '${promptId}': ${JSON.stringify(nestedPoint)}`);
@@ -212,11 +211,26 @@ export class LLMCoverageEvaluator implements Evaluator {
                 const standardKeys = ['text', 'fn', 'fnArgs', 'arg', 'multiplier', 'citation'];
                 const idiomaticFnName = Object.keys(rest).find(k => !standardKeys.includes(k) && k.startsWith('$'));
 
-                if (text && (fn || idiomaticFnName)) {
-                    throw new Error(`Point object cannot have both 'text' and a function ('fn' or idiomatic). Prompt ID: '${promptId}'`);
-                }
+                if (fn || idiomaticFnName) {
+                    // When both text and fn are present, fn takes precedence; text is used as display label
+                    const fnName = fn || (idiomaticFnName ? idiomaticFnName.substring(1) : undefined);
+                    if (!fnName) {
+                        throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(pointDef)}`);
+                    }
 
-                if (text) {
+                    const effectiveFnArgs = fnArgs ?? arg ?? (idiomaticFnName ? pointDef[idiomaticFnName] : undefined);
+                    const displayLabel = text || `Function: ${fnName}(${JSON.stringify(effectiveFnArgs)})`;
+                    normalizedPoints.push({
+                        id: displayLabel,
+                        displayText: displayLabel,
+                        multiplier: multiplier ?? 1,
+                        citation,
+                        isFunction: true,
+                        functionName: fnName,
+                        functionArgs: effectiveFnArgs,
+                        isInverted,
+                    });
+                } else if (text) {
                     normalizedPoints.push({
                         id: text,
                         displayText: text,
@@ -227,23 +241,7 @@ export class LLMCoverageEvaluator implements Evaluator {
                         isInverted,
                     });
                 } else {
-                    const fnName = fn || (idiomaticFnName ? idiomaticFnName.substring(1) : undefined);
-                    if (!fnName) {
-                        throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(pointDef)}`);
-                    }
-
-                    const effectiveFnArgs = fnArgs ?? arg ?? (idiomaticFnName ? pointDef[idiomaticFnName] : undefined);
-                    const displayText = `Function: ${fnName}(${JSON.stringify(effectiveFnArgs)})`;
-                    normalizedPoints.push({
-                        id: displayText,
-                        displayText: displayText,
-                        multiplier: multiplier ?? 1,
-                        citation,
-                        isFunction: true,
-                        functionName: fnName,
-                        functionArgs: effectiveFnArgs,
-                        isInverted,
-                    });
+                    throw new Error(`Point object must have 'text', 'fn', or an idiomatic function name (starting with $). Found: ${JSON.stringify(pointDef)}`);
                 }
             } else {
                 throw new Error(`Invalid point definition found in prompt '${promptId}': ${JSON.stringify(pointDef)}`);
