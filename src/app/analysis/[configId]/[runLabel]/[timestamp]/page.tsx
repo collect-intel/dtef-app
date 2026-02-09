@@ -40,7 +40,7 @@ export async function generateMetadata(
   );
 }
 
-const getComparisonData = cache(async (params: ThisPageProps['params']): Promise<ComparisonDataV2> => {
+const getComparisonData = cache(async (params: ThisPageProps['params']): Promise<ComparisonDataV2 | null> => {
   const { configId, runLabel, timestamp } = await params;
 
   try {
@@ -56,7 +56,7 @@ const getComparisonData = cache(async (params: ThisPageProps['params']): Promise
     const jsonData = await getResultByFileName(configId, fileName);
     if (!jsonData) {
       console.log(`[Page Fetch] Data not found for file: ${fileName}`);
-      notFound();
+      return null;
     }
 
     console.log(`[Page Fetch] Using full data from storage for ${configId}/${runLabel}/${timestamp}`);
@@ -64,7 +64,7 @@ const getComparisonData = cache(async (params: ThisPageProps['params']): Promise
 
   } catch (error) {
     console.error(`[Page Fetch] Failed to get comparison data for ${configId}/${runLabel}/${timestamp}:`, error);
-    notFound();
+    return null;
   }
 });
 
@@ -72,9 +72,30 @@ export default async function ComparisonPage(props: ThisPageProps) {
   const data = await getComparisonData(props.params);
   const { configId, runLabel, timestamp } = await props.params;
 
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="max-w-lg mx-auto px-6 py-12 text-center">
+          <h1 className="text-2xl font-bold mb-3">Results Not Available</h1>
+          <p className="text-muted-foreground mb-6">
+            This evaluation is either still processing or encountered an error during execution. Results will appear here once the evaluation completes successfully.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href={`/analysis/${configId}`} className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors">
+              View All Runs
+            </a>
+            <a href="/all" className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors">
+              Browse All Evaluations
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <AnalysisProvider 
-        initialData={data} 
+    <AnalysisProvider
+        initialData={data}
         configId={configId}
         runLabel={runLabel}
         timestamp={timestamp}
