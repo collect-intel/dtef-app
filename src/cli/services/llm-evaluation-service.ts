@@ -63,7 +63,7 @@ ${idealResponse}
     // Define default models to try for key point extraction. Can be any supported provider.
     const modelsToTry: string[] = judgeModels && judgeModels.length > 0 ? judgeModels : [
         'openai:gpt-4o-mini',
-        'openrouter:google/gemini-1.5-flash-latest',
+        'openrouter:google/gemini-2.5-flash',
     ]; 
     // These should be sensible defaults if this function is ever called without specific models from a config.
     // However, ideally, the calling context (like LLMCoverageEvaluator) should pass specific models if needed.

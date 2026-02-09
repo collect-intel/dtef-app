@@ -121,9 +121,14 @@ const MODEL_NAME_NORMALIZATIONS: Record<string, string> = {
   'gemini-2.5-flash-preview-05-20': 'gemini-2.5-flash',
   'gemini-2.5-flash-preview': 'gemini-2.5-flash',
   'gemini-2.5-pro-preview': 'gemini-2.5-pro',
-  
-  // Add other model normalizations as needed
-  // 'model-variant-name': 'canonical-name',
+  'gemini-3-flash-preview': 'gemini-3-flash',
+
+  // Claude 4.5+ normalizations
+  'claude-sonnet-4-5-20250929': 'claude-sonnet-4.5',
+  'claude-opus-4-6': 'claude-opus-4.6',
+
+  // DeepSeek normalizations
+  'deepseek-v3.2-exp': 'deepseek-v3.2',
 };
 
 /**
@@ -196,7 +201,7 @@ function normalizeModelBaseId(baseId: string): string {
   }
   
   // OpenAI models
-  if (modelNameLower.includes('gpt-') || modelNameLower.includes('o1-') || modelNameLower.includes('o4-')) {
+  if (modelNameLower.includes('gpt-') || modelNameLower.includes('gpt-oss') || modelNameLower.includes('o1-') || modelNameLower.includes('o4-')) {
     return `openai:${normalizedModelName}`;
   }
   
@@ -452,7 +457,8 @@ export function getModelDisplayLabel(
             .replace(/gpt oss/i, 'GPT OSS')
             .replace('Gpt', 'GPT')
             .replace('A3b', 'A3B')
-            .replace('Glm', 'GLM');
+            .replace('Glm', 'GLM')
+            .replace(/V3\.2/i, 'V3.2');
     }
     
     let baseDisplayName = finalModelName;

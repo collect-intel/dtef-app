@@ -12,12 +12,12 @@ const THOROUGH_MODELS = [
     'openrouter:google/gemini-2.5-flash',
     'openrouter:openai/gpt-4.1',
     'openrouter:openai/gpt-5',
-    'openrouter:anthropic/claude-sonnet-4',
+    'openrouter:anthropic/claude-sonnet-4.5',
     'openrouter:x-ai/grok-4',
     'openrouter:mistralai/mistral-medium-3',
     'openrouter:deepseek/deepseek-r1',
-    'together:meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo',
-    'openrouter:openai/gpt-4o',
+    'openrouter:deepseek/deepseek-v3.2',
+    'openrouter:meta-llama/llama-4-maverick',
 ];
 
 export async function POST(req: Request) {

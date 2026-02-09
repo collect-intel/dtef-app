@@ -56,8 +56,8 @@ export const DEFAULT_JUDGES: Judge[] = [
     },
 
     {
-        id: 'holistic-zai-glm-4.5',
-        model: 'openrouter:z-ai/glm-4.5',
+        id: 'holistic-google-gemini-2.5-flash',
+        model: 'openrouter:google/gemini-2.5-flash',
         approach: 'holistic'
     }
 ];

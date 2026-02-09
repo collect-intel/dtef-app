@@ -164,6 +164,24 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "openai:gpt-5",
           "openrouter:openai/gpt-5"
         ]
+      },
+      {
+        id: "openai:gpt-5.1",
+        name: "GPT-5.1",
+        releaseDate: "2025-10-01", // Estimated
+        aliases: [
+          "openai:gpt-5.1",
+          "openrouter:openai/gpt-5.1"
+        ]
+      },
+      {
+        id: "openai:gpt-5.2",
+        name: "GPT-5.2",
+        releaseDate: "2026-01-01", // Estimated
+        aliases: [
+          "openai:gpt-5.2",
+          "openrouter:openai/gpt-5.2"
+        ]
       }
     ]
   },
@@ -251,6 +269,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "anthropic:claude-3-5-haiku",
           "openrouter:anthropic/claude-3.5-haiku",
           "openrouter:anthropic/claude-3-5-haiku-20241022"
+        ]
+      },
+      {
+        id: "anthropic:claude-haiku-4.5",
+        name: "Claude Haiku 4.5",
+        releaseDate: "2025-10-01", // Estimated
+        aliases: [
+          "anthropic:claude-haiku-4.5",
+          "openrouter:anthropic/claude-haiku-4.5"
         ]
       }
     ]
@@ -350,6 +377,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "anthropic:claude-opus-4.1",
           "openrouter:anthropic/claude-opus-4.1"
         ]
+      },
+      {
+        id: "anthropic:claude-opus-4.6",
+        name: "Claude Opus 4.6",
+        releaseDate: "2026-01-01", // Estimated
+        aliases: [
+          "anthropic:claude-opus-4.6",
+          "openrouter:anthropic/claude-opus-4.6"
+        ]
       }
     ]
   },
@@ -380,6 +416,16 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "google:gemini-2.5-flash-preview-05-20",
           "openrouter:google/gemini-2.5-flash"
         ]
+      },
+      {
+        id: "google:gemini-3-flash",
+        name: "Gemini 3 Flash",
+        releaseDate: "2026-01-01", // Estimated
+        aliases: [
+          "google:gemini-3-flash",
+          "google:gemini-3-flash-preview",
+          "openrouter:google/gemini-3-flash-preview"
+        ]
       }
     ]
   },
@@ -408,6 +454,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "google:gemini-2.5-pro",
           "google:gemini-2.5-pro-preview",
           "openrouter:google/gemini-2.5-pro"
+        ]
+      },
+      {
+        id: "google:gemini-3-pro",
+        name: "Gemini 3 Pro",
+        releaseDate: "2026-01-01", // Estimated
+        aliases: [
+          "google:gemini-3-pro",
+          "openrouter:google/gemini-3-pro"
         ]
       }
     ]
@@ -457,6 +512,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
         aliases: [
           "deepseek:deepseek-chat-v3.1",
           "openrouter:deepseek/deepseek-chat-v3.1"
+        ]
+      },
+      {
+        id: "deepseek:deepseek-v3.2",
+        name: "DeepSeek V3.2",
+        releaseDate: "2025-09-01", // Estimated
+        aliases: [
+          "deepseek:deepseek-v3.2",
+          "openrouter:deepseek/deepseek-v3.2"
         ]
       }
     ]
@@ -565,6 +629,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
           "xai:grok-4-0709",
           "openrouter:x-ai/grok-4",
           "openrouter:xai/grok-4"
+        ]
+      },
+      {
+        id: "xai:grok-4.1-fast",
+        name: "Grok 4.1 Fast",
+        releaseDate: "2026-01-01", // Estimated
+        aliases: [
+          "xai:grok-4.1-fast",
+          "openrouter:x-ai/grok-4.1-fast"
         ]
       }
     ]
@@ -681,6 +754,15 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
         aliases: [
           "z-ai:glm-4.5",
           "openrouter:z-ai/glm-4.5"
+        ]
+      },
+      {
+        id: "z-ai:glm-4.7",
+        name: "GLM 4.7",
+        releaseDate: "2025-12-01", // Estimated
+        aliases: [
+          "z-ai:glm-4.7",
+          "openrouter:z-ai/glm-4.7"
         ]
       }
     ]
