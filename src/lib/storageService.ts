@@ -1143,16 +1143,23 @@ export async function listConfigIds(): Promise<string[]> {
 export async function listRunsForConfig(configId: string): Promise<Array<{ runLabel: string; timestamp: string | null; fileName: string }>> {
   const runs: Array<{ runLabel: string; timestamp: string | null; fileName: string }> = [];
   const parseFileName = (fileName: string) => {
+    // Primary: strict format {runLabel}_{YYYY-MM-DDTHH-MM-SS[-mmm]Z}_comparison.json
     const regex = /^(.*?)_([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-[0-9]{3})?Z)_comparison\.json$/;
     const match = fileName.match(regex);
 
     if (match && match[1] && match[2]) {
       return { runLabel: match[1], timestamp: match[2], fileName };
-    } else {
-      // If no separate timestamp is found, assume the whole baseName (before _comparison.json) is the runLabel
-      const baseNameNoSuffix = fileName.endsWith('_comparison.json') ? fileName.substring(0, fileName.length - '_comparison.json'.length) : fileName;
-      return { runLabel: baseNameNoSuffix, timestamp: null, fileName };
     }
+
+    // Fallback: look for any timestamp-like pattern anywhere in the filename
+    const looseMatch = fileName.match(/^(.*?)_((\d{4}-\d{2}-\d{2}T[\d-]+Z))_comparison\.json$/);
+    if (looseMatch && looseMatch[1] && looseMatch[2]) {
+      return { runLabel: looseMatch[1], timestamp: looseMatch[2], fileName };
+    }
+
+    // Last resort: no timestamp extractable from filename
+    const baseNameNoSuffix = fileName.endsWith('_comparison.json') ? fileName.substring(0, fileName.length - '_comparison.json'.length) : fileName;
+    return { runLabel: baseNameNoSuffix, timestamp: null, fileName };
   };
 
   const basePath = getConfigBasePath(configId);

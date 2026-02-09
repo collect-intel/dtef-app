@@ -68,8 +68,11 @@ const LatestEvaluationRunsSection = ({ latestRuns }: { latestRuns: DisplayableRu
             </thead>
             <tbody className="divide-y divide-border dark:divide-border/40 bg-card dark:bg-card/50">
               {latestRuns.map(run => {
-                const runTimestampForUrl = run.timestamp || '_';
-                const analysisUrl = `/analysis/${run.configId}/${encodeURIComponent(run.runLabel)}/${runTimestampForUrl}`;
+                // If timestamp is available, link directly to the run analysis.
+                // Otherwise, fall back to the run-label page which lists all instances.
+                const analysisUrl = run.timestamp
+                  ? `/analysis/${run.configId}/${encodeURIComponent(run.runLabel)}/${run.timestamp}`
+                  : `/analysis/${run.configId}/${encodeURIComponent(run.runLabel)}`;
                 const blueprintUrl = `/analysis/${run.configId}`;
                 const runLabelUrl = `/analysis/${run.configId}/${encodeURIComponent(run.runLabel)}`;
                 

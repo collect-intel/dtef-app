@@ -78,8 +78,21 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                 limit(async () => {
                     try {
                         const resultData = await getResultByFileName(configId, runInfo.fileName) as FetchedComparisonData;
-                        if (resultData && runInfo.timestamp) {
-                            resultData.timestamp = runInfo.timestamp;
+                        if (resultData) {
+                            if (runInfo.timestamp) {
+                                // Prefer filename-derived timestamp (canonical source)
+                                resultData.timestamp = runInfo.timestamp;
+                            } else if (!resultData.timestamp) {
+                                // Neither filename nor result data has a timestamp —
+                                // last resort: try to extract from the filename more leniently
+                                const isoMatch = runInfo.fileName.match(/(\d{4}-\d{2}-\d{2}T[\d-]+Z)/);
+                                if (isoMatch) {
+                                    resultData.timestamp = isoMatch[1];
+                                    logger.warn(`  Extracted timestamp from filename fallback for ${runInfo.fileName}: ${isoMatch[1]}`);
+                                }
+                            }
+                            // If resultData.timestamp existed already and runInfo.timestamp was null,
+                            // we keep the existing resultData.timestamp as-is.
                         }
                         return { resultData, runInfo };
                     } catch (error: any) {
