@@ -1,7 +1,6 @@
 import type { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react';
 import { generateAnalysisPageMetadata } from '@/app/utils/metadataUtils';
-import { notFound } from 'next/navigation';
 import { ComparisonDataV2 } from '@/app/utils/types';
 import { getResultByFileName, getCoreResult } from '@/lib/storageService';
 import { ClientPage } from './ClientPage';
@@ -41,7 +40,11 @@ export async function generateMetadata(
 }
 
 const getComparisonData = cache(async (params: ThisPageProps['params']): Promise<ComparisonDataV2 | null> => {
-  const { configId, runLabel, timestamp } = await params;
+  const rawParams = await params;
+  // Next.js may not fully decode URL params (e.g. %3A stays encoded for colons)
+  const configId = decodeURIComponent(rawParams.configId);
+  const runLabel = decodeURIComponent(rawParams.runLabel);
+  const timestamp = decodeURIComponent(rawParams.timestamp);
 
   try {
     // Prefer direct core artefact read (works in SSR/Netlify without localhost fetch)
@@ -70,7 +73,10 @@ const getComparisonData = cache(async (params: ThisPageProps['params']): Promise
 
 export default async function ComparisonPage(props: ThisPageProps) {
   const data = await getComparisonData(props.params);
-  const { configId, runLabel, timestamp } = await props.params;
+  const rawParams = await props.params;
+  const configId = decodeURIComponent(rawParams.configId);
+  const runLabel = decodeURIComponent(rawParams.runLabel);
+  const timestamp = decodeURIComponent(rawParams.timestamp);
 
   if (!data) {
     return (

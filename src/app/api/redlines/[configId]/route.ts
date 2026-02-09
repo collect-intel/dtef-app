@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConfigRedlinesFeed } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { configId } = await params;
+    const { configId } = decodeRouteParams(await params);
     
     if (!configId) {
       return NextResponse.json({ error: 'configId is required' }, { status: 400 });

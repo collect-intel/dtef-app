@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSingleModelResponse, getCoreResult, getConversationHistory } from '@/lib/storageService';
 import { WevalConfig } from '@/types/shared';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 type RouteContext = {
     params: Promise<{
@@ -13,7 +14,7 @@ type RouteContext = {
 };
 
 export async function GET(request: Request, context: RouteContext) {
-    const { configId, runLabel, timestamp, promptId, modelId } = await context.params;
+    const { configId, runLabel, timestamp, promptId, modelId } = decodeRouteParams(await context.params);
 
     if (!configId || !runLabel || !timestamp || !promptId || !modelId) {
         return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCoverageResult } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 /**
  * API endpoint that returns full evaluation details for a specific prompt+model combination.
@@ -19,7 +20,7 @@ export async function GET(
   }
 ) {
   try {
-    const { configId, runLabel, timestamp, promptId, modelId } = await context.params;
+    const { configId, runLabel, timestamp, promptId, modelId } = decodeRouteParams(await context.params);
 
     // Decode URL-encoded parameters
     const decodedPromptId = decodeURIComponent(promptId);

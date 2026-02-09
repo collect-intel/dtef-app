@@ -56,7 +56,8 @@ export async function generateMetadata(
   props: ThisPageGenerateMetadataProps,
   _parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const { configId } = await props.params;
+  const { configId: rawConfigId } = await props.params;
+  const configId = decodeURIComponent(rawConfigId);
   try {
     const data = await getConfigRunsData(configId);
     const titleBase = data.configTitle || configId;
@@ -74,10 +75,11 @@ export async function generateMetadata(
 
 export default async function ConfigRunsPage({ params }: ThisPageProps) {
   const thisParams = await params;
-  const data = await getConfigRunsData(thisParams.configId);
+  const configId = decodeURIComponent(thisParams.configId);
+  const data = await getConfigRunsData(configId);
   return (
-    <ConfigRunsClientPage 
-      configId={thisParams.configId} 
+    <ConfigRunsClientPage
+      configId={configId} 
       configTitle={data.configTitle || 'Unknown Configuration'}
       description={data.configDescription || undefined}
       tags={data.configTags || undefined}

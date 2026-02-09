@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 /**
  * @deprecated This API route is no longer used for rendering analysis pages.
@@ -9,7 +10,7 @@ export async function GET(
     request: NextRequest, 
     context: { params: Promise<{ configId: string, runLabel: string, timestamp: string }> } 
 ) {
-    const { configId, runLabel, timestamp } = await context.params;
+    const { configId, runLabel, timestamp } = decodeRouteParams(await context.params);
     const key = `${configId}/${runLabel}/${timestamp}`;
     
     console.error(

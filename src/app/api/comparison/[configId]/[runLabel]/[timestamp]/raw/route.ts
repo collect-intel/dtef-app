@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResultByFileName, listRunsForConfig } from '@/lib/storageService';
 import type { ComparisonDataV2 } from '@/app/utils/types';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 3600; // Cache for 1 hour
 
@@ -13,7 +14,7 @@ export async function GET(
   context: { params: Promise<{ configId: string; runLabel: string; timestamp: string }> }
 ) {
   try {
-    const { configId, runLabel, timestamp } = await context.params;
+    const { configId, runLabel, timestamp } = decodeRouteParams(await context.params);
 
     // Get all runs for this config to find the specific file
     const allRuns = await listRunsForConfig(configId);

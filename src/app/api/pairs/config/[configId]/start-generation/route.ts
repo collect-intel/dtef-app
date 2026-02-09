@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/utils/logger';
 import { getGenerationStatus, updateGenerationStatus } from '@/cli/services/pairwise-task-queue-service';
 import { callBackgroundFunction } from '@/lib/background-function-client';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 0;
 
@@ -10,7 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ configId: string }> }
 ) {
   const logger = await getLogger('pairs:start-generation');
-  const { configId } = await params;
+  const { configId } = decodeRouteParams(await params);
 
   try {
     if (!configId) {

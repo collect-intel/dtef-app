@@ -44,6 +44,8 @@ const getRunLabelInstancesData = cache(async (configId: string, runLabel: string
 
 export default async function RunLabelInstancesPage({ params }: ThisPageProps) {
   const thisParams = await params;
-  const data = await getRunLabelInstancesData(thisParams.configId, thisParams.runLabel);
-  return <RunLabelInstancesClientPage configId={thisParams.configId} runLabel={thisParams.runLabel} data={data} />;
+  const configId = decodeURIComponent(thisParams.configId);
+  const runLabel = decodeURIComponent(thisParams.runLabel);
+  const data = await getRunLabelInstancesData(configId, runLabel);
+  return <RunLabelInstancesClientPage configId={configId} runLabel={runLabel} data={data} />;
 } 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCoreResult } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 import { ComparisonDataV2 } from '@/app/utils/types';
 
 // Lightweight version of IndividualJudgement (no bulky reflection text)
@@ -50,7 +51,7 @@ export async function GET(
   context: { params: Promise<{ configId: string; runLabel: string; timestamp: string }> }
 ) {
   try {
-    const { configId, runLabel, timestamp } = await context.params;
+    const { configId, runLabel, timestamp } = decodeRouteParams(await context.params);
 
     // Fetch lightweight core data (artefact aware)
     const fullData = await getCoreResult(configId, runLabel, timestamp) as ComparisonDataV2;

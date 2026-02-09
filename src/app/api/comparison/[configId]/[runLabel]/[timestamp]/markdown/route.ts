@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listRunsForConfig, getResultByFileName } from '@/lib/storageService';
 import { generateRunMarkdown } from '@/app/utils/markdownGenerator';
 import { ComparisonDataV2 } from '@/app/utils/types';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 3600;
 
@@ -9,7 +10,7 @@ export async function GET(
     request: NextRequest, 
     context: { params: Promise<{ configId: string, runLabel: string, timestamp: string }> } 
 ) {
-    const { configId, runLabel: routeRunLabel, timestamp: routeTimestamp } = await context.params;
+    const { configId, runLabel: routeRunLabel, timestamp: routeTimestamp } = decodeRouteParams(await context.params);
 
     if (typeof configId !== 'string' || typeof routeRunLabel !== 'string' || typeof routeTimestamp !== 'string') {
         return NextResponse.json({ error: 'Config ID, Run Label, and Timestamp must be strings' }, { status: 400 });

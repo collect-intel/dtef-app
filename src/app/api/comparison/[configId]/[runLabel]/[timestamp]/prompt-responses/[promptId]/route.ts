@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPromptResponses } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 
 /**
@@ -18,7 +19,7 @@ export async function GET(
   }
 ) {
   try {
-    const { configId, runLabel, timestamp, promptId } = await context.params;
+    const { configId, runLabel, timestamp, promptId } = decodeRouteParams(await context.params);
 
     // Decode URL-encoded parameter
     const decodedPromptId = decodeURIComponent(promptId);

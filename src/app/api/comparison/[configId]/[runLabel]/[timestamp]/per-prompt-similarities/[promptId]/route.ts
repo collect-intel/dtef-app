@@ -4,6 +4,7 @@ import { ComparisonDataV2 } from '@/app/utils/types';
 import { buildBaseSimilarityMatrix } from '@/app/utils/calculationUtils';
 import { IDEAL_MODEL_ID } from '@/app/utils/calculationUtils';
 import { parseModelIdForDisplay } from '@/app/utils/modelIdUtils';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 /**
  * Returns the per-prompt embedding similarity matrix for a given prompt.
@@ -15,7 +16,7 @@ export async function GET(
   context: { params: Promise<{ configId: string; runLabel: string; timestamp: string; promptId: string }> }
 ) {
   try {
-    const { configId, runLabel, timestamp, promptId } = await context.params;
+    const { configId, runLabel, timestamp, promptId } = decodeRouteParams(await context.params);
     const decodedPromptId = decodeURIComponent(promptId);
 
     const fileName = `${runLabel}_${timestamp}_comparison.json`;

@@ -41,7 +41,10 @@ export async function generateMetadata(
 }
 
 const getComparisonData = cache(async (params: ThisPageProps['params']): Promise<ComparisonDataV2> => {
-  const { configId, runLabel, timestamp } = await params;
+  const rawParams = await params;
+  const configId = decodeURIComponent(rawParams.configId);
+  const runLabel = decodeURIComponent(rawParams.runLabel);
+  const timestamp = decodeURIComponent(rawParams.timestamp);
 
   try {
     const core = await getCoreResult(configId, runLabel, timestamp);
@@ -67,7 +70,10 @@ const getComparisonData = cache(async (params: ThisPageProps['params']): Promise
 
 export default async function ConversationThreadPage(props: ThisPageProps) {
   const data = await getComparisonData(props.params);
-  const { configId, runLabel, timestamp } = await props.params;
+  const rawParams = await props.params;
+  const configId = decodeURIComponent(rawParams.configId);
+  const runLabel = decodeURIComponent(rawParams.runLabel);
+  const timestamp = decodeURIComponent(rawParams.timestamp);
 
   return (
     <AnalysisProvider 

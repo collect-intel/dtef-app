@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSingleModelResponse, getCoreResult } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 /**
  * API endpoint that returns all response data for a specific model across all prompts.
@@ -17,7 +18,7 @@ export async function GET(
   }
 ) {
   try {
-    const { configId, runLabel, timestamp, modelId } = await context.params;
+    const { configId, runLabel, timestamp, modelId } = decodeRouteParams(await context.params);
 
     // Decode URL-encoded parameter
     const decodedModelId = decodeURIComponent(modelId);

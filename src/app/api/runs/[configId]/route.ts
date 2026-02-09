@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConfigSummary } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 3600;
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export async function GET(
     request: NextRequest,
     context: { params: Promise<{ configId: string }> } 
 ) {
-    const params = await context.params;
+    const params = decodeRouteParams(await context.params);
     const { configId } = params;
     const { searchParams } = new URL(request.url);
     const runLabelFilter = searchParams.get('runLabel');

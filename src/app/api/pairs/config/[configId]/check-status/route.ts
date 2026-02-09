@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGenerationStatus, getConfigTaskCount, GenerationStatus } from '@/cli/services/pairwise-task-queue-service';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 0;
 
@@ -14,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { configId } = await params;
+    const { configId } = decodeRouteParams(await params);
     console.log(`[check-status] Starting status check for configId: ${configId}`);
 
     if (!configId) {

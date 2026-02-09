@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCoreResult, getCoverageResult } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 /**
  * Batch endpoint: returns evaluation details for ALL models for a given prompt.
@@ -17,7 +18,7 @@ export async function GET(
   }
 ) {
   try {
-    const { configId, runLabel, timestamp, promptId } = await context.params;
+    const { configId, runLabel, timestamp, promptId } = decodeRouteParams(await context.params);
 
     const decodedPromptId = decodeURIComponent(promptId);
 

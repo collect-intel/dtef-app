@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSingleModelResponse } from '@/lib/storageService';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 type RouteContext = {
     params: Promise<{
@@ -14,7 +15,7 @@ type BatchRequestBody = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-    const { configId, runLabel, timestamp } = await context.params;
+    const { configId, runLabel, timestamp } = decodeRouteParams(await context.params);
 
     try {
         const { pairs }: BatchRequestBody = await request.json();

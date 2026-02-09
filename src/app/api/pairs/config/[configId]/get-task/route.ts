@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { PairwiseTask } from '@/cli/services/pairwise-task-queue-service';
+import { decodeRouteParams } from '@/app/utils/decodeParams';
 
 export const revalidate = 0;
 
@@ -33,7 +34,7 @@ export async function GET(
   console.log('[get-task] Route handler called');
   try {
     console.log('[get-task] Awaiting params...');
-    const { configId } = await params;
+    const { configId } = decodeRouteParams(await params);
     console.log('[get-task] Got configId:', configId);
 
     if (!configId) {

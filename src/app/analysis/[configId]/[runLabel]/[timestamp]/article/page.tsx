@@ -10,7 +10,10 @@ type ThisPageProps = {
 };
 
 const getRunData = cache(async (params: ThisPageProps['params']): Promise<WevalResult> => {
-  const { configId, runLabel, timestamp } = await params;
+  const rawParams = await params;
+  const configId = decodeURIComponent(rawParams.configId);
+  const runLabel = decodeURIComponent(rawParams.runLabel);
+  const timestamp = decodeURIComponent(rawParams.timestamp);
   try {
     const core = await getCoreResult(configId, runLabel, timestamp);
     if (core) return core as WevalResult;
