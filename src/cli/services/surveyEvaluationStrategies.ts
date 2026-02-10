@@ -137,7 +137,7 @@ export class SurveyEvaluationStrategies {
         contextQuestionIds: string[],
         anchorQuestionIds: string[],
         stageName: string
-    ): WevalConfig[] {
+    ): Promise<WevalConfig[]> {
         const { survey } = config;
         
         // Create prompts for ALL anchor questions
@@ -187,7 +187,7 @@ export class SurveyEvaluationStrategies {
         anchorQuestionId: string,
         contextQuestionIds: string[],
         includeDemographics: boolean
-    ): WevalPromptConfig {
+    ): Promise<WevalPromptConfig> {
         // Build the configuration for the survey blueprint service
         const blueprintConfig: SurveyBlueprintConfig = {
             survey,

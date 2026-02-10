@@ -145,6 +145,7 @@ function createAssessmentFromResult(result: PointFunctionReturn, point: Normaliz
         citation: point.citation,
         isInverted: point.isInverted,
         pathId: point.pathId,
+        evaluationType: 'computational',
         reflection,
         error,
     };

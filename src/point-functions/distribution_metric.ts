@@ -31,7 +31,7 @@ interface DistributionMetricArgs {
  *   45.2, 30.1, 15.5, 9.2
  *   45.2%, 30.1%, 15.5%, 9.2%
  */
-function parseDistribution(text: string): number[] | null {
+export function parseDistribution(text: string): number[] | null {
     // Try JSON array format first: [45.2, 30.1, 15.5, 9.2]
     const bracketMatch = text.match(/\[([^\]]+)\]/);
     if (bracketMatch) {
@@ -75,7 +75,7 @@ function parseDistribution(text: string): number[] | null {
 /**
  * Normalize a distribution to sum to 1.0 (probability distribution).
  */
-function normalize(dist: number[]): number[] {
+export function normalize(dist: number[]): number[] {
     const sum = dist.reduce((a, b) => a + b, 0);
     if (sum === 0) return dist.map(() => 1 / dist.length);
     return dist.map(v => v / sum);

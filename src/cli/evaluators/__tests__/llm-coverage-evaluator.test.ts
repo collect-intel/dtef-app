@@ -686,8 +686,12 @@ describe('LLMCoverageEvaluator', () => {
             const input = createMockEvaluationInput('prompt-text-fn', [
                 { text: 'Display label', fn: 'contains', arg: 'word' }
             ]);
-            const results = await evaluator.evaluate([input]);
-            expect(results[0].scores[0]).toEqual(
+            const result = await evaluator.evaluate([input]);
+            const model1Result = result.llmCoverageScores?.['prompt-text-fn']?.['model1'];
+            expect(model1Result).toBeDefined();
+            expect(model1Result).not.toHaveProperty('error');
+            const successResult = model1Result as Exclude<CoverageResult, { error: string } | null>;
+            expect(successResult.pointAssessments?.[0]).toEqual(
                 expect.objectContaining({ keyPointText: 'Display label', isFunction: true })
             );
         });

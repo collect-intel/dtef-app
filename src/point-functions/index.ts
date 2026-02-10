@@ -33,8 +33,9 @@ import { icontains_word } from './icontains_word';
 import { not_contains_word } from './not_contains_word';
 import { not_icontains_word } from './not_icontains_word';
 
-// Import DTEF distribution metric
+// Import DTEF distribution metric and per-option accuracy
 import { distribution_metric } from './distribution_metric';
+import { per_option_accuracy } from './per_option_accuracy';
 
 // Import negative variants
 import { not_contains } from './not_contains';
@@ -126,9 +127,11 @@ export const pointFunctions: Record<string, PointFunction> = {
     not_iends_with,
     not_iend_with: not_iends_with,
 
-    // DTEF distribution metric
+    // DTEF distribution metric and per-option accuracy
     distribution_metric,
     dist_metric: distribution_metric,
+    per_option_accuracy,
+    option_accuracy: per_option_accuracy,
 
     // Negative Unicode-aware word boundary functions
     not_contains_word,

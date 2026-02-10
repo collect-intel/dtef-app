@@ -76,6 +76,8 @@ export interface PointAssessment {
     individualJudgements?: IndividualJudgement[];
     isInverted?: boolean;
     pathId?: string; // Used for alternative paths (OR logic)
+    /** Indicates whether this assessment was computed by a function or judged by an LLM */
+    evaluationType?: 'computational' | 'llm-judge';
 }
 
 // A container for the results of an llm-coverage evaluation for a single

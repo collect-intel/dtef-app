@@ -108,7 +108,7 @@ export class SurveyValidator {
             }
             
             // Validate that text-content doesn't have options
-            if (question.type === 'text-content' && question.options) {
+            if (question.type === 'text-content' && (question as any).options) {
                 this.addWarning(`Text-content question ${question.id} should not have options`);
             }
         }

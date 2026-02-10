@@ -1051,6 +1051,7 @@ Output: <reflection>The text mentions empathy, which means the criterion is MET 
                                     citation: point.citation,
                                     isInverted: point.isInverted,
                                     pathId: point.pathId,
+                                    evaluationType: 'llm-judge',
                                 } as PointAssessment;
                             });
 

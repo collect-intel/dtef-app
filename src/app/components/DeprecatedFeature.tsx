@@ -24,7 +24,7 @@ export default function DeprecatedFeature({
     <div className="min-h-[60vh] flex items-center justify-center p-8">
       <div className="max-w-lg text-center">
         <div className="mb-6">
-          <Icon name="archive" className="w-16 h-16 mx-auto text-muted-foreground/50" />
+          <Icon name="package-search" className="w-16 h-16 mx-auto text-muted-foreground/50" />
         </div>
         <h1 className="text-2xl font-bold mb-4 text-foreground">
           {featureName}

@@ -425,7 +425,8 @@ const MacroCoverageTable: React.FC = () => {
                     const segmentWidthPercent = totalMultiplier > 0 ? (pointMultiplier / totalMultiplier) * 100 : (1 / nKeyPoints) * 100;
                     
                     let pointTooltip = `T ${temp} - Criterion ${index + 1}: "${assessment.keyPointText}"`;
-                    
+                    pointTooltip += `\nScoring: ${(assessment as any).evaluationType === 'computational' ? 'Computational' : 'LLM Judge'}`;
+
                     if ((assessment as any).isInverted) {
                         pointTooltip += `\nType: Should NOT be present`;
                         pointTooltip += `\nStatus: ${isConsideredPresent ? 'Passed (Not Present)' : 'VIOLATION (Present)'}`;
@@ -725,7 +726,7 @@ const MacroCoverageTable: React.FC = () => {
                 const isBestPath = assessment.pathId === bestPathId;
                 
                 let pointTooltip = `(model: ${getModelDisplayLabel(parsedModelsMap[modelId])})\n`;
-                
+
                 if (pathLabel) {
                     pointTooltip += `${pathLabel} - Criterion ${index + 1}: "${assessment.keyPointText}"`;
                     if (assessment.pathId === bestPathId) {
@@ -734,6 +735,7 @@ const MacroCoverageTable: React.FC = () => {
                 } else {
                     pointTooltip += `Criterion ${originalIndex + 1}: "${assessment.keyPointText}"`;
                 }
+                pointTooltip += `\nScoring: ${(assessment as any).evaluationType === 'computational' ? 'Computational' : 'LLM Judge'}`;
 
                 if ((assessment as any).isInverted) {
                     pointTooltip += `\nType: Should NOT be present`;
@@ -819,6 +821,7 @@ const MacroCoverageTable: React.FC = () => {
                             const segmentWidthPercent = totalMultiplier > 0 ? (pointMultiplier / totalMultiplier) * 100 : (1 / nKeyPoints) * 100;
                             
                             let pointTooltip = `(model: ${getModelDisplayLabel(parsedModelsMap[modelId])})\nCriterion ${index + 1}/${nKeyPoints}: "${assessment.keyPointText}"`;
+                            pointTooltip += `\nScoring: ${(assessment as any).evaluationType === 'computational' ? 'Computational' : 'LLM Judge'}`;
 
                             if ((assessment as any).isInverted) {
                                 pointTooltip += `\nType: Should NOT be present`;

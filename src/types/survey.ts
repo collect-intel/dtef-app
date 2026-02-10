@@ -8,6 +8,7 @@ export interface BaseQuestion {
     id: string;
     type: QuestionType;
     text: string;
+    order?: number;
 }
 
 export interface SingleSelectQuestion extends BaseQuestion {

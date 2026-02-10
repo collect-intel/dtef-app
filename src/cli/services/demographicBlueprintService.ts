@@ -274,8 +274,9 @@ export class DemographicBlueprintService {
 
     /**
      * Generate evaluation points for distribution comparison.
-     * Uses the distribution_metric point function to compare
-     * expected vs actual distributions.
+     * Uses computational point functions only (no LLM judges needed):
+     * - distribution_metric for overall JS-divergence similarity
+     * - per_option_accuracy for per-option error scoring
      */
     private static generateDistributionPoints(
         expectedDistribution: number[],
@@ -283,8 +284,9 @@ export class DemographicBlueprintService {
     ): WevalPromptConfig['points'] {
         const points: WevalPromptConfig['points'] = [];
 
-        // Primary point: overall distribution similarity
+        // Primary point: overall distribution similarity (JS-divergence)
         points.push({
+            text: 'Distribution Similarity (Jensen-Shannon Divergence)',
             fn: 'distribution_metric',
             fnArgs: {
                 expected: expectedDistribution,
@@ -293,14 +295,19 @@ export class DemographicBlueprintService {
             },
         });
 
-        // Secondary points: individual option accuracy (within tolerance)
+        // Secondary points: per-option accuracy (computational)
         expectedDistribution.forEach((expected, idx) => {
             if (expected >= 5) {  // Only check options with meaningful presence
                 const optionLabel = options[idx] || `Option ${idx + 1}`;
-                const tolerance = Math.max(5, expected * 0.3); // 30% relative or 5pp absolute
-                points.push(
-                    `Predicted percentage for "${optionLabel}" is within ${tolerance.toFixed(0)}pp of ${expected.toFixed(1)}%`
-                );
+                points.push({
+                    text: `Per-Option Accuracy: "${optionLabel}" (expected: ${expected.toFixed(1)}%)`,
+                    fn: 'per_option_accuracy',
+                    fnArgs: {
+                        expected: expectedDistribution,
+                        options: options,
+                        optionIndex: idx,
+                    },
+                });
             }
         });
 

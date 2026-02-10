@@ -44,7 +44,8 @@ export const AssessmentItem: React.FC<{
 }> = ({ assessment, index, isLogExpanded, toggleLogExpansion, isExpanded, toggleExpansion }) => {
     const scoreColor = getScoreColor(assessment.coverageExtent);
     const [isDisagreementExpanded, setIsDisagreementExpanded] = useState(false);
-    
+    const isComputational = assessment.evaluationType === 'computational';
+
     return (
         <Collapsible open={isExpanded} onOpenChange={toggleExpansion}>
             <div className={cn(
@@ -63,6 +64,12 @@ export const AssessmentItem: React.FC<{
                     <button type="button" className="flex justify-between items-center cursor-pointer p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-full text-left">
                         <h4 className="font-semibold text-sm text-primary pr-2 flex-1">{assessment.keyPointText}</h4>
                         <div className="flex items-center space-x-3 flex-shrink-0">
+                            {isComputational && (
+                                <Badge variant="outline" className="text-xs font-normal whitespace-nowrap border-blue-400 text-blue-600 dark:border-blue-500 dark:text-blue-400" title="This score was computed mathematically. No LLM judge was used.">
+                                    <Icon name="cpu" className="h-3 w-3 mr-0.5" />
+                                    COMPUTED
+                                </Badge>
+                            )}
                             {assessment.isInverted && (
                                 <Badge variant="destructive" className="text-xs font-normal whitespace-nowrap" title="This is a 'should not' criterion.">
                                     NEGATIVE
@@ -131,12 +138,23 @@ export const AssessmentItem: React.FC<{
                         )}
 
                         {assessment.reflection ? (
-                        <div className="mt-1 p-3 rounded-md bg-background/70 dark:bg-slate-900/50 border border-dashed border-primary/30">
+                        <div className={cn(
+                            "mt-1 p-3 rounded-md border",
+                            isComputational
+                                ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200/50 dark:border-blue-800/30"
+                                : "bg-background/70 dark:bg-slate-900/50 border-dashed border-primary/30"
+                        )}>
                             <div className="flex items-center space-x-1.5 mb-1.5">
-                                <Icon name="message-square" className="h-4 w-4 text-primary/80 flex-shrink-0" />
-                                <span className="font-semibold text-xs text-muted-foreground">Judge's Reflection:</span>
+                                <Icon name={isComputational ? "cpu" : "message-square"} className="h-4 w-4 text-primary/80 flex-shrink-0" />
+                                <span className="font-semibold text-xs text-muted-foreground">
+                                    {isComputational ? "Scoring Methodology:" : "Judge's Reflection:"}
+                                </span>
                             </div>
-                            <p className="text-sm text-foreground/80 pl-1 whitespace-pre-wrap italic">"{assessment.reflection}"</p>
+                            {isComputational ? (
+                                <p className="text-sm text-foreground/80 pl-1 whitespace-pre-wrap">{assessment.reflection}</p>
+                            ) : (
+                                <p className="text-sm text-foreground/80 pl-1 whitespace-pre-wrap italic">"{assessment.reflection}"</p>
+                            )}
                         </div>
                         ) : (
                             <div className="mt-1 p-3 rounded-md bg-muted/50 text-center text-muted-foreground text-sm italic">No reflection provided.</div>
@@ -235,7 +253,7 @@ export const EvaluationView: React.FC<{
     const [activeTab, setActiveTab] = useState('model-response');
     const [isGlobalAgreementExpanded, setIsGlobalAgreementExpanded] = useState(false);
 
-    usePreloadIcons(['message-square', 'chevron-up', 'chevron-down', 'chevrons-up-down', 'server', 'thumbs-down', 'alert-triangle', 'check-circle', 'trophy']);
+    usePreloadIcons(['message-square', 'cpu', 'chevron-up', 'chevron-down', 'chevrons-up-down', 'server', 'thumbs-down', 'alert-triangle', 'check-circle', 'trophy']);
 
     const toggleAssessmentExpansion = (index: number) => {
         setExpandedAssessments(prev => {
