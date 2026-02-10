@@ -1,6 +1,8 @@
 ### Netlify Background Functions – Implementation & Run Guide
 
-This guide captures the proven patterns for implementing and running Netlify background functions, distilled from our current project. It’s written to be copy-pastable into new services (e.g., TreeTalk) with minimal adjustments.
+> **Historical Note (2026-02):** DTEF no longer uses Netlify. Background functions have been migrated to Next.js API routes under `/api/internal/` — see `src/lib/background-function-client.ts` and `src/lib/background-function-auth.ts`. This document is preserved as a reference for the original pattern.
+
+This guide captures the proven patterns for implementing and running Netlify background functions, distilled from our current project. It's written to be copy-pastable into new services (e.g., TreeTalk) with minimal adjustments.
 
 ### What is a background function?
 - A function under `netlify/functions/` whose filename ends with `-background` (e.g., `summarize-session-background.ts`).

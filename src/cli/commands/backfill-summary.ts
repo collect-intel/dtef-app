@@ -31,7 +31,6 @@ import { calculateStandardDeviation } from '../../app/utils/calculationUtils';
 import { fromSafeTimestamp } from '../../lib/timestampUtils';
 import { ModelRunPerformance, ModelSummary } from '@/types/shared';
 import { parseModelIdForDisplay, getModelDisplayLabel } from '@/app/utils/modelIdUtils';
-import { populatePairwiseQueue } from '../services/pairwise-task-queue-service';
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { buildDTEFSummary, buildAllDTEFSummaries } from '@/cli/utils/dtefSummaryUtils';
 import { saveJsonFile } from '@/lib/storageService';
@@ -214,15 +213,6 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                         latestResultDataForConfig = resultData;
                     }
                     
-                    // Populate the pairwise queue with tasks from this run, ONLY if it's the latest one and has the tag.
-                    if (runInfo.fileName === latestRunInfo.fileName && resultData.config?.tags?.includes('_get_human_prefs')) {
-                        try {
-                            if (options.verbose) logger.info(`  Found _get_human_prefs tag. Populating pairwise queue for LATEST run: ${runInfo.fileName}`);
-                            await populatePairwiseQueue(resultData, { logger });
-                        } catch (pairwiseError: any) {
-                            logger.error(`  Error populating pairwise queue for run ${runInfo.fileName}: ${pairwiseError.message}`);
-                        }
-                    }
                 } else {
                     logger.warn(`  Could not fetch or parse result data for run file: ${runInfo.fileName}`);
                     totalRunsFailed++;

@@ -1,5 +1,7 @@
 # Pairs: Human Preference Collection System
 
+> **Deprecated (2026-02):** The Pairs feature has been removed from DTEF. It was a Weval-inherited feature for crowdsourced human preference collection that used `@netlify/blobs` (incompatible with Railway deployment). All pairwise code, API routes, and the `@netlify/blobs` dependency have been removed. This document is preserved for historical reference only.
+
 This document provides a comprehensive technical overview of the architecture, data flow, and implementation details for the "Pairs" feature, which is designed to collect human preference data on AI model responses.
 
 ## 1. Introduction & Core Philosophy

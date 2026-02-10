@@ -44,7 +44,6 @@ import { SimpleLogger } from '@/lib/blueprint-service';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
 import { ModelRunPerformance, ModelSummary } from '@/types/shared';
 import { getModelDisplayLabel, parseModelIdForDisplay } from '@/app/utils/modelIdUtils';
-import { populatePairwiseQueue } from '../services/pairwise-task-queue-service';
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
@@ -891,19 +890,8 @@ async function runBlueprint(config: ComparisonConfig, options: RunOptions & { fi
                 }
                 // --- END: Update Model Summaries ---
 
-                // --- BEGIN: Populate Pairwise Task Queue ---
-                try {
-                    if (newResultData.config?.tags?.includes('_get_human_prefs')) {
-                        loggerInstance.info('Found _get_human_prefs tag. Populating pairwise queue for latest run...');
-                        await populatePairwiseQueue(newResultData, { logger: loggerInstance });
-                        loggerInstance.info('Pairwise queue populated successfully.');
-                    }
-                } catch (pairwiseError: any) {
-                    loggerInstance.error(`Failed to populate pairwise queue: ${pairwiseError.message}`);
-                }
-                // --- END: Populate Pairwise Task Queue ---
             } else {
-                loggerInstance.info('Skipping homepage summary, model summaries, and pairwise queue updates (use --update-summaries to enable).');
+                loggerInstance.info('Skipping homepage summary and model summaries updates (use --update-summaries to enable).');
             }
 
         } else {

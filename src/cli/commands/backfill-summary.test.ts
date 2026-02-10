@@ -1,7 +1,6 @@
 import { backfillSummaryCommand } from './backfill-summary';
 import * as storageService from '../../lib/storageService';
 import { getConfig }from '../config';
-import * as pairwiseService from '../services/pairwise-task-queue-service';
 import { ComparisonDataV2 as FetchedComparisonData } from '../../app/utils/types';
 import { IDEAL_MODEL_ID } from '../../app/utils/calculationUtils';
 
@@ -20,11 +19,9 @@ jest.mock('../../lib/storageService', () => {
   };
 });
 
-jest.mock('../services/pairwise-task-queue-service');
 jest.mock('../config');
 
 const mockedStorage = storageService as jest.Mocked<typeof storageService>;
-const mockedPairwiseService = pairwiseService as jest.Mocked<typeof pairwiseService>;
 const mockedGetConfig = getConfig as jest.Mocked<typeof getConfig>;
 
 const mockLogger = {

@@ -24,8 +24,6 @@ import { backfillPromptContextsCommand } from './commands/backfill-prompt-contex
 import { getConfig } from './config';
 import { backfillExecutiveSummaryCommand } from './commands/backfill-executive-summary';
 import { repairRunCommand } from './commands/repair-run';
-import { addToPairsCommand } from './commands/add-to-pairs';
-import { deleteFromPairsCommand } from './commands/delete-from-pairs';
 import { generateModelCardCommand, deleteModelCardCommand } from './commands/generate-model-card';
 import { generateSearchIndexCommand } from './commands/generate-search-index';
 import { backupDataCommand } from './commands/backup-data';
@@ -49,7 +47,6 @@ import { generateRegressionsCommand } from './commands/generate-regressions';
 import { backfillGranularResponsesCommand } from './commands/backfill-granular-responses';
 import { authorDistanceCommand } from './commands/author-distance';
 import { scanUnrunBlueprintsCommand } from './commands/scan-unrun-blueprints';
-import { registerSurveyCommands } from './commands/surveyCommands';
 import { dtefCommand } from './commands/dtef-commands';
 
 let isTerminating = false
@@ -115,8 +112,6 @@ cli.addCommand(backfillArticleCommand);
 cli.addCommand(repairRunCommand);
 cli.addCommand(cloneRunCommand);
 cli.addCommand(updateRunMetadataCommand);
-cli.addCommand(addToPairsCommand);
-cli.addCommand(deleteFromPairsCommand);
 cli.addCommand(generateModelCardCommand);
 cli.addCommand(deleteModelCardCommand);
 cli.addCommand(generateSearchIndexCommand);
@@ -138,7 +133,6 @@ cli.addCommand(generateRegressionsCommand);
 cli.addCommand(backfillGranularResponsesCommand);
 cli.addCommand(authorDistanceCommand);
 cli.addCommand(scanUnrunBlueprintsCommand);
-registerSurveyCommands(cli);
 cli.addCommand(dtefCommand);
 
 cli.parseAsync(process.argv).catch(err => {

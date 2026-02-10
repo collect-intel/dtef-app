@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
-  // Externalize heavy packages from server bundle to reduce Netlify function size
+  // Externalize heavy packages from server bundle to reduce bundle size
   serverExternalPackages: [
     'd3',
     'reactflow',

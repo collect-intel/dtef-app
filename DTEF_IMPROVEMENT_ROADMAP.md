@@ -28,59 +28,18 @@ This roadmap is organized by **priority tier**. Each item includes context, rati
 
 ### 1.1 Run First Real Evaluation (Phase 5)
 
-**Status:** Not started (Phase 5.1-5.4 in DTEF_TASK_PLAN.md)
-**Impact:** Without real evaluation data, the entire leaderboard UI shows empty states
+**Status:** ✅ Complete — evaluations are live on digitaltwinseval.org
 
-The platform is built but has never run evaluations against real data. This is the single most important next step.
+### 1.2 Remove Pairwise System & @netlify/blobs
 
-**Steps:**
-1. Import Global Dialogues data: `pnpm cli dtef import-gd -r GD4 -o output/gd4.json`
-2. Generate zero-context blueprints: `pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4/`
-3. Generate full-context blueprints: `pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4-ctx/ --context-questions all --token-budget 16384`
-4. Publish to dtef-configs: `pnpm cli dtef publish -s ./output/dtef-blueprints/gd4/ -t ../dtef-configs/blueprints/gd4/ --tag "global-dialogues-v1"`
-5. Tag blueprints with `_periodic` for scheduled runs
-6. Trigger manual evaluation run
-7. Verify results populate in S3 and leaderboard UI
+**Status:** 🔄 In progress — decided to deprecate and remove
+**Impact:** Removes broken feature and eliminates `@netlify/blobs` dependency
 
-**Files:** `src/cli/commands/dtef-commands.ts`, dtef-configs repo
-**Depends on:** Global Dialogues submodule at `data/global-dialogues`
+The pairwise comparison system is not relevant to DTEF's mission (demographic distribution prediction). It was a Weval feature for crowdsourced preference collection. Removing it and the `@netlify/blobs` dependency entirely.
 
-### 1.2 Migrate Pairwise System Off @netlify/blobs
+### 1.3 Security: Credential Review
 
-**Status:** Broken on Railway
-**Impact:** Pairwise human preference voting is non-functional
-
-The pairwise comparison system (`/pairs` route) still uses `@netlify/blobs` which only works on Netlify. Since deployment moved to Railway, this entire feature is broken.
-
-**Options:**
-- (A) Migrate to S3-based storage (align with rest of app)
-- (B) Migrate to PostgreSQL (Railway offers managed Postgres)
-- (C) Deprecate the feature if not needed for DTEF
-
-**Files (9):**
-- `src/cli/services/pairwise-task-queue-service.ts`
-- `src/app/api/pairs/get-task/route.ts`
-- `src/app/api/pairs/config/[configId]/get-task/route.ts`
-- `src/app/api/pairs/config/[configId]/start-generation/route.ts`
-- `src/app/api/pairs/config/[configId]/check-status/route.ts`
-- `src/app/api/pairs/submit-preference/route.ts`
-- `src/app/api/pairs/log/route.ts`
-- Related test files
-
-**Decision needed:** Is pairwise preference collection relevant to DTEF's mission? If not, deprecate and remove the `@netlify/blobs` dependency entirely.
-
-### 1.3 Security: Rotate Exposed Credentials
-
-**Status:** Credentials committed to repo
-**Impact:** Security vulnerability
-
-The `.env` and `.env.sentry-build-plugin` files contain real API keys committed to git history. Even if `.gitignore` now excludes them, they exist in git history.
-
-**Action:**
-1. Rotate all API keys: OpenRouter, OpenAI, AWS, GitHub token, Sentry auth token, background function auth token
-2. Verify `.gitignore` excludes `.env`, `.env.local`, `.env.sentry-build-plugin`
-3. Use `git filter-branch` or BFG Repo Cleaner to remove from history (optional but recommended)
-4. Ensure all production secrets are in Railway environment variables and GitHub Actions secrets only
+**Status:** ✅ Verified — `.env` and `.env.sentry-build-plugin` were never committed to git history. No credential rotation needed. Repo is private (`collect-intel/dtef-app`).
 
 ---
 
@@ -194,12 +153,12 @@ The evaluation queue (`src/lib/evaluation-queue.ts`) uses an in-memory array. On
 
 ### 2.6 Remove GLM-4.5 Judge Model
 
-**Status:** Fails 100% with empty responses
+**Status:** Needs action in dtef-configs repo (not in dtef-app)
 **Impact:** Wastes evaluation time, always falls back to backup judge
 
-The `z-ai/glm-4.5` model consistently returns empty responses when used as a judge. It should be removed from any judge model configurations.
+The `z-ai/glm-4.5` model consistently returns empty responses when used as a judge. Judge models are configured per-blueprint in dtef-configs, not hardcoded in the app. The model version registry in `src/lib/model-version-registry.ts` should keep the entry (for historical result lookups) but the model should be removed from active blueprint judge configurations.
 
-**Files:** Check `models/CORE.json` in dtef-configs, any hardcoded judge model lists in `src/cli/services/llm-coverage-evaluator.ts`
+**Action:** In dtef-configs repo, remove `z-ai/glm-4.5` from judge model lists in blueprint configs.
 
 ---
 
@@ -349,11 +308,11 @@ The `PROJECT_CONTEXT.md` mentions making evaluation types pluggable. Currently o
 
 ## Summary Matrix
 
-| # | Item | Tier | Effort | Impact | Blocked By |
-|---|------|------|--------|--------|------------|
-| 1.1 | Run first real evaluation | 1 | Medium | Critical | GD submodule |
-| 1.2 | Migrate pairwise off @netlify/blobs | 1 | Medium | High (or deprecate) | Decision needed |
-| 1.3 | Rotate exposed credentials | 1 | Small | Critical | None |
+| # | Item | Tier | Effort | Impact | Status |
+|---|------|------|--------|--------|--------|
+| 1.1 | Run first real evaluation | 1 | — | — | ✅ Complete |
+| 1.2 | Remove pairwise system | 1 | Medium | High | 🔄 In progress |
+| 1.3 | Credential review | 1 | — | — | ✅ Verified safe |
 | 2.1 | Weval→DTEF branding cleanup | 2 | Small | Medium | None |
 | 2.2 | Deprecated feature assessment | 2 | Small | Medium | None |
 | 2.3 | Demographics page enhancements | 2 | Large | High | 1.1 |
@@ -388,8 +347,6 @@ The `PROJECT_CONTEXT.md` mentions making evaluation types pluggable. Currently o
 - UI uses modern stack (Next.js 15, React 19, Tailwind, Radix UI)
 
 ### What Needs Attention
-- No real DTEF evaluation data exists yet (the platform is built but untested with real runs)
-- Pairwise system is non-functional on Railway
 - Error handling in storage layer silently swallows failures
 - In-memory evaluation queue is fragile
 - Legacy code adds ~2,000 lines of dead weight
