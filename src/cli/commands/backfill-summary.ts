@@ -33,6 +33,8 @@ import { ModelRunPerformance, ModelSummary } from '@/types/shared';
 import { parseModelIdForDisplay, getModelDisplayLabel } from '@/app/utils/modelIdUtils';
 import { populatePairwiseQueue } from '../services/pairwise-task-queue-service';
 import { normalizeTag } from '@/app/utils/tagUtils';
+import { buildDTEFSummary, buildAllDTEFSummaries } from '@/cli/utils/dtefSummaryUtils';
+import { saveJsonFile } from '@/lib/storageService';
 
 async function actionBackfillSummary(options: { verbose?: boolean; configId?: string; dryRun?: boolean }) {
     const { logger } = getConfig();
@@ -45,6 +47,7 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
     let totalConfigsProcessed = 0;
     let totalRunsProcessed = 0;
     let totalRunsFailed = 0;
+    const allDTEFResults: FetchedComparisonData[] = [];
     const modelDimensionGrades = new Map<string, Map<string, { totalScore: number; count: number; uniqueConfigs: Set<string>; scores: Array<{ score: number; configTitle: string; runLabel: string; timestamp: string; configId: string; }> }>>();
     const topicModelScores = new Map<string, Map<string, { scores: Array<{ score: number; configId: string; configTitle: string; runLabel: string; timestamp: string; }>; uniqueConfigs: Set<string> }>>();
 
@@ -118,6 +121,11 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                         resultData.config.tags = normalizedTags;
                     }
                     // --- END NORMALIZE TAGS ---
+
+                    // --- Accumulate DTEF results ---
+                    if (resultData.config?.tags?.includes('dtef') && runInfo.fileName === latestRunInfo.fileName) {
+                        allDTEFResults.push(resultData);
+                    }
 
                     // --- Process Executive Summary Grades ---
                     // Only process grades from the latest run per config for dimension leaderboards
@@ -341,13 +349,40 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
             const modelCardMappings = await buildModelCardMappings();
             logger.info(`Built mappings for ${Object.keys(modelCardMappings).length} model variants to ${new Set(Object.values(modelCardMappings)).size} model cards.`);
 
+            // --- BEGIN: DTEF Summary Generation ---
+            let combinedDTEFSummary = null;
+            if (allDTEFResults.length > 0) {
+                logger.info(`Building DTEF summaries from ${allDTEFResults.length} DTEF-tagged results...`);
+                const perSurveySummaries = buildAllDTEFSummaries(allDTEFResults);
+                combinedDTEFSummary = buildDTEFSummary(allDTEFResults);
+                logger.info(`Built ${perSurveySummaries.size} per-survey summaries and 1 combined summary.`);
+
+                if (!options.dryRun) {
+                    for (const [surveyId, summary] of perSurveySummaries) {
+                        await saveJsonFile(`live/aggregates/dtef_summary_${surveyId}.json`, summary);
+                        logger.info(`Saved DTEF summary for survey: ${surveyId}`);
+                    }
+                    if (combinedDTEFSummary) {
+                        await saveJsonFile('live/aggregates/dtef_summary.json', combinedDTEFSummary);
+                        logger.info('Saved combined DTEF summary.');
+                    }
+                } else {
+                    logger.info(`[DRY RUN] Would save ${perSurveySummaries.size} per-survey DTEF summaries.`);
+                    if (combinedDTEFSummary) {
+                        logger.info(`[DRY RUN] Would save combined DTEF summary with ${combinedDTEFSummary.topModels.length} top models.`);
+                    }
+                }
+            } else {
+                logger.info('No DTEF-tagged results found. Skipping DTEF summary generation.');
+            }
+            // --- END: DTEF Summary Generation ---
+
             const finalHomepageSummaryObject: HomepageSummaryFileContent = {
                 configs: homepageConfigs, // The hybrid array
                 headlineStats: headlineStats,
                 driftDetectionResult: driftDetectionResult,
                 topicChampions: topicChampions,
-                capabilityLeaderboards: headlineStats.capabilityLeaderboards || undefined,
-                capabilityRawData: headlineStats.capabilityRawData || undefined,
+                dtefSummary: combinedDTEFSummary,
                 modelCardMappings: Object.keys(modelCardMappings).length > 0 ? modelCardMappings : undefined,
                 lastUpdated: new Date().toISOString(),
             };

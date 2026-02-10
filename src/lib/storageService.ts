@@ -22,7 +22,6 @@ import {
   EnhancedRunInfo,
   PerModelScoreStats,
 } from '@/app/utils/homepageDataUtils';
-import type { CapabilityLeaderboard, CapabilityRawData } from '../types/summary';
 import type { PotentialDriftInfo } from '../types/summary';
 import { ComparisonDataV2 as FetchedComparisonData } from '@/app/utils/types';
 import {
@@ -57,9 +56,8 @@ export interface HomepageSummaryFileContent {
   headlineStats: any; // Consider creating a specific type for this
   driftDetectionResult: PotentialDriftInfo | null;
   lastUpdated: string;
-  capabilityLeaderboards?: CapabilityLeaderboard[] | null;
   topicChampions?: Record<string, TopicChampionInfo[]> | null;
-  capabilityRawData?: CapabilityRawData | null;
+  dtefSummary?: import('@/cli/utils/dtefSummaryUtils').DTEFSummary | null;
   modelCardMappings?: Record<string, string>; // model variant -> card base model
   fileSizeKB?: number;
 }
@@ -211,18 +209,8 @@ interface SerializableEnhancedComparisonConfigInfo extends Omit<EnhancedComparis
   runs: SerializableEnhancedRunInfo[];
 }
 
-interface SerializableCapabilityRawData {
-    modelDimensions: Record<string, Record<string, number>>;
-    modelTopics: Record<string, Record<string, number>>;
-    modelConfigs: Record<string, Record<string, number>>;
-    modelAxes?: Record<string, Record<string, number>>;
-    qualifyingModels: string[];
-    capabilityQualifyingModels?: Record<string, string[]>;
-}
-
-interface SerializableHomepageSummaryFileContent extends Omit<HomepageSummaryFileContent, 'configs' | 'capabilityRawData'> {
+interface SerializableHomepageSummaryFileContent extends Omit<HomepageSummaryFileContent, 'configs'> {
     configs: (Omit<EnhancedComparisonConfigInfo, 'runs'> & { runs: SerializableEnhancedRunInfo[] })[];
-    capabilityRawData?: SerializableCapabilityRawData;
 }
 
 // --- New Serializable Types for Latest Runs Summary ---
@@ -353,23 +341,9 @@ export async function saveHomepageSummary(summaryData: HomepageSummaryFileConten
     }),
   }));
 
-  // Serialize capabilityRawData if it exists
-  let serializableCapabilityRawData: SerializableCapabilityRawData | undefined = undefined;
-  if (summaryData.capabilityRawData) {
-    serializableCapabilityRawData = {
-        modelDimensions: summaryData.capabilityRawData.modelDimensions,
-        modelTopics: summaryData.capabilityRawData.modelTopics,
-        modelConfigs: summaryData.capabilityRawData.modelConfigs,
-        modelAxes: summaryData.capabilityRawData.modelAxes,
-        qualifyingModels: summaryData.capabilityRawData.qualifyingModels,
-        capabilityQualifyingModels: summaryData.capabilityRawData.capabilityQualifyingModels,
-    };
-  }
-
   const serializableSummary: SerializableHomepageSummaryFileContent = {
     ...summaryData,
     configs: serializableConfigs,
-    capabilityRawData: serializableCapabilityRawData,
   };
 
   const fileContent = JSON.stringify(serializableSummary, null, 2);
@@ -1656,7 +1630,7 @@ export async function removeConfigFromHomepageSummary(configIdToRemove: string):
       headlineStats: updatedHeadlineStats,
       driftDetectionResult: updatedDriftDetectionResult,
       topicChampions: currentSummaryObject.topicChampions,
-      capabilityLeaderboards: currentSummaryObject.capabilityLeaderboards,
+      dtefSummary: currentSummaryObject.dtefSummary,
       lastUpdated: new Date().toISOString(),
     };
 

@@ -3,7 +3,7 @@ import AggregateStatsDisplay from '@/app/components/AggregateStatsDisplay';
 import { AggregateStatsData } from '@/app/components/home/types';
 import ModelDriftIndicator, { PotentialDriftInfo } from '@/app/components/ModelDriftIndicator';
 import HomePageBanner from "@/app/components/HomePageBanner";
-import CapabilityLeaderboardDisplay from '@/app/components/home/CapabilityLeaderboardDisplay';
+import DTEFLeaderboardDisplay from '@/app/components/home/DTEFLeaderboardDisplay';
 import {
   getComparisonRunInfo,
   EnhancedComparisonConfigInfo,
@@ -99,11 +99,7 @@ export default async function HomePage() {
   const blueprintSummaries = processBlueprintSummaries(featuredConfigs);
   
   // Featured config IDs for the top 3 showcase
-  const FEATURED_CONFIG_IDS: string[] = [
-    'evidence-based-ai-tutoring',
-    'sri-lanka-citizen-compendium-factum',
-    'sycophancy-probe'
-  ];
+  const FEATURED_CONFIG_IDS: string[] = [];
   
   // Split blueprints into featured (top 3) and remaining
   const featuredBlueprints = FEATURED_CONFIG_IDS.length > 0 
@@ -168,7 +164,7 @@ export default async function HomePage() {
                   </span>
                 )}
                 <span className="text-xs text-blue-600 dark:text-blue-300">
-                  Raw data available: {homepageStats.capabilityRawData ? '✓' : '✗'}
+                  DTEF summary: {homepageStats.dtefSummary ? '✓' : '✗'}
                 </span>
                 <span className="text-xs text-blue-600 dark:text-blue-300">
                   Configs loaded: {featuredConfigs.length}
@@ -177,14 +173,10 @@ export default async function HomePage() {
             </div>
           )}
 
-          {/* The Leaderboards - Standalone First-Class Section */}
-          {featuredConfigs.length > 0 && homepageStats?.capabilityLeaderboards && (
+          {/* The Leaderboards - DTEF Demographic Prediction */}
+          {homepageStats?.dtefSummary && (
             <section aria-labelledby="the-leaderboards-heading">
-              <CapabilityLeaderboardDisplay 
-                leaderboards={homepageStats.capabilityLeaderboards} 
-                rawData={homepageStats.capabilityRawData}
-                modelCardMappings={homepageStats.modelCardMappings}
-              />
+              <DTEFLeaderboardDisplay dtefSummary={homepageStats.dtefSummary} />
             </section>
           )}
 
@@ -198,6 +190,12 @@ export default async function HomePage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   How well do AI models predict survey response distributions across demographic groups?
                 </p>
+                {homepageStats?.dtefSummary && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {homepageStats.dtefSummary.topModels?.length || 0} models evaluated across{' '}
+                    {homepageStats.dtefSummary.aggregation?.modelResults?.[0]?.segmentCount || 0} segments
+                  </p>
+                )}
               </div>
               <Link
                 href="/demographics"

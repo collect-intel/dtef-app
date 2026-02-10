@@ -12,7 +12,6 @@ import { ComparisonDataV2 as WevalResult } from '@/app/utils/types';
 import { IDEAL_MODEL_ID } from '@/app/utils/calculationUtils';
 import { parseModelIdForApiCall } from '@/app/utils/modelIdUtils';
 import { calculatePerModelScoreStatsForRun } from '../utils/summaryCalculationUtils';
-import { CAPABILITY_BUCKETS } from '@/lib/capabilities';
 
 export async function actionGenerateVibesIndex(options: { dryRun?: boolean; verbose?: boolean; concurrency?: number }) {
   const { logger } = getConfig();
@@ -23,8 +22,6 @@ export async function actionGenerateVibesIndex(options: { dryRun?: boolean; verb
   const pairCount: Map<string, Map<string, number>> = new Map();
   const modelRuns: Map<string, { runs: number; configs: Set<string>; hybridSum: number; hybridCount: number }>
     = new Map();
-  // capability accumulation: baseModel -> capabilityId -> { weightedSum, weightSum, contributingRuns }
-  const capabilityAccum: Map<string, Map<string, { weightedSum: number; weightSum: number; contributingRuns: number }>> = new Map();
 
   const addPair = (a: string, b: string, v: number) => {
     if (!isFinite(v)) return;
@@ -61,30 +58,6 @@ export async function actionGenerateVibesIndex(options: { dryRun?: boolean; verb
           const baseId = parseModelIdForApiCall(fullId).originalModelId;
           addModelHybrid(baseId, runData.configId, stats.hybrid.average);
         });
-        // Accumulate capability scores for buckets that reference this config
-        try {
-          const matchingBuckets = CAPABILITY_BUCKETS.filter(b => (b.blueprints || b.configs)?.some(c => c.key === runData.configId));
-          if (matchingBuckets.length > 0) {
-            perModel.forEach((stats, fullId) => {
-              if (fullId === IDEAL_MODEL_ID) return;
-              const baseId = parseModelIdForApiCall(fullId).originalModelId;
-              const val = stats.hybrid.average; // 0..1 or null
-              if (val === null || val === undefined || !isFinite(val)) return;
-              for (const bucket of matchingBuckets) {
-                const weight = (bucket.blueprints || bucket.configs)!.find(c => c.key === runData.configId)!.weight || 1;
-                if (!capabilityAccum.has(baseId)) capabilityAccum.set(baseId, new Map());
-                const inner = capabilityAccum.get(baseId)!;
-                const rec = inner.get(bucket.id) || { weightedSum: 0, weightSum: 0, contributingRuns: 0 };
-                rec.weightedSum += val * weight;
-                rec.weightSum += weight;
-                rec.contributingRuns += 1;
-                inner.set(bucket.id, rec);
-              }
-            });
-          }
-        } catch (e: any) {
-          if (options.verbose) logger.warn(`[Vibes] Failed capability accumulation for ${configId}: ${e?.message || e}`);
-        }
       } catch (e: any) {
         if (options.verbose) logger.warn(`[Vibes] Failed per-model hybrid for ${configId}: ${e?.message || e}`);
       }
@@ -137,20 +110,6 @@ export async function actionGenerateVibesIndex(options: { dryRun?: boolean; verb
   const output: VibesIndexContent = {
     models,
     similarity,
-    capabilityScores: (() => {
-      const result: VibesIndexContent['capabilityScores'] = {};
-      capabilityAccum.forEach((byCap, baseId) => {
-        const obj: Record<string, { score: number | null; contributingRuns: number }> = {};
-        byCap.forEach((rec, capId) => {
-          obj[capId] = {
-            score: rec.weightSum > 0 ? rec.weightedSum / rec.weightSum : null,
-            contributingRuns: rec.contributingRuns,
-          };
-        });
-        if (Object.keys(obj).length > 0) result[baseId] = obj;
-      });
-      return Object.keys(result).length > 0 ? result : undefined;
-    })(),
     generatedAt: new Date().toISOString(),
   };
 

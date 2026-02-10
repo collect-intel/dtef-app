@@ -63,33 +63,4 @@ export interface AggregateStatsData {
   rankedOverallModels: TopModelStatInfo[] | null;
   dimensionLeaderboards?: DimensionLeaderboard[] | null;
   topicChampions?: Record<string, TopicChampionInfo[]> | null;
-  capabilityLeaderboards?: CapabilityLeaderboard[] | null;
-  capabilityRawData?: CapabilityRawData | null;
 }
-
-// NOTE: These are duplicated in src/types/summary.ts for CLI consumption.
-// Consider importing from that shared module in the future to avoid duplication.
-export interface CapabilityScoreInfo {
-  modelId: string;
-  averageScore: number;
-  contributingRuns: number;
-  contributingDimensions: number;
-}
-
-export interface CapabilityLeaderboard {
-  id: string;
-  label: string;
-  description: string;
-  icon: string;
-  leaderboard: CapabilityScoreInfo[];
-}
-
-// Raw data for dev mode capability weight adjustment
-export interface CapabilityRawData {
-  modelDimensions: Record<string, Record<string, number>>; // modelId -> dimension -> normalized_score (0-1)
-  modelTopics: Record<string, Record<string, number>>;     // modelId -> topic -> score (0-1)
-  modelConfigs: Record<string, Record<string, number>>;    // modelId -> configId -> score (0-1)
-  modelAxes?: Record<string, Record<string, number>>;      // modelId -> compassAxis -> value (0-1)
-  qualifyingModels: string[]; // Models that meet the minimum thresholds globally
-  capabilityQualifyingModels?: Record<string, string[]>; // capabilityId -> qualifying models for that capability
-} 
