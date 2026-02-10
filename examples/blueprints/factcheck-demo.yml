@@ -1,6 +1,6 @@
 title: "Fact-Checking with Web-Enabled Evaluation"
 description: "Demonstrates using the fact-check endpoint to verify claims against online sources"
-author: "Weval Team"
+author: "DTEF Team"
 tags: ["demo", "fact-checking", "external-services", "web-enabled"]
 
 # Configure the fact-check service

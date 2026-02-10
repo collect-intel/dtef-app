@@ -4,7 +4,7 @@
 
 The dtef-app (Next.js 15.4.4) fails to build on Vercel's free tier due to insufficient memory. The build consistently runs for ~13-14 minutes before being killed with SIGABRT (out of memory). Vercel's free tier provides 8GB build memory, which is not enough for this application.
 
-**Current status**: The app successfully builds and deploys on **Netlify** (at weval.org). Vercel deployment would require upgrading to Pro plan ($20/member/month) for 16GB enhanced builds.
+**Current status**: The app now deploys on **Railway** (at digitaltwinseval.org). Both Vercel and Netlify deployments were abandoned. This document is preserved for historical reference.
 
 ## Root Cause Analysis
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the complete implementation plan for adding Krippendorff's α inter-judge agreement metrics to the Weval platform. This addresses a key methodological gap identified in external feedback: quantifying judge reliability beyond showing individual judgements.
+This document outlines the complete implementation plan for adding Krippendorff's α inter-judge agreement metrics to the DTEF platform (inherited from the Weval evaluation engine). This addresses a key methodological gap identified in external feedback: quantifying judge reliability beyond showing individual judgements.
 
 **Goal**: Calculate and display inter-judge agreement at multiple granularities (per-point, per-blueprint, platform-wide) to give users confidence in evaluation reliability.
 

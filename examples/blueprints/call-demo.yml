@@ -1,6 +1,6 @@
 title: "$call Point Function Demo"
 description: "Demonstrates the $call point function with a real external service endpoint"
-author: "Weval Team"
+author: "DTEF Team"
 tags: ["demo", "external-services", "$call"]
 
 # Configure external services that can be called during evaluation

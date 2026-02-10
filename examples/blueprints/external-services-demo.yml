@@ -1,6 +1,6 @@
 title: "External Service Demo"
 description: "Demonstrates calling external HTTP services for custom evaluation logic (e.g., fact-checking, code execution)"
-author: "Weval Team"
+author: "DTEF Team"
 tags: ["demo", "external-services", "fact-checking"]
 
 # Define external services that can be called during evaluation

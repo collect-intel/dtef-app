@@ -1,6 +1,8 @@
 # Survey to Blueprint Module
 
-This module enables converting structured survey data into Weval Blueprints to evaluate AI models' ability to predict survey responses based on participant demographics and previous answers.
+> **Deprecated (2026-02):** This per-participant survey approach has been superseded by the DTEF demographic distribution approach. See `src/cli/services/demographicBlueprintService.ts` and `src/cli/commands/dtef-commands.ts` for the current implementation. The legacy survey code has been removed; this document is preserved for reference.
+
+This module enables converting structured survey data into evaluation blueprints to evaluate AI models' ability to predict survey responses based on participant demographics and previous answers.
 
 ## Data Structure
 

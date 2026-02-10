@@ -959,7 +959,7 @@ result.pointAssessments.filter(p => p.pathId).forEach(p => {
 
     **External Service Integration: `$call` and `$factcheck`**
 
-    For validation that requires external services or web searches, Weval provides two special functions:
+    For validation that requires external services or web searches, The platform provides two special functions:
 
     - **`$call`**: Integrate external HTTP services for custom validation (fact-checking, code execution, domain-specific evaluation). Can use pre-configured services or inline URLs with template substitution for `{response}`, `{modelId}`, `{promptId}`, etc. See [examples/blueprints/CALL_DEMO_README.md](../examples/blueprints/CALL_DEMO_README.md) for full documentation.
 
@@ -993,7 +993,7 @@ For more details, see the [POINTS_DOCUMENTATION.md](POINTS_DOCUMENTATION.md).
 
 ### Negative Point-Functions
 
-Weval provides negative variants of most point-functions, prefixed with `$not_`. These functions return `true` when the criterion is **not** met, making them ideal for expressing negative constraints without the confusion of `should_not` blocks.
+The platform provides negative variants of most point-functions, prefixed with `$not_`. These functions return `true` when the criterion is **not** met, making them ideal for expressing negative constraints without the confusion of `should_not` blocks.
 
 **Available Negative Functions:**
 
@@ -1130,7 +1130,7 @@ While YAML is recommended, JSON is fully supported. JSON blueprints must be a si
 
 ## Tool-Use (Trace-Only) Support
 
-Weval supports evaluating tool-use without executing any tools. Models are instructed to emit a normalized, machine-parseable tool-call trace, which is parsed and scored deterministically.
+The platform supports evaluating tool-use without executing any tools. Models are instructed to emit a normalized, machine-parseable tool-call trace, which is parsed and scored deterministically.
 
 ### How it works
 

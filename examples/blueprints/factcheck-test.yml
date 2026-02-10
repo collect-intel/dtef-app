@@ -1,6 +1,6 @@
 title: "Fact-Check Test - Both Methods"
 description: "Test blueprint comparing $call and $factcheck shortcut side-by-side"
-author: "Weval Team"
+author: "DTEF Team"
 tags: ["test", "fact-checking"]
 
 # Method 1: Define external service for $call usage
