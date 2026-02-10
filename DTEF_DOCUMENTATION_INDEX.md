@@ -2,7 +2,7 @@
 
 *Quick reference guide to all DTEF documentation*
 
-**Last Updated:** 2025-01-27
+**Last Updated:** 2026-02-10
 
 ---
 
@@ -19,7 +19,8 @@
    - `DTEF_TASK_PLAN.md` - ⭐ **ESSENTIAL** - Your detailed task roadmap
 
 3. **Reference as Needed:**
-   - `DTEF_PROJECT_PLAN.md` - High-level implementation plan
+   - `DTEF_IMPROVEMENT_ROADMAP.md` - ⭐ **Current priorities** - What to work on next
+   - `DTEF_PROJECT_PLAN.md` - High-level implementation plan (Phases 0-4 complete)
    - `docs/ARCHITECTURE.md` - Weval architecture (DTEF is based on this)
 
 ---
@@ -34,6 +35,7 @@
 | **`PROJECT_CONTEXT.md`** | Essential context: DTEF vs Weval, key differences | First - understand the "what" |
 | **`DTEF_PROJECT_PLAN.md`** | High-level implementation plan with phases | Reference - understand the "how" at high level |
 | **`DTEF_TASK_PLAN.md`** | ⭐ **Detailed task breakdown** - Step-by-step roadmap | Always - this is your working document |
+| **`DTEF_IMPROVEMENT_ROADMAP.md`** | ⭐ **Current priorities** - Audit findings, next steps, improvements | Always - what to work on next |
 | **`DTEF_AGENT_ARCHITECTURE.md`** | ⭐ **Coding agent guide** - Architecture, conventions, workflow | Always - reference for coding standards |
 
 ### Supporting Documentation
@@ -78,9 +80,11 @@ DTEF_OVERVIEW.md (Vision & Goals)
     ↓
 PROJECT_CONTEXT.md (Context & Differences)
     ↓
-DTEF_PROJECT_PLAN.md (High-Level Plan)
+DTEF_PROJECT_PLAN.md (High-Level Plan — Phases 0-4 complete)
     ↓
-DTEF_TASK_PLAN.md (Detailed Tasks) ← YOU ARE HERE
+DTEF_TASK_PLAN.md (Detailed Tasks — Phases 5-6 remaining)
+    ↓
+DTEF_IMPROVEMENT_ROADMAP.md (Current Priorities) ← START HERE FOR NEW WORK
     ↑
 DTEF_AGENT_ARCHITECTURE.md (How to Work)
 ```
@@ -90,7 +94,8 @@ DTEF_AGENT_ARCHITECTURE.md (How to Work)
 ## 🔍 Finding Information
 
 ### "What should I work on next?"
-→ Check `DTEF_TASK_PLAN.md` - Task Status Tracking section
+→ Check `DTEF_IMPROVEMENT_ROADMAP.md` - Prioritized improvement tiers
+→ Check `DTEF_TASK_PLAN.md` - Phase 5-6 tasks remaining
 
 ### "How do I code this feature?"
 → Read `DTEF_AGENT_ARCHITECTURE.md` - Coding Standards & Patterns
