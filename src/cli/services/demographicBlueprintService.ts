@@ -274,18 +274,16 @@ export class DemographicBlueprintService {
 
     /**
      * Generate evaluation points for distribution comparison.
-     * Uses computational point functions only (no LLM judges needed):
-     * - distribution_metric for overall JS-divergence similarity
-     * - per_option_accuracy for per-option error scoring
+     * Uses a single computational point function (no LLM judges needed).
+     * JS-divergence captures overall distribution similarity in one score,
+     * avoiding the double-counting that per-option scoring introduces
+     * (distribution options are constrained to sum to ~100%).
      */
     private static generateDistributionPoints(
         expectedDistribution: number[],
-        options: string[]
+        _options: string[]
     ): WevalPromptConfig['points'] {
-        const points: WevalPromptConfig['points'] = [];
-
-        // Primary point: overall distribution similarity (JS-divergence)
-        points.push({
+        return [{
             text: 'Distribution Similarity (Jensen-Shannon Divergence)',
             fn: 'distribution_metric',
             fnArgs: {
@@ -293,25 +291,7 @@ export class DemographicBlueprintService {
                 metric: 'js-divergence',
                 threshold: 0.85,
             },
-        });
-
-        // Secondary points: per-option accuracy (computational)
-        expectedDistribution.forEach((expected, idx) => {
-            if (expected >= 5) {  // Only check options with meaningful presence
-                const optionLabel = options[idx] || `Option ${idx + 1}`;
-                points.push({
-                    text: `Per-Option Accuracy: "${optionLabel}" (expected: ${expected.toFixed(1)}%)`,
-                    fn: 'per_option_accuracy',
-                    fnArgs: {
-                        expected: expectedDistribution,
-                        options: options,
-                        optionIndex: idx,
-                    },
-                });
-            }
-        });
-
-        return points;
+        }];
     }
 
     /**
