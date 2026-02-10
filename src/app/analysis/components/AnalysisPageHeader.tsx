@@ -408,7 +408,6 @@ const AnalysisPageHeader: React.FC<AnalysisPageHeaderProps> = ({
     data,
     pageTitle,
     breadcrumbItems,
-    isSandbox,
     normalizedExecutiveSummary,
     currentPromptId,
     summaryStats,
@@ -457,7 +456,7 @@ const AnalysisPageHeader: React.FC<AnalysisPageHeaderProps> = ({
         isSticky ? 'sticky top-4 z-40' : ''
       }`}
     >
-      {!isSandbox && breadcrumbItems && breadcrumbItems.length > 0 && (
+      {breadcrumbItems && breadcrumbItems.length > 0 && (
         <div className="mb-3 px-1 sm:px-0">
           <Breadcrumbs items={breadcrumbItems} className="text-xs sm:text-sm" />
         </div>

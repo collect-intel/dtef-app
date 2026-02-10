@@ -1,7 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { useMobile } from "@/app/sandbox/hooks/useMobile"
+import { useMobile } from "@/hooks/useMobile"
 
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}

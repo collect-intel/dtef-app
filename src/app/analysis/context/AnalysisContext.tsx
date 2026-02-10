@@ -68,8 +68,6 @@ export interface AnalysisContextType {
         leastSimilarPair: { pair: [string, string]; value: number } | null;
         modelLeaderboard: Array<{ id: string; score: number; count: number }> | null;
     } | null;
-    isSandbox: boolean;
-    sandboxId?: string;
     workshopId?: string;
     evalId?: string;
     normalizedExecutiveSummary: string | null;

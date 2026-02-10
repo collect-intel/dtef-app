@@ -109,7 +109,6 @@ export const AggregateAnalysisView: React.FC = () => {
         analysisStats,
         permutationSensitivityMap,
         promptTextsForMacroTable,
-        isSandbox,
     } = useAnalysis();
     
     const [showMacroTable, setShowMacroTable] = useState(false);
@@ -175,82 +174,6 @@ export const AggregateAnalysisView: React.FC = () => {
         );
     }
     
-    if (isSandbox) {
-        return (
-            <div className="space-y-8">
-                <SystemPromptsDisplay />
-
-                {hasMeaningfulCoverageData && (
-                    <>
-                        <div className="flex items-center space-x-2 justify-end">
-                          <Label htmlFor="macro-table-toggle">Show Macro Coverage Table</Label>
-                          <Switch
-                            id="macro-table-toggle"
-                            checked={showMacroTable}
-                            onCheckedChange={setShowMacroTable}
-                          />
-                        </div>
-
-                        {showMacroTable ? (
-                            <Card className="shadow-lg border-border dark:border-border">
-                                <CardHeader>
-                                    <CardTitle className="text-primary">Macro Coverage Overview</CardTitle>
-                                    <CardDescription>
-                                        Average key point coverage extent for each model across all prompts.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <MacroCoverageTable />
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            promptIds.map(promptId => (
-                                <Card key={promptId} className="shadow-lg border-border dark:border-border">
-                                    <CardHeader>
-                                        <div className="w-full">
-                                            <CardTitle className="text-primary text-base font-semibold mb-2">
-                                                <span className="text-muted-foreground">Prompt: </span>
-                                                <code className="text-foreground">{promptId}</code>
-                                            </CardTitle>
-                                            <RenderPromptDetails
-                                                promptId={promptId}
-                                            />
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                         {data.evaluationResults?.llmCoverageScores?.[promptId] ? (
-                                            <KeyPointCoverageTable
-                                                data={data}
-                                                promptId={promptId}
-                                                displayedModels={displayedModels}
-                                                renderAs={data.config.prompts?.find(p => p.id === promptId)?.render_as as RenderAsType}
-                                            />
-                                        ) : (
-                                            <div className="text-center py-4 text-muted-foreground text-sm">
-                                                No coverage data available for this prompt.
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ))
-                        )}
-                    </>
-                )}
-
-                {!hasMeaningfulCoverageData && (
-                    <Alert variant="default" className="border-blue-500/50 bg-blue-50/50 dark:bg-blue-900/10">
-                        <Icon name="info" className="h-4 w-4 text-blue-600" />
-                        <AlertTitle>No Coverage Data Available</AlertTitle>
-                        <AlertDescription>
-                            This sandbox run has no rubric criteria (should/should_not) defined.
-                            Coverage analysis is not available.
-                        </AlertDescription>
-                    </Alert>
-                )}
-            </div>
-        );
-    }
-
     return (
         <>
             <SystemPromptsDisplay />

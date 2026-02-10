@@ -265,8 +265,6 @@ const MacroCoverageTable: React.FC = () => {
         activeSysPromptIndex: systemPromptIndex,
         permutationSensitivityMap,
         promptTextsForMacroTable: promptTexts,
-        isSandbox,
-        sandboxId,
         activeHighlights,
         analysisStats,
         displayedModels,
@@ -1040,7 +1038,7 @@ const MacroCoverageTable: React.FC = () => {
                                             </button>
                                         ) : (
                                             <Link
-                                                href={isSandbox ? `/sandbox/results/${sandboxId}?prompt=${encodeURIComponent(promptId)}` : `/analysis/${encodeURIComponent(configId)}/${encodeURIComponent(runLabel)}/${encodeURIComponent(safeTimestampFromParams)}?prompt=${encodeURIComponent(promptId)}`}
+                                                href={`/analysis/${encodeURIComponent(configId)}/${encodeURIComponent(runLabel)}/${encodeURIComponent(safeTimestampFromParams)}?prompt=${encodeURIComponent(promptId)}`}
                                                 className={promptDisplayClasses}
                                                 title={`View details for prompt ID ${promptId}: ${getPromptText(promptId)}`}
                                             >

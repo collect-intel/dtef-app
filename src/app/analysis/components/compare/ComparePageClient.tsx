@@ -443,7 +443,7 @@ const ModelResponseCell = ({
 };
 
 export const ComparePageClient: React.FC = () => {
-    const { data, pageTitle, breadcrumbItems, isSandbox, configId, runLabel, timestamp, sandboxId, workshopId, evalId, fetchModalResponseBatch, openModelEvaluationDetailModal, currentPromptId } = useAnalysis();
+    const { data, pageTitle, breadcrumbItems, configId, runLabel, timestamp, workshopId, evalId, fetchModalResponseBatch, openModelEvaluationDetailModal, currentPromptId } = useAnalysis();
     const [loadingQueue, setLoadingQueue] = useState(() => new Set<string>());
     const [overlayMode, setOverlayMode] = useState(false);
 
@@ -548,17 +548,13 @@ export const ComparePageClient: React.FC = () => {
         );
     }
 
-    // Determine the back link - if workshop, link to workshop results; if sandbox, link to sandbox results; otherwise standard analysis
+    // Determine the back link - if workshop, link to workshop results; otherwise standard analysis
     const backLink = workshopId && evalId
         ? `/workshop/${workshopId}/eval/${evalId}`
-        : sandboxId
-        ? `/sandbox/results/${sandboxId}`
         : `/analysis/${configId}/${runLabel}/${timestamp}`;
 
     const backLinkText = workshopId && evalId
         ? 'Back to Workshop Results'
-        : sandboxId
-        ? 'Back to Results'
         : 'Advanced Analysis';
 
     const unifiedTags = useMemo(() => {
@@ -570,7 +566,7 @@ export const ComparePageClient: React.FC = () => {
         <div className="bg-slate-50 dark:bg-slate-900 h-screen flex flex-col overflow-hidden">
             <header className="flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-border">
                 <div className="w-full px-4 sm:px-6 lg:px-8 py-3">
-                    {!isSandbox && breadcrumbItems && breadcrumbItems.length > 0 && (
+                    {breadcrumbItems && breadcrumbItems.length > 0 && (
                         <div className="mb-2">
                             <Breadcrumbs items={breadcrumbItems} className="text-xs" />
                         </div>
@@ -649,14 +645,6 @@ export const ComparePageClient: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            {sandboxId && (
-                                <Button asChild variant="outline" size="sm" className="text-xs">
-                                    <Link href="/sandbox">
-                                        <Icon name="flask-conical" className="w-3.5 h-3.5 mr-1.5" />
-                                        Sandbox
-                                    </Link>
-                                </Button>
-                            )}
                             <Button asChild variant="outline" size="sm" className="text-xs">
                                 <Link href={backLink}>
                                     <Icon name="sliders-horizontal" className="w-3.5 h-3.5 mr-1.5" />

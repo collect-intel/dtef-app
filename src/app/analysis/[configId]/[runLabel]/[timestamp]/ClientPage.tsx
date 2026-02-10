@@ -25,7 +25,7 @@ import { BLUEPRINT_CONFIG_REPO_URL } from '@/lib/configConstants';
 import { SinglePromptView } from '@/app/analysis/components/SinglePromptView';
 import { AggregateAnalysisView } from '@/app/analysis/components/AggregateAnalysisView';
 import { useToast } from '@/components/ui/use-toast';
-import { generateMinimalBlueprintYaml } from '@/app/sandbox/utils/yaml-generator';
+
 import { useAnalysis } from '@/app/analysis/context/AnalysisContext';
 import AnalysisPageHeader from '@/app/analysis/components/AnalysisPageHeader';
 import { fromSafeTimestamp, formatTimestampForDisplay } from '@/lib/timestampUtils';
@@ -95,31 +95,6 @@ export const ClientPage: React.FC = () => {
         );
     }, [currentPromptId, data, displayedModels]);
 
-    const handleExploreInSandbox = () => {
-        try {
-          if (!configId || !runLabel || !timestamp) {
-            throw new Error('Missing identifiers to construct sandbox import URL.');
-          }
-
-          const param = encodeURIComponent(`${configId}/${runLabel}/${timestamp}`);
-
-          toast({
-            title: "Opening Sandbox...",
-            description: "Preparing import from selected analysis run.",
-          });
-
-          window.open(`/sandbox?config=${param}`, '_blank');
-
-        } catch (error) {
-          console.error("Failed to open Sandbox:", error);
-          toast({
-            variant: 'destructive',
-            title: 'Operation Failed',
-            description: 'Could not open the Sandbox Studio.',
-          });
-        }
-    };
-     
     if (loading) {
         return (
           <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -272,10 +247,6 @@ export const ClientPage: React.FC = () => {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button onClick={handleExploreInSandbox} variant="outline" size="sm" className="bg-exciting text-exciting-foreground border-exciting hover:bg-exciting/90 hover:text-exciting-foreground text-xs" aria-label="Open in Sandbox Studio">
-              <Icon name="flask-conical" className="w-4 h-4 mr-2" aria-hidden="true" />
-              Run in Sandbox
-            </Button>
         </div>
     );
 

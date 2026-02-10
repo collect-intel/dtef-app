@@ -37,8 +37,6 @@ interface AnalysisProviderProps {
     configId: string;
     runLabel?: string;
     timestamp?: string;
-    isSandbox?: boolean;
-    sandboxId?: string;
     workshopId?: string;
     evalId?: string;
     children: React.ReactNode;
@@ -60,8 +58,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
     configId: configIdFromProps,
     runLabel: runLabelFromProps,
     timestamp: timestampFromProps,
-    isSandbox: isSandboxFromProps,
-    sandboxId: sandboxIdFromProps,
     workshopId: workshopIdFromProps,
     evalId: evalIdFromProps,
     children
@@ -77,8 +73,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
     const configId = configIdFromProps || latchedInitialData?.configId || '';
     const runLabel = runLabelFromProps || latchedInitialData?.runLabel || '';
     const timestamp = timestampFromProps || latchedInitialData?.timestamp || '';
-    const isSandbox = isSandboxFromProps || false;
-
     // Only load data if we have initial data
     // const { data, loading, error, promptNotFound, excludedModelsList } = useComparisonData({
     //     initialData: initialData || null,
@@ -130,7 +124,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
     const analysisStats = useAnalysisStats(isFullMode ? data : null);
 
     // Lazy loading for response data (only in full mode)
-    // Pre-populate with initial responses if available (for workshop/sandbox with all data loaded)
+    // Pre-populate with initial responses if available (for workshop with all data loaded)
     const lazyResponseData = useLazyResponseData(
         isFullMode ? configId : '',
         isFullMode ? runLabel : '',
@@ -352,20 +346,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
         let bestPerformer = null;
         let worstPerformer = null;
 
-        if (isSandbox) {
-            if (analysisStats.overallCoverageExtremes?.bestCoverage) {
-                bestPerformer = {
-                    id: analysisStats.overallCoverageExtremes.bestCoverage.modelId,
-                    score: analysisStats.overallCoverageExtremes.bestCoverage.avgScore,
-                };
-            }
-            if (analysisStats.overallCoverageExtremes?.worstCoverage) {
-                worstPerformer = {
-                    id: analysisStats.overallCoverageExtremes.worstCoverage.modelId,
-                    score: analysisStats.overallCoverageExtremes.worstCoverage.avgScore,
-                };
-            }
-        } else if (analysisStats.overallHybridExtremes) {
+        if (analysisStats.overallHybridExtremes) {
             if (analysisStats.overallHybridExtremes.bestHybrid) {
                 bestPerformer = {
                     id: analysisStats.overallHybridExtremes.bestHybrid.modelId,
@@ -406,7 +387,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
             leastSimilarPair: overallPairExtremes.leastSimilar,
             modelLeaderboard,
         };
-    }, [isSandbox, data, analysisStats, getPromptContextDisplayString, isFullMode]);
+    }, [data, analysisStats, getPromptContextDisplayString, isFullMode]);
 
     // Create minimal data for non-full mode
     const contextData = useMemo(() => {
@@ -509,8 +490,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
         pageTitle,
         breadcrumbItems,
         summaryStats,
-        isSandbox,
-        sandboxId: sandboxIdFromProps,
         workshopId: workshopIdFromProps,
         evalId: evalIdFromProps,
         normalizedExecutiveSummary,
@@ -552,7 +531,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({
         canonicalModels, analysisStats, modelEvaluationModal, openModelEvaluationDetailModal,
         closeModelEvaluationDetailModal, resolvedTheme, permutationSensitivityMap,
         promptTextsForMacroTable, currentPromptId, pageTitle, breadcrumbItems, summaryStats,
-        isSandbox, sandboxIdFromProps, workshopIdFromProps, evalIdFromProps, normalizedExecutiveSummary, modelPerformanceModal,
+        workshopIdFromProps, evalIdFromProps, normalizedExecutiveSummary, modelPerformanceModal,
         openModelPerformanceModal, closeModelPerformanceModal, similarityModal, openSimilarityModal, closeSimilarityModal, promptDetailModal,
         openPromptDetailModal, closePromptDetailModal, lazyResponseData, promptSimilarityModal, openPromptSimilarityModal, closePromptSimilarityModal,
         semanticCellModal, openSemanticCellModal, closeSemanticCellModal

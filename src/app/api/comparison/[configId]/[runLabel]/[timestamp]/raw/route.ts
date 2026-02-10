@@ -7,7 +7,7 @@ export const revalidate = 3600; // Cache for 1 hour
 
 /**
  * API endpoint that returns the complete, unstripped comparison data.
- * This is used when "Run in Sandbox" needs full rubric points that aren't in core.json.
+ * This returns the complete comparison data including full rubric points not in core.json.
  */
 export async function GET(
   request: NextRequest,
