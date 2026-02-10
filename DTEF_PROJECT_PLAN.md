@@ -271,25 +271,56 @@ function evaluateDistributionMetric(
 - Calculate MAE: `mean(|predicted[i] - actual[i]|)`
 - Calculate JSD: Jensen-Shannon Divergence
 
-### 2.4 CLI Commands & Workflow
+### 2.4 Context-Level Blueprint Strategy
 
-Extend `src/cli/commands/surveyCommands.ts`:
+**Core Research Design:** Generate multiple blueprint sets for the same segment + question combinations at different context levels to measure evidence-adaptation vs. stereotype-holding.
+
+**Blueprint naming convention:**
+- `dtef-global-dialogues-gd4-country:australia.yml` — zero-context (no other question distributions)
+- `dtef-global-dialogues-gd4-country:australia-ctx.yml` — full-context (all available question distributions, up to token budget)
+
+**Generating context-enriched blueprints:**
+```bash
+# Zero-context (baseline): only demographic + target question
+pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4/
+
+# Full-context: all other questions' distributions provided as context
+pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4-ctx/ \
+  --context-questions all --token-budget 16384
+```
+
+When `--context-questions all` is specified, the generator automatically uses all non-target questions as context for each prompt. The token budget controls how many context questions fit — with a 16K budget, most or all of a round's questions will fit as context.
+
+**Research analysis:** By comparing the same model's JSD score on zero-context vs. full-context blueprints for the same question and segment:
+- **Improvement** = model is evidence-adapting (uses provided distributions to inform prediction)
+- **No change** = model is stereotype-holding (ignores context, relies on priors)
+- **Degradation** = model is confused by additional context (potential noise sensitivity)
+
+### 2.5 CLI Commands & Workflow
+
+`src/cli/commands/dtef-commands.ts`:
 
 **Workflow:**
-1. **Generate:** Run CLI to generate YAML files in a local `output/` directory (gitignored).
-2. **Review:** User manually checks a few blueprints.
-3. **Transfer:** Use a helper script to copy valid blueprints to the `dtef-configs` repo (assumed sibling directory).
+1. **Import:** Convert survey data to DTEF format (e.g., `import-gd` for Global Dialogues)
+2. **Generate:** Run CLI to generate YAML files in a local `output/` directory (gitignored)
+3. **Review:** User manually checks a few blueprints
+4. **Publish:** Copy valid blueprints to the `dtef-configs` repo (assumed sibling directory)
 
 ```bash
-# Generate demographic blueprints to local folder
-pnpm cli survey generate-demographic \
-  --input survey-data.json \
-  --output ./local-blueprints/
-  
-# Transfer to config repo (if approved)
-pnpm cli survey publish \
-  --source ./local-blueprints/ \
-  --target ../dtef-configs/blueprints/ \
+# Import GD4 data
+pnpm cli dtef import-gd -r GD4 -o output/gd4.json
+
+# Generate zero-context blueprints
+pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4/
+
+# Generate full-context blueprints
+pnpm cli dtef generate -i output/gd4.json -o ./output/dtef-blueprints/gd4-ctx/ \
+  --context-questions all --token-budget 16384
+
+# Publish to config repo
+pnpm cli dtef publish \
+  --source ./output/dtef-blueprints/gd4-ctx/ \
+  --target ../dtef-configs/blueprints/gd4-ctx/ \
   --tag "global-dialogues-v1"
 ```
 
@@ -476,12 +507,27 @@ Example: 4 age groups × 2 genders × 5 countries = 40 segments
 **Question:** Which questions to include as context?
 
 **Options:**
-- Random selection
-- Semantically similar questions
-- Questions with highest demographic variance
-- User-configurable
+- All available questions (`--context-questions all`) — maximizes evidence provided to the model
+- Random selection — useful for studying which questions provide the most informative context
+- Semantically similar questions — test whether topically related context helps
+- Questions with highest demographic variance — context that most differentiates this segment
+- User-configurable — explicit question IDs
 
-**Recommendation:** Start with random, explore variance-based selection later.
+**Recommendation:** Start with `all` (all non-target questions as context) for the primary evidence-adapting evaluation. This provides the maximum amount of evidence to the model and establishes the upper bound on context-informed performance. Random or variance-based selection can be explored later for more granular analysis.
+
+### Decision 5: Context-Level Comparison Strategy
+**Question:** How to structure the varying-context comparison for measuring evidence-adaptation vs. stereotype-holding?
+
+**Approach (implemented):**
+- **Zero-context blueprints**: Existing baseline — only demographic attributes + target question
+- **Full-context blueprints** (suffix `-ctx`): All non-target question distributions provided, up to token budget
+- Compare the same model's scores on zero-context vs. full-context for the same segment + question
+- The delta is the "evidence-adaptation" measure
+
+**Future extensions:**
+- Intermediate context levels (5, 10, 25, 50 questions) to plot a learning curve
+- Context ordering experiments (random vs. semantic similarity vs. variance-based)
+- Per-question analysis of which context questions are most informative
 
 ---
 

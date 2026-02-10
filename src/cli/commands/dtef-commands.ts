@@ -34,7 +34,7 @@ dtefCommand
     .option('--segments <ids>', 'Comma-separated list of segment IDs to include (default: all)')
     .option('--models <models>', 'Comma-separated list of models or model collections', 'CORE')
     .option('--temperature <temp>', 'Model temperature', '0.3')
-    .option('--context-questions <ids>', 'Comma-separated question IDs to use as context in prompts')
+    .option('--context-questions <ids>', 'Comma-separated question IDs to use as context, or "all" for all non-target questions')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
@@ -85,7 +85,9 @@ dtefCommand
             : Object.keys(surveyData.questions);
 
         const contextQuestionIds = options.contextQuestions
-            ? options.contextQuestions.split(',').map((s: string) => s.trim())
+            ? (options.contextQuestions.toLowerCase() === 'all'
+                ? Object.keys(surveyData.questions)
+                : options.contextQuestions.split(',').map((s: string) => s.trim()))
             : undefined;
 
         const config: DTEFBlueprintConfig = {

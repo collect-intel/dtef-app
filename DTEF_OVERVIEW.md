@@ -82,6 +82,23 @@ This evaluation type assesses an AI model's ability to predict a demographic seg
 
 The system automatically generates multiple evaluation variants with varying demographic specificity levels.
 
+**Core Research Design: Varying-Context Comparison**
+
+A central research dimension of DTEF is comparing model performance at **different levels of provided context**. The platform generates multiple blueprint sets for the *same* segment + question combinations, but with different amounts of context questions (other survey question distributions) provided as input:
+
+| Context Level | Description | What It Measures |
+|---------------|-------------|------------------|
+| **Zero context** | Only demographic attributes + target question | Baseline: model's priors/stereotypes about this demographic |
+| **Low context** | A few other question distributions provided | Whether models begin adapting to evidence |
+| **Full context** | All available question distributions (up to token budget) | Maximum evidence-informed prediction |
+
+This enables measuring two key model behaviors:
+
+* **Evidence-adapting**: The model improves its predictions when given more evidence about how this demographic actually responds to other questions. Performance improves with more context.
+* **Stereotype-holding**: The model ignores provided evidence and relies on prior assumptions about the demographic. Performance stays flat or doesn't improve with added context.
+
+The **delta between zero-context and full-context performance** for a given model is a key metric: it quantifies the degree to which a model can genuinely learn from demographic response patterns rather than relying on stereotypical priors. A model that performs well with zero context but doesn't improve with full context may be applying stereotypes that happen to be accurate — the context comparison helps distinguish this from genuine evidence-based reasoning.
+
 ### 3.3 Methodology
 
 * **Blueprint Generation:** The system automatically generates weval-compatible blueprints from survey data based on selected evaluation types
@@ -117,6 +134,7 @@ DTEF aims to enable investigation of:
 * What context (amount, type) is required for reliable demographic predictions?
 * Which demographic segments and question types are most challenging?
 * Do models show evidence of stereotypical reasoning vs. data-adaptive predictions?
+* **How does prediction accuracy change as more context is provided?** (The "evidence-adapting vs. stereotype-holding" question: comparing zero-context, low-context, and full-context performance for the same model, segment, and question to measure whether models genuinely incorporate provided demographic evidence or default to stereotypical priors.)
 
 ## 7. Risks
 
@@ -154,6 +172,17 @@ Q3 "Would you use an AI therapist?" → Predict distribution
 *Actual:* `Strongly Agree: 12%, Agree: 28%, Neutral: 30%, Disagree: 22%, Strongly Disagree: 8%`
 
 *Score:* Calculate MAE or JSD between predicted and actual distributions
+
+**Varying-Context Comparison:**
+
+The same evaluation is run at multiple context levels to measure evidence-adaptation:
+
+| Blueprint Variant | Context Provided | Purpose |
+|-------------------|-----------------|---------|
+| `gd4-age:18-25` (zero-context) | None — only demographic + target question | Baseline stereotype measure |
+| `gd4-age:18-25-ctx` (full-context) | Q1, Q2, Q4–Q116 distributions for this segment | Evidence-informed prediction |
+
+By comparing the same model's JSD score on the zero-context vs. full-context variant for the same question and segment, DTEF measures how much a model benefits from (or ignores) provided demographic evidence.
 
 ## 9. Leaderboards
 

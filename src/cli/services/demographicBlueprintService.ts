@@ -84,8 +84,11 @@ export class DemographicBlueprintService {
             prompts.push(prompt);
         }
 
-        const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}`;
-        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label}`;
+        const hasContext = config.contextQuestionIds && config.contextQuestionIds.length > 0;
+        const ctxSuffix = hasContext ? '-ctx' : '';
+        const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}${ctxSuffix}`;
+        const ctxLabel = hasContext ? ' (with context)' : '';
+        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label}${ctxLabel}`;
 
         // Build ground truth distributions map for DTEF metadata
         const groundTruthDistributions: Record<string, number[]> = {};
@@ -252,10 +255,17 @@ export class DemographicBlueprintService {
 
         if (contextTexts.length === 0) return null;
 
+        // Estimate core prompt size (demographics + target question + formatting)
+        // to get a more accurate token budget for context questions
+        const attributeLines = Object.entries(segment.attributes)
+            .map(([key, value]) => `- ${key}: ${value}`)
+            .join('\n');
+        const coreEstimate = `Consider the following demographic group (sample size: ${segment.sampleSize}):\n${attributeLines}\n\nSurvey question:\n"[question text placeholder ~100 chars]"\n\nAnswer options:\n  a. Option 1\n  b. Option 2\n  c. Option 3\n\nPredict the percentage distribution of responses for this demographic group across the answer options.`;
+
         // Check token budget - estimate how many context questions fit
         const budget = calculateTokenBudget(
             systemPrompt,
-            '', // Core prompt not built yet at this point; use conservative estimate
+            coreEstimate,
             contextTexts.map(c => c.text),
             tokenBudget
         );
