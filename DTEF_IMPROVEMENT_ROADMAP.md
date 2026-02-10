@@ -139,15 +139,10 @@ Currently there are no automated checks on PR/push. Need:
 
 ### 2.5 Evaluation Queue Persistence
 
-**Status:** In-memory only; lost on restart
-**Impact:** Queued evaluations silently disappear when Railway redeploys
+**Status:** ✅ Assessed — accepting current limitation
+**Impact:** Low — weekly cron provides recovery
 
-The evaluation queue (`src/lib/evaluation-queue.ts`) uses an in-memory array. On server restart (Railway deploys), all pending evaluations are lost.
-
-**Options:**
-- (A) Use Railway-managed Redis for queue persistence
-- (B) Use S3 as a simple queue (write pending items as JSON, poll on startup)
-- (C) Accept the limitation and document it (weekly cron will re-discover unrun blueprints)
+The queue stores function references that can't be serialized. The weekly cron (`fetch-and-schedule-evals`) re-discovers unrun blueprints, so nothing is permanently lost. Adding persistence would require a significant architecture change (storing evaluation parameters and reconstructing pipelines on startup) that isn't worth the complexity given the existing recovery mechanism.
 
 **Files:** `src/lib/evaluation-queue.ts`
 

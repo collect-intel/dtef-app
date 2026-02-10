@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   staticPageGenerationTimeout: 600,
   productionBrowserSourceMaps: false,
-  typescript: { ignoreBuildErrors: true },
+  typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: true },
   // Externalize heavy packages from server bundle to reduce bundle size
   serverExternalPackages: [

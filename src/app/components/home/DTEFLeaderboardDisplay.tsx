@@ -64,7 +64,7 @@ const DTEFLeaderboardDisplay: React.FC<{
           <div className="mb-4">
             <div className="flex items-start justify-between mb-3">
               <h4 className="text-lg font-bold text-foreground leading-tight pr-2">Overall Prediction Accuracy</h4>
-              <Icon name="bar-chart" className="w-6 h-6 flex-shrink-0 text-primary" />
+              <Icon name="bar-chart-3" className="w-6 h-6 flex-shrink-0 text-primary" />
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               How accurately models predict survey response distributions across all demographic segments
@@ -242,7 +242,7 @@ function computeSegmentTypeLeaders(
       const prefix = seg.segmentId?.split(':')[0] || seg.segmentId?.substring(0, 2);
       if (!prefix || !segmentTypeNames[prefix]) continue;
       if (!byType.has(prefix)) byType.set(prefix, []);
-      byType.get(prefix)!.push(seg.score);
+      byType.get(prefix)!.push(seg.avgCoverageExtent);
     }
     for (const [prefix, scores] of byType) {
       const avg = scores.reduce((a, b) => a + b, 0) / scores.length;

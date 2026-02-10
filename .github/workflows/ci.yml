@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Type check
+        run: npx tsc --noEmit
+
       - name: Run web tests
         run: pnpm test:web
 
