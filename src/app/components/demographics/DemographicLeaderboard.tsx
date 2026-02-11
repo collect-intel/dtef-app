@@ -32,6 +32,17 @@ interface FairnessConcern {
     gap: number;
 }
 
+interface ContextResponsivenessModel {
+    modelId: string;
+    displayName: string;
+    slope: number;
+}
+
+interface ContextResponsivenessData {
+    models: ContextResponsivenessModel[];
+    contextLevelsFound: number[];
+}
+
 interface DemographicsData {
     status?: string;
     message?: string;
@@ -45,6 +56,7 @@ interface DemographicsData {
         segmentCount: number;
     }>;
     fairnessConcerns?: FairnessConcern[];
+    contextResponsiveness?: ContextResponsivenessData;
     aggregation?: {
         modelResults?: ModelResult[];
         disparities?: Array<{
@@ -295,6 +307,104 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     );
 }
 
+/** Gradient bar showing where a model falls on the prior-reliant ↔ context-responsive spectrum */
+function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: number }) {
+    // Normalize slope to 0-100 range. Slope can be negative (gets worse with context).
+    // Center 0 at 50%, positive slopes go right, negative go left.
+    const range = maxSlope || 1;
+    const normalized = Math.max(0, Math.min(100, 50 + (slope / range) * 50));
+
+    return (
+        <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 relative bg-muted rounded-full h-3 overflow-hidden">
+                {/* Gradient background */}
+                <div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                        background: 'linear-gradient(to right, #6366f1, #a5b4fc, #e2e8f0, #fbbf24, #f97316)',
+                    }}
+                />
+                {/* Indicator dot */}
+                <div
+                    className="absolute top-0.5 w-2 h-2 rounded-full bg-foreground border border-background shadow-sm"
+                    style={{ left: `calc(${normalized}% - 4px)` }}
+                />
+            </div>
+            <span className="text-xs text-muted-foreground w-16 text-right font-mono">
+                {slope >= 0 ? '+' : ''}{(slope * 100).toFixed(2)}
+            </span>
+        </div>
+    );
+}
+
+/** Context Responsiveness section: shows how models respond to increasing context */
+function ContextResponsivenessSection({ data }: { data: ContextResponsivenessData }) {
+    const models = data.models;
+    if (!models || models.length === 0) return null;
+
+    const maxAbsSlope = Math.max(...models.map(m => Math.abs(m.slope)), 0.001);
+    const levelsLabel = data.contextLevelsFound
+        .map(l => l === 0 ? '0 (baseline)' : String(l))
+        .join(', ');
+
+    return (
+        <section>
+            <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold tracking-tight">Context Responsiveness</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                    How much does prediction accuracy change as models receive more context?
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                    Based on evaluations at {levelsLabel} context questions
+                </p>
+            </div>
+
+            {/* Spectrum legend */}
+            <div className="flex justify-between items-center text-xs text-muted-foreground mb-4 px-2">
+                <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-full" style={{ background: '#6366f1' }} />
+                    Prior-reliant
+                </span>
+                <span className="flex items-center gap-1">
+                    Context-responsive
+                    <span className="inline-block w-3 h-3 rounded-full" style={{ background: '#f97316' }} />
+                </span>
+            </div>
+
+            <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Model
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/2">
+                                Responsiveness
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {models.map((model) => (
+                            <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
+                                    {formatModelName(model.modelId)}
+                                </td>
+                                <td className="px-4 py-3">
+                                    <ResponsivenessBar slope={model.slope} maxSlope={maxAbsSlope} />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+                Score = slope of accuracy vs. context count. Positive = improves with more context.
+            </p>
+        </section>
+    );
+}
+
 // --- Main component ---
 
 export default function DemographicLeaderboard() {
@@ -452,6 +562,11 @@ export default function DemographicLeaderboard() {
             {/* Segment Explorer */}
             {modelResults.length > 0 && (
                 <SegmentExplorer modelResults={modelResults} />
+            )}
+
+            {/* Context Responsiveness */}
+            {data.contextResponsiveness && data.contextResponsiveness.models.length > 0 && (
+                <ContextResponsivenessSection data={data.contextResponsiveness} />
             )}
 
             {/* Fairness Analysis */}

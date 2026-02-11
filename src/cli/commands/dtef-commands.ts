@@ -35,6 +35,7 @@ dtefCommand
     .option('--models <models>', 'Comma-separated list of models or model collections', 'CORE')
     .option('--temperature <temp>', 'Model temperature', '0.3')
     .option('--context-questions <ids>', 'Comma-separated question IDs to use as context, or "all" for all non-target questions')
+    .option('--context-levels <levels>', 'Generate blueprints at multiple context levels (e.g., "0,5,10,all")')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
@@ -90,22 +91,72 @@ dtefCommand
                 : options.contextQuestions.split(',').map((s: string) => s.trim()))
             : undefined;
 
-        const config: DTEFBlueprintConfig = {
-            surveyData,
-            targetQuestionIds,
-            contextQuestionIds,
-            segmentSelection: options.segments ? 'specific' : 'all',
-            segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
-            tokenBudget: parseInt(options.tokenBudget, 10),
-            modelConfig: {
-                models: options.models.split(',').map((s: string) => s.trim()),
-                temperature: parseFloat(options.temperature),
-            },
-        };
+        // Parse --context-levels if specified
+        const contextLevels: number[] | undefined = options.contextLevels
+            ? options.contextLevels.split(',').map((s: string) => {
+                const trimmed = s.trim().toLowerCase();
+                if (trimmed === 'all') return -1; // -1 sentinel for "all available"
+                const n = parseInt(trimmed, 10);
+                if (isNaN(n) || n < 0) {
+                    console.error(chalk.red(`Invalid context level: "${s}". Use numbers or "all".`));
+                    process.exit(1);
+                }
+                return n;
+            })
+            : undefined;
 
-        // Generate blueprints
+        // Generate blueprints (possibly at multiple context levels)
         console.log(chalk.gray('Generating blueprints...'));
-        const blueprints = DemographicBlueprintService.generateBlueprints(config);
+
+        let allBlueprints: ReturnType<typeof DemographicBlueprintService.generateBlueprints> = [];
+
+        if (contextLevels && contextQuestionIds) {
+            // Multi-level context generation
+            const allContextIds = contextQuestionIds;
+            for (const level of contextLevels) {
+                const levelContextIds = level === 0 ? undefined
+                    : level === -1 ? allContextIds
+                    : allContextIds.slice(0, level);
+                const levelContextCount = level === 0 ? undefined
+                    : level === -1 ? undefined
+                    : level;
+
+                const config: DTEFBlueprintConfig = {
+                    surveyData,
+                    targetQuestionIds,
+                    contextQuestionIds: levelContextIds,
+                    contextQuestionCount: levelContextCount,
+                    segmentSelection: options.segments ? 'specific' : 'all',
+                    segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
+                    tokenBudget: parseInt(options.tokenBudget, 10),
+                    modelConfig: {
+                        models: options.models.split(',').map((s: string) => s.trim()),
+                        temperature: parseFloat(options.temperature),
+                    },
+                };
+
+                const levelLabel = level === -1 ? 'all' : level === 0 ? '0 (baseline)' : String(level);
+                console.log(chalk.gray(`  Context level ${levelLabel}...`));
+                const blueprints = DemographicBlueprintService.generateBlueprints(config);
+                allBlueprints.push(...blueprints);
+            }
+        } else {
+            const config: DTEFBlueprintConfig = {
+                surveyData,
+                targetQuestionIds,
+                contextQuestionIds,
+                segmentSelection: options.segments ? 'specific' : 'all',
+                segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
+                tokenBudget: parseInt(options.tokenBudget, 10),
+                modelConfig: {
+                    models: options.models.split(',').map((s: string) => s.trim()),
+                    temperature: parseFloat(options.temperature),
+                },
+            };
+            allBlueprints = DemographicBlueprintService.generateBlueprints(config);
+        }
+
+        const blueprints = allBlueprints;
 
         console.log(chalk.green(`Generated ${blueprints.length} blueprint(s)\n`));
 

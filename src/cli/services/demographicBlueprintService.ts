@@ -66,6 +66,8 @@ export class DemographicBlueprintService {
         segment: SegmentWithResponses
     ): WevalConfig {
         const prompts: WevalPromptConfig[] = [];
+        let blueprintContextCount = 0;
+        let blueprintContextIds: string[] = [];
 
         for (const questionId of config.targetQuestionIds) {
             const question = config.surveyData.questions[questionId];
@@ -74,7 +76,7 @@ export class DemographicBlueprintService {
             const response = segment.responses.find(r => r.questionId === questionId);
             if (!response) continue;
 
-            const prompt = this.generatePromptForQuestion(
+            const { prompt, contextQuestionCount, contextQuestionIds } = this.generatePromptForQuestion(
                 config,
                 segment,
                 questionId,
@@ -82,19 +84,24 @@ export class DemographicBlueprintService {
                 response
             );
             prompts.push(prompt);
+
+            // Track context metadata from the first prompt (consistent across prompts in a segment)
+            if (blueprintContextCount === 0 && contextQuestionCount > 0) {
+                blueprintContextCount = contextQuestionCount;
+                blueprintContextIds = contextQuestionIds;
+            }
         }
 
-        const hasContext = config.contextQuestionIds && config.contextQuestionIds.length > 0;
-        const ctxSuffix = hasContext ? '-ctx' : '';
+        // ConfigId: no suffix for 0 context, -c{N} for N context questions
+        const ctxSuffix = blueprintContextCount > 0 ? `-c${blueprintContextCount}` : '';
         const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}${ctxSuffix}`;
-        const ctxLabel = hasContext ? ' (with context)' : '';
+        const ctxLabel = blueprintContextCount > 0 ? ` (${blueprintContextCount} context Qs)` : '';
         const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label}${ctxLabel}`;
 
         // Build ground truth distributions map for DTEF metadata
         const groundTruthDistributions: Record<string, number[]> = {};
         for (const prompt of prompts) {
             const response = segment.responses.find(r => r.questionId === prompt.id.split('-')[0]);
-            // Use the idealResponse to extract expected distribution
             if (prompt.idealResponse) {
                 try {
                     const dist = JSON.parse(prompt.idealResponse);
@@ -121,6 +128,8 @@ export class DemographicBlueprintService {
                     segmentLabel: segment.label,
                     segmentAttributes: segment.attributes,
                     groundTruthDistributions,
+                    contextQuestionCount: blueprintContextCount,
+                    contextQuestionIds: blueprintContextIds,
                 },
             },
         };
@@ -136,9 +145,9 @@ export class DemographicBlueprintService {
         questionId: string,
         question: { text: string; type: string; options?: string[] },
         response: DemographicResponse
-    ): WevalPromptConfig {
+    ): { prompt: WevalPromptConfig; contextQuestionCount: number; contextQuestionIds: string[] } {
         const options = question.options || [];
-        const promptText = this.buildPromptText(config, segment, question, options, questionId);
+        const { text: promptText, contextQuestionCount, contextQuestionIds } = this.buildPromptText(config, segment, question, options, questionId);
 
         // Build the ideal response as the distribution string
         const idealDistribution = response.distribution
@@ -150,12 +159,16 @@ export class DemographicBlueprintService {
         const points = this.generateDistributionPoints(response.distribution, options);
 
         return {
-            id: `${questionId}-${segment.id}`,
-            description: `Predict: ${segment.label} → "${question.text}"`,
-            promptText,
-            points,
-            idealResponse,
-            temperature: config.modelConfig?.temperature,
+            prompt: {
+                id: `${questionId}-${segment.id}`,
+                description: `Predict: ${segment.label} → "${question.text}"`,
+                promptText,
+                points,
+                idealResponse,
+                temperature: config.modelConfig?.temperature,
+            },
+            contextQuestionCount,
+            contextQuestionIds,
         };
     }
 
@@ -163,6 +176,7 @@ export class DemographicBlueprintService {
      * Build the prompt text for a demographic prediction question.
      * Optionally includes context questions (other questions' distributions
      * for the same segment) if token budget allows.
+     * Returns text and context metadata.
      */
     private static buildPromptText(
         config: DTEFBlueprintConfig,
@@ -170,7 +184,7 @@ export class DemographicBlueprintService {
         question: { text: string; type: string; options?: string[] },
         options: string[],
         targetQuestionId?: string
-    ): string {
+    ): { text: string; contextQuestionCount: number; contextQuestionIds: string[] } {
         const prefix = config.blueprintTemplate?.promptPrefix || '';
         const suffix = config.blueprintTemplate?.promptSuffix || '';
 
@@ -190,14 +204,19 @@ export class DemographicBlueprintService {
         corePrompt += `${attributeLines}\n\n`;
 
         // Build context questions section if configured and budget allows
-        const contextSection = this.buildContextSection(
+        const contextResult = this.buildContextSection(
             config,
             segment,
             targetQuestionId
         );
 
-        if (contextSection) {
-            corePrompt += contextSection;
+        let contextQuestionCount = 0;
+        let contextQuestionIds: string[] = [];
+
+        if (contextResult) {
+            corePrompt += contextResult.text;
+            contextQuestionCount = contextResult.questionCount;
+            contextQuestionIds = contextResult.questionIds;
         }
 
         corePrompt += `Survey question:\n"${question.text}"\n\n`;
@@ -217,23 +236,27 @@ export class DemographicBlueprintService {
             corePrompt += `\n\n${suffix}`;
         }
 
-        return corePrompt;
+        return { text: corePrompt, contextQuestionCount, contextQuestionIds };
     }
 
     /**
      * Build context section with other question distributions for the segment.
      * Uses token budget to decide how many context questions to include.
+     * Returns structured result with text, count, and IDs for metadata.
      */
     private static buildContextSection(
         config: DTEFBlueprintConfig,
         segment: SegmentWithResponses,
         targetQuestionId?: string
-    ): string | null {
+    ): { text: string; questionCount: number; questionIds: string[] } | null {
         const contextQuestionIds = config.contextQuestionIds;
         if (!contextQuestionIds || contextQuestionIds.length === 0) return null;
 
         const tokenBudget = config.tokenBudget || DEFAULT_TOKEN_BUDGET;
         const systemPrompt = config.blueprintTemplate?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+        // If contextQuestionCount is set, limit pool to that many questions
+        const maxContextQuestions = config.contextQuestionCount;
 
         // Build context question texts
         const contextTexts: { questionId: string; text: string }[] = [];
@@ -251,6 +274,9 @@ export class DemographicBlueprintService {
 
             const text = `Q: "${q.text}"\n  Response distribution: ${optionLines || distStr}\n`;
             contextTexts.push({ questionId: qId, text });
+
+            // Stop early if we've hit the explicit context count limit
+            if (maxContextQuestions !== undefined && contextTexts.length >= maxContextQuestions) break;
         }
 
         if (contextTexts.length === 0) return null;
@@ -279,7 +305,11 @@ export class DemographicBlueprintService {
         }
         section += '\n';
 
-        return section;
+        return {
+            text: section,
+            questionCount: questionsToInclude.length,
+            questionIds: questionsToInclude.map(q => q.questionId),
+        };
     }
 
     /**
@@ -346,7 +376,7 @@ export class DemographicBlueprintService {
                 if (!response) continue;
 
                 const options = question.options || [];
-                const promptText = this.buildPromptText(config, segment, question, options, questionId);
+                const { text: promptText } = this.buildPromptText(config, segment, question, options, questionId);
 
                 prompts.push({
                     id: `${questionId}-${segment.id}`,

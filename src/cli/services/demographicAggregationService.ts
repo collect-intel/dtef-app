@@ -62,6 +62,40 @@ export interface DisparityEntry {
 }
 
 /**
+ * A single (contextCount, score) data point for context responsiveness analysis.
+ */
+export interface ContextDataPoint {
+    contextCount: number;
+    score: number;
+}
+
+/**
+ * Context responsiveness for a single segment.
+ */
+export interface SegmentResponsiveness {
+    segmentId: string;
+    dataPoints: ContextDataPoint[];
+    slope: number;
+}
+
+/**
+ * Context responsiveness for a single model across segments.
+ */
+export interface ModelResponsiveness {
+    modelId: string;
+    overallSlope: number;
+    segmentResponsiveness: SegmentResponsiveness[];
+}
+
+/**
+ * Context analysis across all models.
+ */
+export interface ContextAnalysis {
+    models: ModelResponsiveness[];
+    contextLevelsFound: number[];
+}
+
+/**
  * Full aggregation output.
  */
 export interface DemographicAggregation {
@@ -76,6 +110,8 @@ export interface DemographicAggregation {
     disparities: DisparityEntry[];
     /** Leaderboard entries sorted by overall score */
     leaderboard: DTEFLeaderboardEntry[];
+    /** Context responsiveness analysis (present when multiple context levels exist) */
+    contextAnalysis?: ContextAnalysis;
 }
 
 /**
@@ -158,6 +194,125 @@ export class DemographicAggregationService {
             };
         }
         return result2;
+    }
+
+    /**
+     * Extract the context question count from a result.
+     * Reads context.dtef.contextQuestionCount, falling back to legacy detection:
+     *   - configId contains '-ctx' → total available questions for the segment (treated as "full")
+     *   - configId matches '-c{N}' → N
+     *   - otherwise → 0
+     */
+    static extractContextCount(result: WevalResult): number {
+        const ctx = (result.config?.context as any)?.dtef;
+        if (ctx?.contextQuestionCount !== undefined) {
+            return ctx.contextQuestionCount;
+        }
+
+        const configId = result.config?.configId || '';
+        // Match -c{N} suffix
+        const cMatch = configId.match(/-c(\d+)$/);
+        if (cMatch) return parseInt(cMatch[1], 10);
+
+        // Legacy: -ctx suffix means "full context" — estimate from contextQuestionIds length
+        if (configId.includes('-ctx')) {
+            const ids = ctx?.contextQuestionIds;
+            return Array.isArray(ids) ? ids.length : -1; // -1 = full but unknown count
+        }
+
+        return 0;
+    }
+
+    /**
+     * Simple least-squares linear regression slope for (x, y) points.
+     * Returns the slope of the best-fit line. Works with 2+ points.
+     */
+    static linearRegressionSlope(points: ContextDataPoint[]): number {
+        if (points.length < 2) return 0;
+
+        const n = points.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (const p of points) {
+            sumX += p.contextCount;
+            sumY += p.score;
+            sumXY += p.contextCount * p.score;
+            sumXX += p.contextCount * p.contextCount;
+        }
+
+        const denominator = n * sumXX - sumX * sumX;
+        if (denominator === 0) return 0;
+
+        return (n * sumXY - sumX * sumY) / denominator;
+    }
+
+    /**
+     * Compute context responsiveness analysis from results with varying context levels.
+     * Groups results by model → segment → context level, then computes regression slopes.
+     */
+    static computeContextAnalysis(results: WevalResult[]): ContextAnalysis | undefined {
+        // Collect all (model, segment, contextCount, score) tuples
+        const tuples: { modelId: string; segmentId: string; contextCount: number; score: number }[] = [];
+        const contextLevels = new Set<number>();
+
+        for (const result of results) {
+            const ctx = this.extractDTEFContext(result);
+            if (!ctx) continue;
+
+            const contextCount = this.extractContextCount(result);
+            // Skip results where we can't determine context count (-1 = unknown full)
+            if (contextCount === -1) continue;
+
+            contextLevels.add(contextCount);
+            const modelScores = this.extractModelScores(result);
+
+            for (const [modelId, data] of Object.entries(modelScores)) {
+                tuples.push({
+                    modelId,
+                    segmentId: ctx.segmentId,
+                    contextCount,
+                    score: data.avgScore,
+                });
+            }
+        }
+
+        // Need at least 2 different context levels to compute responsiveness
+        if (contextLevels.size < 2) return undefined;
+
+        // Group by model → segment
+        const modelMap = new Map<string, Map<string, ContextDataPoint[]>>();
+        for (const t of tuples) {
+            if (!modelMap.has(t.modelId)) modelMap.set(t.modelId, new Map());
+            const segMap = modelMap.get(t.modelId)!;
+            if (!segMap.has(t.segmentId)) segMap.set(t.segmentId, []);
+            segMap.get(t.segmentId)!.push({ contextCount: t.contextCount, score: t.score });
+        }
+
+        const models: ModelResponsiveness[] = [];
+        for (const [modelId, segMap] of modelMap) {
+            const segmentResponsiveness: SegmentResponsiveness[] = [];
+            const allSlopes: number[] = [];
+
+            for (const [segmentId, dataPoints] of segMap) {
+                if (dataPoints.length < 2) continue;
+                const slope = this.linearRegressionSlope(dataPoints);
+                segmentResponsiveness.push({ segmentId, dataPoints, slope });
+                allSlopes.push(slope);
+            }
+
+            const overallSlope = allSlopes.length > 0
+                ? allSlopes.reduce((a, b) => a + b, 0) / allSlopes.length
+                : 0;
+
+            models.push({ modelId, overallSlope, segmentResponsiveness });
+        }
+
+        // Sort by slope descending (most context-responsive first)
+        models.sort((a, b) => b.overallSlope - a.overallSlope);
+
+        return {
+            models,
+            contextLevelsFound: Array.from(contextLevels).sort((a, b) => a - b),
+        };
     }
 
     /**
@@ -267,6 +422,9 @@ export class DemographicAggregationService {
             lastEvaluatedAt: new Date().toISOString(),
         }));
 
+        // Compute context responsiveness analysis
+        const contextAnalysis = this.computeContextAnalysis(dtefResults);
+
         return {
             surveyId,
             aggregatedAt: new Date().toISOString(),
@@ -274,6 +432,7 @@ export class DemographicAggregationService {
             modelResults,
             disparities,
             leaderboard,
+            contextAnalysis,
         };
     }
 }

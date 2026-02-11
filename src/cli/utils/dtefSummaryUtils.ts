@@ -41,6 +41,11 @@ export interface DTEFSummary {
     }[];
     /** Full aggregation data */
     aggregation: DemographicAggregation;
+    /** Context responsiveness (present when multiple context levels evaluated) */
+    contextResponsiveness?: {
+        models: Array<{ modelId: string; displayName: string; slope: number }>;
+        contextLevelsFound: number[];
+    };
 }
 
 /**
@@ -77,6 +82,18 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
             gap: d.absoluteGap,
         }));
 
+    // Context responsiveness (if multiple context levels exist)
+    const contextResponsiveness = aggregation.contextAnalysis
+        ? {
+            models: aggregation.contextAnalysis.models.map(m => ({
+                modelId: m.modelId,
+                displayName: m.modelId.replace(/^openrouter:/, ''),
+                slope: m.overallSlope,
+            })),
+            contextLevelsFound: aggregation.contextAnalysis.contextLevelsFound,
+        }
+        : undefined;
+
     return {
         generatedAt: new Date().toISOString(),
         surveyId: aggregation.surveyId,
@@ -84,6 +101,7 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
         topModels,
         fairnessConcerns,
         aggregation,
+        contextResponsiveness,
     };
 }
 

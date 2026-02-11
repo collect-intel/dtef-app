@@ -139,6 +139,12 @@ export interface DTEFBlueprintConfig {
     temperature?: number;
   };
 
+  /**
+   * Number of context questions to include (for multi-level context generation).
+   * When specified via --context-levels, overrides contextQuestionIds length.
+   */
+  contextQuestionCount?: number;
+
   /** Blueprint template customization */
   blueprintTemplate?: {
     /** Custom system prompt */
