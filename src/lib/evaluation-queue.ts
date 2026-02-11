@@ -7,7 +7,7 @@
  * any that were lost.
  */
 
-const MAX_CONCURRENT = 3;
+const MAX_CONCURRENT = 10;
 
 interface QueueItem {
   id: string;
