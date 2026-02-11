@@ -327,12 +327,11 @@ export class DemographicBlueprintService {
         _options: string[]
     ): WevalPromptConfig['points'] {
         return [{
-            text: 'Distribution Similarity (Jensen-Shannon Divergence)',
+            text: 'Distribution Similarity (Jensen-Shannon Distance)',
             fn: 'distribution_metric',
             fnArgs: {
                 expected: expectedDistribution,
                 metric: 'js-divergence',
-                threshold: 0.85,
             },
         }];
     }

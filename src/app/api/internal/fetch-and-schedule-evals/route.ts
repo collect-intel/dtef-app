@@ -33,6 +33,19 @@ export async function POST(req: NextRequest) {
   const logger = await getLogger('schedule-evals:cron');
   logger.info(`Function triggered (${new Date().toISOString()})`);
 
+  // Parse request body for force flag
+  let force = false;
+  try {
+    const body = await req.json();
+    force = body?.force === true;
+  } catch {
+    // No body or invalid JSON — not forced
+  }
+
+  if (force) {
+    logger.info('Force mode enabled — skipping freshness checks');
+  }
+
   const githubToken = process.env.GITHUB_TOKEN;
   const githubHeaders: Record<string, string> = {
     'Accept': 'application/vnd.github.v3+json',
@@ -152,7 +165,9 @@ export async function POST(req: NextRequest) {
         const existingRuns = await listRunsForConfig(currentId);
         let needsRun = true;
 
-        if (existingRuns && existingRuns.length > 0) {
+        if (force) {
+          logger.info(`Force mode: scheduling run for ${currentId} regardless of history.`);
+        } else if (existingRuns && existingRuns.length > 0) {
           const matchingExistingRuns = existingRuns.filter(run => run.runLabel === baseRunLabelForCheck);
           if (matchingExistingRuns.length > 0) {
             const latestMatchingRun = matchingExistingRuns[0];

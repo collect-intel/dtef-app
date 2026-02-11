@@ -10,7 +10,6 @@
  *   fnArgs:
  *     expected: [45.2, 30.1, 15.5, 9.2]
  *     metric: js-divergence  # or cosine, earth-mover
- *     threshold: 0.85
  */
 
 import { PointFunction, PointFunctionReturn } from './types';
@@ -20,8 +19,6 @@ interface DistributionMetricArgs {
     expected: number[];
     /** Comparison metric to use */
     metric?: 'js-divergence' | 'cosine' | 'earth-mover';
-    /** Score threshold for pass/fail (0-1, default 0.7) */
-    threshold?: number;
 }
 
 /**
@@ -82,9 +79,11 @@ export function normalize(dist: number[]): number[] {
 }
 
 /**
- * Jensen-Shannon divergence (symmetric version of KL divergence).
- * Returns a value in [0, 1] where 0 = identical distributions.
- * We convert to a similarity score: 1 - JSD.
+ * Jensen-Shannon Distance (square root of Jensen-Shannon Divergence).
+ * Uses the JSD's square root because it is a true metric (satisfies triangle
+ * inequality) and produces scores in a more discriminative range than raw JSD,
+ * which clusters near 1.0 for distributions that are even roughly similar.
+ * Returns a similarity score: 1 - sqrt(JSD), bounded [0, 1].
  */
 function jsDivergenceSimilarity(p: number[], q: number[]): number {
     const pNorm = normalize(p);
@@ -108,8 +107,9 @@ function jsDivergenceSimilarity(p: number[], q: number[]): number {
     }
 
     const jsd = (klPM + klQM) / 2;
-    // JSD is bounded [0, 1] when using log2
-    return Math.max(0, 1 - jsd);
+    // Use sqrt(JSD) — the Jensen-Shannon Distance — for better score spread
+    const jsDistance = Math.sqrt(Math.max(0, jsd));
+    return Math.max(0, 1 - jsDistance);
 }
 
 /**
@@ -172,7 +172,6 @@ export const distribution_metric: PointFunction = (
 
     const expected = typedArgs.expected;
     const metric = typedArgs.metric || 'js-divergence';
-    const threshold = typedArgs.threshold ?? 0.7;
 
     // Parse the predicted distribution from the LLM response
     const predicted = parseDistribution(llmResponseText);
@@ -217,6 +216,6 @@ export const distribution_metric: PointFunction = (
 
     return {
         score,
-        explain: `${metricName}: ${score.toFixed(3)} (threshold: ${threshold}). Expected: [${expectedStr}], Predicted: [${predictedStr}]`,
+        explain: `${metricName}: ${score.toFixed(3)}. Expected: [${expectedStr}], Predicted: [${predictedStr}]`,
     };
 };
