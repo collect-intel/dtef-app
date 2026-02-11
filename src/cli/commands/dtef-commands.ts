@@ -105,6 +105,13 @@ dtefCommand
             })
             : undefined;
 
+        // Validate --context-levels requires --context-questions
+        if (contextLevels && !contextQuestionIds) {
+            console.error(chalk.red('--context-levels requires --context-questions to specify the pool of context questions.'));
+            console.error(chalk.gray('Example: --context-questions all --context-levels 0,5,10,all'));
+            process.exit(1);
+        }
+
         // Generate blueprints (possibly at multiple context levels)
         console.log(chalk.gray('Generating blueprints...'));
 

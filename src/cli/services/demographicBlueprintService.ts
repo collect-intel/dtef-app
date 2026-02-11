@@ -85,8 +85,11 @@ export class DemographicBlueprintService {
             );
             prompts.push(prompt);
 
-            // Track context metadata from the first prompt (consistent across prompts in a segment)
-            if (blueprintContextCount === 0 && contextQuestionCount > 0) {
+            // Track the maximum context count across all prompts.
+            // Different prompts may get different counts due to token budget constraints
+            // (longer target questions leave less room for context), so we use the max
+            // as the representative value for this blueprint.
+            if (contextQuestionCount > blueprintContextCount) {
                 blueprintContextCount = contextQuestionCount;
                 blueprintContextIds = contextQuestionIds;
             }

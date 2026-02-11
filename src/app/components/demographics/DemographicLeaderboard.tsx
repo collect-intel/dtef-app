@@ -311,8 +311,9 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
 function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: number }) {
     // Normalize slope to 0-100 range. Slope can be negative (gets worse with context).
     // Center 0 at 50%, positive slopes go right, negative go left.
-    const range = maxSlope || 1;
-    const normalized = Math.max(0, Math.min(100, 50 + (slope / range) * 50));
+    // Use a minimum range of 0.01 to avoid exaggerating trivially small differences.
+    const range = Math.max(maxSlope, 0.01);
+    const normalized = Math.max(2, Math.min(98, 50 + (slope / range) * 45));
 
     return (
         <div className="flex items-center gap-2 w-full">

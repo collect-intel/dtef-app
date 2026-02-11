@@ -10,8 +10,8 @@
  * @module cli/services/demographicAggregationService
  */
 
-import { WevalResult, DTEFResultMetadata } from '@/types/shared';
-import { DTEFLeaderboardEntry, DemographicSegment } from '@/types/dtef';
+import { WevalResult } from '@/types/shared';
+import { DTEFLeaderboardEntry } from '@/types/dtef';
 
 /**
  * Per-segment score for a model.
@@ -199,25 +199,42 @@ export class DemographicAggregationService {
     /**
      * Extract the context question count from a result.
      * Reads context.dtef.contextQuestionCount, falling back to legacy detection:
-     *   - configId contains '-ctx' → total available questions for the segment (treated as "full")
      *   - configId matches '-c{N}' → N
+     *   - configId contains '-ctx' → estimate from metadata or prompt count
      *   - otherwise → 0
+     *
+     * Returns null when context count cannot be determined (excluded from analysis).
      */
-    static extractContextCount(result: WevalResult): number {
+    static extractContextCount(result: WevalResult): number | null {
         const ctx = (result.config?.context as any)?.dtef;
         if (ctx?.contextQuestionCount !== undefined) {
             return ctx.contextQuestionCount;
         }
 
         const configId = result.config?.configId || '';
-        // Match -c{N} suffix
+        // Match -c{N} suffix (new format)
         const cMatch = configId.match(/-c(\d+)$/);
         if (cMatch) return parseInt(cMatch[1], 10);
 
-        // Legacy: -ctx suffix means "full context" — estimate from contextQuestionIds length
+        // Legacy: -ctx suffix means "full context"
         if (configId.includes('-ctx')) {
+            // Try contextQuestionIds from metadata
             const ids = ctx?.contextQuestionIds;
-            return Array.isArray(ids) ? ids.length : -1; // -1 = full but unknown count
+            if (Array.isArray(ids) && ids.length > 0) return ids.length;
+
+            // Estimate from ground truth distributions (number of prompts ≈ number of questions)
+            const gtd = ctx?.groundTruthDistributions;
+            if (gtd && typeof gtd === 'object') {
+                const promptCount = Object.keys(gtd).length;
+                if (promptCount > 0) return promptCount;
+            }
+
+            // Last resort: use the total prompt count from the config as a reasonable proxy
+            const prompts = result.config?.prompts;
+            if (Array.isArray(prompts) && prompts.length > 0) return prompts.length;
+
+            // Cannot determine — return null to exclude from context analysis
+            return null;
         }
 
         return 0;
@@ -242,7 +259,8 @@ export class DemographicAggregationService {
         const denominator = n * sumXX - sumX * sumX;
         if (denominator === 0) return 0;
 
-        return (n * sumXY - sumX * sumY) / denominator;
+        const slope = (n * sumXY - sumX * sumY) / denominator;
+        return isFinite(slope) ? slope : 0;
     }
 
     /**
@@ -259,8 +277,8 @@ export class DemographicAggregationService {
             if (!ctx) continue;
 
             const contextCount = this.extractContextCount(result);
-            // Skip results where we can't determine context count (-1 = unknown full)
-            if (contextCount === -1) continue;
+            // Skip results where context count cannot be determined
+            if (contextCount === null) continue;
 
             contextLevels.add(contextCount);
             const modelScores = this.extractModelScores(result);
@@ -336,26 +354,40 @@ export class DemographicAggregationService {
         const firstCtx = this.extractDTEFContext(dtefResults[0]);
         const surveyId = firstCtx?.surveyId || 'unknown';
 
-        // Collect all segment-model scores
-        const allSegmentScores: SegmentModelScore[] = [];
+        // Collect all segment-model scores, deduplicating multi-level context results.
+        // When the same (model, segment) pair has results at multiple context levels,
+        // use only the highest-context result for the main leaderboard/disparity analysis.
+        // This prevents multi-level evaluations from inflating segment counts.
+        const scoreMap = new Map<string, { score: SegmentModelScore; contextCount: number }>();
 
         for (const result of dtefResults) {
             const ctx = this.extractDTEFContext(result);
             if (!ctx) continue;
 
+            const contextCount = this.extractContextCount(result) ?? 0;
             const modelScores = this.extractModelScores(result);
 
             for (const [modelId, data] of Object.entries(modelScores)) {
-                allSegmentScores.push({
+                const key = `${modelId}::${ctx.segmentId}`;
+                const existing = scoreMap.get(key);
+
+                const score: SegmentModelScore = {
                     segmentId: ctx.segmentId,
                     segmentLabel: ctx.segmentLabel,
                     segmentAttributes: ctx.segmentAttributes,
                     modelId,
                     avgCoverageExtent: data.avgScore,
                     promptCount: data.promptCount,
-                });
+                };
+
+                // Keep the highest-context result for each (model, segment) pair
+                if (!existing || contextCount > existing.contextCount) {
+                    scoreMap.set(key, { score, contextCount });
+                }
             }
         }
+
+        const allSegmentScores: SegmentModelScore[] = Array.from(scoreMap.values()).map(e => e.score);
 
         // Group by model
         const modelGroups = new Map<string, SegmentModelScore[]>();
