@@ -70,6 +70,14 @@ interface DemographicsData {
 
 // Segment type prefix → human-readable label
 const SEGMENT_TYPE_LABELS: Record<string, string> = {
+    // Human-readable prefixes (from DTEF pipeline)
+    'ageGroup': 'Age',
+    'gender': 'Gender',
+    'environment': 'Environment',
+    'aiConcern': 'AI Concern',
+    'religion': 'Religion',
+    'country': 'Country',
+    // Legacy O-column prefixes (from raw GD CSVs)
     'O2': 'Age',
     'O3': 'Gender',
     'O4': 'Environment',
