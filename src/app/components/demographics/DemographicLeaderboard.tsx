@@ -814,16 +814,16 @@ export default function DemographicLeaderboard() {
                                     const hasDetails = fullData && fullData.segmentScores?.length > 0;
 
                                     return (
-                                        <tr key={model.modelId} className="group">
-                                            <td colSpan={5} className="p-0">
-                                                <div
-                                                    className={`grid grid-cols-[3rem_1fr_25%_5rem_4rem] items-center border-b border-border/30 hover:bg-muted/20 transition-colors ${hasDetails ? 'cursor-pointer' : ''}`}
-                                                    onClick={() => hasDetails && setExpandedModel(isExpanded ? null : model.modelId)}
-                                                >
-                                                    <div className="px-4 py-3 text-sm">
-                                                        <RankBadge rank={model.scoreRank} />
-                                                    </div>
-                                                    <div className="px-4 py-3 flex items-center gap-2 min-w-0">
+                                        <Fragment key={model.modelId}>
+                                            <tr
+                                                className={`border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors ${hasDetails ? 'cursor-pointer' : ''}`}
+                                                onClick={() => hasDetails && setExpandedModel(isExpanded ? null : model.modelId)}
+                                            >
+                                                <td className="px-4 py-3 text-sm">
+                                                    <RankBadge rank={model.scoreRank} />
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2 min-w-0">
                                                         <span className="text-sm font-medium text-foreground truncate">
                                                             {formatModelName(model.modelId)}
                                                         </span>
@@ -833,23 +833,25 @@ export default function DemographicLeaderboard() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="px-4 py-3">
-                                                        <ScoreBar score={model.overallScore} />
-                                                    </div>
-                                                    <div className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">
-                                                        {fullData ? `±${(fullData.segmentStdDev * 100).toFixed(1)}%` : '—'}
-                                                    </div>
-                                                    <div className="px-4 py-3 text-right text-sm text-muted-foreground">
-                                                        {model.segmentCount}
-                                                    </div>
-                                                </div>
-                                                {isExpanded && fullData && (
-                                                    <div className="border-b border-border/30 bg-muted/10">
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <ScoreBar score={model.overallScore} />
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">
+                                                    {fullData ? `±${(fullData.segmentStdDev * 100).toFixed(1)}%` : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+                                                    {model.segmentCount}
+                                                </td>
+                                            </tr>
+                                            {isExpanded && fullData && (
+                                                <tr>
+                                                    <td colSpan={5} className="p-0 border-b border-border/30 bg-muted/10">
                                                         <ModelSegmentBreakdown model={fullData} />
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     );
                                 })}
                             </tbody>
