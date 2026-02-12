@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { getModelDisplayLabel } from '@/app/utils/modelIdUtils';
 import {
     SEGMENT_TYPE_LABELS as SHARED_SEGMENT_TYPE_LABELS,
@@ -92,6 +92,68 @@ function formatModelName(modelId: string): string {
     });
 }
 
+// --- Sort utilities ---
+
+type SortDirection = 'asc' | 'desc';
+interface SortConfig<K extends string = string> { key: K; direction: SortDirection }
+
+function useSort<K extends string>(defaultKey: K, defaultDir: SortDirection = 'desc'): [SortConfig<K>, (key: K) => void] {
+    const [sort, setSort] = useState<SortConfig<K>>({ key: defaultKey, direction: defaultDir });
+    const toggle = useCallback((key: K) => {
+        setSort(prev => prev.key === key
+            ? { key, direction: prev.direction === 'desc' ? 'asc' : 'desc' }
+            : { key, direction: 'desc' }
+        );
+    }, []);
+    return [sort, toggle];
+}
+
+function sortedBy<T>(items: T[], key: string, dir: SortDirection, accessor: (item: T, key: string) => number | string): T[] {
+    return [...items].sort((a, b) => {
+        const va = accessor(a, key);
+        const vb = accessor(b, key);
+        if (typeof va === 'number' && typeof vb === 'number') {
+            return dir === 'desc' ? vb - va : va - vb;
+        }
+        const sa = String(va).toLowerCase();
+        const sb = String(vb).toLowerCase();
+        return dir === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+    });
+}
+
+/** Clickable column header with sort indicator */
+function SortableHeader<K extends string>({
+    label, sortKey, current, onSort, align = 'left', className = '',
+}: {
+    label: string; sortKey: K; current: SortConfig<K>; onSort: (key: K) => void;
+    align?: 'left' | 'right'; className?: string;
+}) {
+    const isActive = current.key === sortKey;
+    return (
+        <th
+            className={`px-4 py-3 text-xs font-medium uppercase tracking-wider select-none cursor-pointer group transition-colors hover:text-foreground ${
+                align === 'right' ? 'text-right' : 'text-left'
+            } ${isActive ? 'text-foreground' : 'text-muted-foreground'} ${className}`}
+            onClick={() => onSort(sortKey)}
+        >
+            <span className="inline-flex items-center gap-1">
+                {align === 'right' && <SortIndicator active={isActive} direction={current.direction} />}
+                {label}
+                {align !== 'right' && <SortIndicator active={isActive} direction={current.direction} />}
+            </span>
+        </th>
+    );
+}
+
+function SortIndicator({ active, direction }: { active: boolean; direction: SortDirection }) {
+    return (
+        <span className={`inline-flex flex-col text-[8px] leading-none ${active ? 'text-foreground' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`}>
+            <span className={active && direction === 'asc' ? 'text-foreground' : active ? 'text-muted-foreground/30' : ''}>▲</span>
+            <span className={active && direction === 'desc' ? 'text-foreground' : active ? 'text-muted-foreground/30' : ''}>▼</span>
+        </span>
+    );
+}
+
 // --- Sub-components ---
 
 function ScoreBar({ score, maxScore = 1 }: { score: number; maxScore?: number }) {
@@ -169,6 +231,10 @@ function ModelSegmentBreakdown({ model }: { model: ModelResult }) {
     );
 }
 
+// --- Segment Explorer ---
+
+type SegmentSortKey = 'label' | 'bestModel' | 'bestScore' | 'avgScore';
+
 /** Segment Explorer: tabs for each segment type with per-value leaderboards */
 function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     const segmentTypes = useMemo(() => {
@@ -183,10 +249,10 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     }, [modelResults]);
 
     const [activeType, setActiveType] = useState<string>(segmentTypes[0] || 'O2');
+    const [sort, toggleSort] = useSort<SegmentSortKey>('bestScore');
 
     // Build a table: rows = segment values, cols = models, cells = scores
     const segmentData = useMemo(() => {
-        // Collect all segment values for this type and all model scores
         const valueMap = new Map<string, { label: string; models: Map<string, number> }>();
 
         for (const model of modelResults) {
@@ -202,7 +268,6 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
             }
         }
 
-        // For each segment value, find the top model and average score
         return Array.from(valueMap.entries()).map(([segId, data]) => {
             let bestModel = '';
             let bestScore = -1;
@@ -224,8 +289,18 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                 avgScore: count > 0 ? totalScore / count : 0,
                 modelCount: count,
             };
-        }).sort((a, b) => b.bestScore - a.bestScore);
+        });
     }, [modelResults, activeType]);
+
+    const sortedData = useMemo(() => sortedBy(segmentData, sort.key, sort.direction, (item, key) => {
+        switch (key as SegmentSortKey) {
+            case 'label': return item.label;
+            case 'bestModel': return formatModelName(item.bestModel);
+            case 'bestScore': return item.bestScore;
+            case 'avgScore': return item.avgScore;
+            default: return 0;
+        }
+    }), [segmentData, sort]);
 
     if (segmentTypes.length === 0) return null;
 
@@ -260,22 +335,14 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                {SEGMENT_TYPE_LABELS[activeType] || activeType}
-                            </th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Best Model
-                            </th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">
-                                Best Score
-                            </th>
-                            <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Avg Score
-                            </th>
+                            <SortableHeader label={SEGMENT_TYPE_LABELS[activeType] || activeType} sortKey="label" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Best Model" sortKey="bestModel" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Best Score" sortKey="bestScore" current={sort} onSort={toggleSort} className="w-1/4" />
+                            <SortableHeader label="Avg Score" sortKey="avgScore" current={sort} onSort={toggleSort} align="right" />
                         </tr>
                     </thead>
                     <tbody>
-                        {segmentData.map((row) => (
+                        {sortedData.map((row) => (
                             <tr key={row.segmentId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
                                 <td className="px-4 py-3 text-sm font-medium text-foreground">
                                     {row.label}
@@ -293,7 +360,7 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                         ))}
                     </tbody>
                 </table>
-                {segmentData.length === 0 && (
+                {sortedData.length === 0 && (
                     <p className="text-center text-muted-foreground py-6 text-sm">
                         No data available for this segment type.
                     </p>
@@ -303,25 +370,22 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     );
 }
 
-/** Gradient bar showing where a model falls on the prior-reliant ↔ context-responsive spectrum */
+// --- Context Responsiveness ---
+
+/** Gradient bar showing where a model falls on the prior-reliant <-> context-responsive spectrum */
 function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: number }) {
-    // Normalize slope to 0-100 range. Slope can be negative (gets worse with context).
-    // Center 0 at 50%, positive slopes go right, negative go left.
-    // Use a minimum range of 0.01 to avoid exaggerating trivially small differences.
     const range = Math.max(maxSlope, 0.01);
     const normalized = Math.max(2, Math.min(98, 50 + (slope / range) * 45));
 
     return (
         <div className="flex items-center gap-2 w-full">
             <div className="flex-1 relative bg-muted rounded-full h-3 overflow-hidden">
-                {/* Gradient background */}
                 <div
                     className="absolute inset-0 rounded-full"
                     style={{
                         background: 'linear-gradient(to right, #6366f1, #a5b4fc, #e2e8f0, #fbbf24, #f97316)',
                     }}
                 />
-                {/* Indicator dot */}
                 <div
                     className="absolute top-0.5 w-2 h-2 rounded-full bg-foreground border border-background shadow-sm"
                     style={{ left: `calc(${normalized}% - 4px)` }}
@@ -334,15 +398,27 @@ function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: numbe
     );
 }
 
+type ContextSortKey = 'model' | 'slope';
+
 /** Context Responsiveness section: shows how models respond to increasing context */
 function ContextResponsivenessSection({ data }: { data: ContextResponsivenessData }) {
     const models = data.models;
     if (!models || models.length === 0) return null;
 
+    const [sort, toggleSort] = useSort<ContextSortKey>('slope');
+
     const maxAbsSlope = Math.max(...models.map(m => Math.abs(m.slope)), 0.001);
     const levelsLabel = data.contextLevelsFound
         .map(l => l === 0 ? '0 (baseline)' : String(l))
         .join(', ');
+
+    const sorted = useMemo(() => sortedBy(models, sort.key, sort.direction, (item, key) => {
+        switch (key as ContextSortKey) {
+            case 'model': return formatModelName(item.modelId);
+            case 'slope': return item.slope;
+            default: return 0;
+        }
+    }), [models, sort]);
 
     return (
         <section>
@@ -372,16 +448,12 @@ function ContextResponsivenessSection({ data }: { data: ContextResponsivenessDat
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Model
-                            </th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/2">
-                                Responsiveness
-                            </th>
+                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2" />
                         </tr>
                     </thead>
                     <tbody>
-                        {models.map((model) => (
+                        {sorted.map((model) => (
                             <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
                                 <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
                                     {formatModelName(model.modelId)}
@@ -401,6 +473,8 @@ function ContextResponsivenessSection({ data }: { data: ContextResponsivenessDat
         </section>
     );
 }
+
+// --- Fairness Analysis ---
 
 /** Two-tone gap bar: green portion for worst score, amber for the gap */
 function GapBar({ worst, best }: { worst: number; best: number }) {
@@ -448,6 +522,8 @@ function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: Model
     );
 }
 
+type FairnessSortKey = 'model' | 'category' | 'gap' | 'bestScore' | 'worstScore';
+
 /** Sorted table of model x category disparity rows */
 function FairnessAnalysisTable({
     disparities,
@@ -473,6 +549,7 @@ function FairnessAnalysisTable({
     onToggleShowAll: () => void;
 }) {
     const modelResultMap = useMemo(() => new Map(modelResults.map(m => [m.modelId, m])), [modelResults]);
+    const [sort, toggleSort] = useSort<FairnessSortKey>('gap');
 
     // Resolve category for old-format entries that lack it (fallback: extract from segment ID)
     const rows = useMemo(() => disparities.map(d => {
@@ -485,7 +562,18 @@ function FairnessAnalysisTable({
         };
     }), [disparities]);
 
-    const displayed = showAll ? rows : rows.slice(0, 10);
+    const sortedRows = useMemo(() => sortedBy(rows, sort.key, sort.direction, (item, key) => {
+        switch (key as FairnessSortKey) {
+            case 'model': return formatModelName(item.modelId);
+            case 'category': return item.categoryLabel;
+            case 'gap': return item.absoluteGap;
+            case 'bestScore': return item.bestSegment.score;
+            case 'worstScore': return item.worstSegment.score;
+            default: return 0;
+        }
+    }), [rows, sort]);
+
+    const displayed = showAll ? sortedRows : sortedRows.slice(0, 10);
 
     return (
         <section>
@@ -501,11 +589,11 @@ function FairnessAnalysisTable({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">Gap</th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Best Segment</th>
-                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Worst Segment</th>
+                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Category" sortKey="category" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Gap" sortKey="gap" current={sort} onSort={toggleSort} className="w-1/4" />
+                            <SortableHeader label="Best Segment" sortKey="bestScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                            <SortableHeader label="Worst Segment" sortKey="worstScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell" />
                             <th className="w-8 px-2"></th>
                         </tr>
                     </thead>
@@ -558,13 +646,13 @@ function FairnessAnalysisTable({
                     </p>
                 )}
             </div>
-            {rows.length > 10 && (
+            {sortedRows.length > 10 && (
                 <div className="text-center mt-3">
                     <button
                         onClick={onToggleShowAll}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
-                        {showAll ? 'Show top 10' : `Show all ${rows.length} entries`}
+                        {showAll ? 'Show top 10' : `Show all ${sortedRows.length} entries`}
                     </button>
                 </div>
             )}
@@ -590,6 +678,10 @@ function CategoryBadge({ label }: { label: string }) {
     );
 }
 
+// --- Leaderboard ---
+
+type LeaderboardSortKey = 'score' | 'model' | 'consistency' | 'segments';
+
 // --- Main component ---
 
 export default function DemographicLeaderboard() {
@@ -599,6 +691,7 @@ export default function DemographicLeaderboard() {
     const [expandedModel, setExpandedModel] = useState<string | null>(null);
     const [expandedFairnessRow, setExpandedFairnessRow] = useState<string | null>(null);
     const [showAllFairness, setShowAllFairness] = useState(false);
+    const [lbSort, toggleLbSort] = useSort<LeaderboardSortKey>('score');
 
     useEffect(() => {
         async function fetchData() {
@@ -662,6 +755,27 @@ export default function DemographicLeaderboard() {
     // Create a lookup for full model data (for expandable rows)
     const modelResultMap = new Map(modelResults.map(m => [m.modelId, m]));
 
+    // Assign score-based rank, then sort by active column
+    const rankedModels = models.map((m, i) => ({ ...m, scoreRank: i + 1 }));
+    const sortedModels = [...rankedModels].sort((a, b) => {
+        const dir = lbSort.direction === 'desc' ? -1 : 1;
+        switch (lbSort.key) {
+            case 'score': return dir * (a.overallScore - b.overallScore);
+            case 'model': {
+                const na = formatModelName(a.modelId).toLowerCase();
+                const nb = formatModelName(b.modelId).toLowerCase();
+                return -dir * na.localeCompare(nb);
+            }
+            case 'consistency': {
+                const fa = modelResultMap.get(a.modelId);
+                const fb = modelResultMap.get(b.modelId);
+                return dir * ((fa?.segmentStdDev ?? 1) - (fb?.segmentStdDev ?? 1));
+            }
+            case 'segments': return dir * (a.segmentCount - b.segmentCount);
+            default: return 0;
+        }
+    });
+
     return (
         <div className="space-y-10">
             {/* Leaderboard Table */}
@@ -681,20 +795,20 @@ export default function DemographicLeaderboard() {
                     )}
                 </div>
 
-                {models.length > 0 ? (
+                {sortedModels.length > 0 ? (
                     <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border/50 bg-muted/30">
-                                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">Rank</th>
-                                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</th>
-                                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">Score</th>
-                                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Consistency</th>
-                                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Segments</th>
+                                    <SortableHeader label="Rank" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-12" />
+                                    <SortableHeader label="Model" sortKey="model" current={lbSort} onSort={toggleLbSort} />
+                                    <SortableHeader label="Score" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-1/4" />
+                                    <SortableHeader label="Consistency" sortKey="consistency" current={lbSort} onSort={toggleLbSort} align="right" />
+                                    <SortableHeader label="Segments" sortKey="segments" current={lbSort} onSort={toggleLbSort} align="right" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {models.map((model, idx) => {
+                                {sortedModels.map((model) => {
                                     const fullData = modelResultMap.get(model.modelId);
                                     const isExpanded = expandedModel === model.modelId;
                                     const hasDetails = fullData && fullData.segmentScores?.length > 0;
@@ -707,7 +821,7 @@ export default function DemographicLeaderboard() {
                                                     onClick={() => hasDetails && setExpandedModel(isExpanded ? null : model.modelId)}
                                                 >
                                                     <div className="px-4 py-3 text-sm">
-                                                        <RankBadge rank={idx + 1} />
+                                                        <RankBadge rank={model.scoreRank} />
                                                     </div>
                                                     <div className="px-4 py-3 flex items-center gap-2 min-w-0">
                                                         <span className="text-sm font-medium text-foreground truncate">
