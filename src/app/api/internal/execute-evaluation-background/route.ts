@@ -13,7 +13,7 @@ import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { configure } from '@/cli/config';
 import { getLogger } from '@/utils/logger';
 import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
-import { enqueueEvaluation, getQueueStatus } from '@/lib/evaluation-queue';
+import { enqueueEvaluation, getQueueStatus, registerBackfillHandler } from '@/lib/evaluation-queue';
 
 export const maxDuration = 300; // 5 minutes max for Railway
 
@@ -115,16 +115,15 @@ async function runPipeline(requestPayload: any) {
     throw new Error(`Pipeline execution for ${currentId} did not yield a valid output file.`);
   }
 
-  // Update summaries if we have results
+  // Register backfill handler — the eval queue will debounce it so that
+  // rapid-fire eval completions trigger only one backfill instead of N.
   if (newResultData && process.env.STORAGE_PROVIDER === 's3') {
-    try {
-      logger.info('New evaluation run completed. Triggering full summary backfill...');
+    registerBackfillHandler(async () => {
+      const bfLogger = await getLogger('eval:backfill:debounced');
+      bfLogger.info('Running debounced summary backfill after eval batch...');
       await actionBackfillSummary({ verbose: false, dryRun: false });
-      logger.info('Homepage summary and all analytics rebuilt successfully.');
-    } catch (summaryError: any) {
-      logger.error('Failed to rebuild summary files', summaryError);
-      captureError(summaryError, { configId: currentId, context: 'summary_rebuild' });
-    }
+      bfLogger.info('Debounced summary backfill completed.');
+    });
   }
 
   logger.info(`Pipeline tasks completed for ${currentId}. Output: ${fileName}`);
@@ -148,7 +147,7 @@ export async function POST(req: NextRequest) {
 
   const configId = body.config.id || 'unknown';
 
-  // Enqueue with concurrency limiting (max 3 concurrent evaluations)
+  // Enqueue with concurrency limiting
   const { position, queueLength } = enqueueEvaluation(configId, () =>
     runPipeline(body).catch(err => {
       console.error(`[execute-evaluation-background] Error for ${configId}:`, err);
