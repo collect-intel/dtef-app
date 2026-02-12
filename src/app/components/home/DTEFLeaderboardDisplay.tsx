@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { getModelDisplayLabel } from '@/app/utils/modelIdUtils';
 import Icon from '@/components/ui/icon';
 import type { DTEFSummary } from '@/cli/utils/dtefSummaryUtils';
 import type { AggregatedModelResult } from '@/cli/services/demographicAggregationService';
+import { SEGMENT_TYPE_LABELS } from '@/lib/segmentUtils';
 
 const DTEFLeaderboardDisplay: React.FC<{
   dtefSummary: DTEFSummary | null | undefined;
@@ -56,6 +58,12 @@ const DTEFLeaderboardDisplay: React.FC<{
         <p className="text-muted-foreground dark:text-muted-foreground text-sm">
           How accurately do AI models predict demographic survey response distributions?
         </p>
+        <Link
+          href="/demographics"
+          className="inline-block mt-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          View full analysis →
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
@@ -221,23 +229,7 @@ function computeSegmentTypeLeaders(
 ): { segmentType: string; modelId: string; score: number }[] {
   if (modelResults.length === 0) return [];
 
-  // Segment type labels based on segment ID prefixes
-  const segmentTypeNames: Record<string, string> = {
-    // Human-readable prefixes (from DTEF pipeline)
-    'ageGroup': 'Age',
-    'gender': 'Gender',
-    'environment': 'Environ.',
-    'aiConcern': 'AI Concern',
-    'religion': 'Religion',
-    'country': 'Country',
-    // Legacy O-column prefixes (from raw GD CSVs)
-    'O2': 'Age',
-    'O3': 'Gender',
-    'O4': 'Environ.',
-    'O5': 'AI Concern',
-    'O6': 'Religion',
-    'O7': 'Country',
-  };
+  const segmentTypeNames: Record<string, string> = { ...SEGMENT_TYPE_LABELS };
 
   // For each segment type, find the model with the highest average score
   const leaders = new Map<string, { modelId: string; score: number }>();

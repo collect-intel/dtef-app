@@ -32,9 +32,11 @@ export interface DTEFSummary {
         overallScore: number;
         segmentCount: number;
     }[];
-    /** Segments where models show biggest accuracy disparities */
+    /** Per-category disparities where models show biggest accuracy gaps */
     fairnessConcerns: {
         modelId: string;
+        category?: string;
+        categoryLabel?: string;
         bestSegment: string;
         worstSegment: string;
         gap: number;
@@ -71,12 +73,14 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
             segmentCount: m.segmentCount,
         }));
 
-    // Fairness concerns: models with >15% gap between best/worst segment
+    // Fairness concerns: per-category entries with >10% gap, sorted by gap descending
     const fairnessConcerns = aggregation.disparities
-        .filter(d => d.absoluteGap > 0.15)
-        .slice(0, 5)
+        .filter(d => d.absoluteGap > 0.10)
+        .slice(0, 10)
         .map(d => ({
             modelId: d.modelId,
+            category: d.category,
+            categoryLabel: d.categoryLabel,
             bestSegment: d.bestSegment.label,
             worstSegment: d.worstSegment.label,
             gap: d.absoluteGap,

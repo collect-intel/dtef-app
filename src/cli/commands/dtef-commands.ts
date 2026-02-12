@@ -384,6 +384,11 @@ dtefCommand
                 continue;
             }
 
+            // Strip deprecated 'id' field — scheduler derives ID from file path
+            if (parsed.id) {
+                delete parsed.id;
+            }
+
             // Add tag if specified
             if (options.tag && Array.isArray(parsed.tags)) {
                 if (!parsed.tags.includes(options.tag)) {

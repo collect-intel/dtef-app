@@ -115,8 +115,9 @@ export async function POST(req: NextRequest) {
           config.tags = normalizedTags;
         }
 
+        // Silently strip deprecated 'id' field — configId is derived from file path
         if (config.id) {
-          logger.warn(`Blueprint '${file.path}' contains deprecated 'id' field ('${config.id}').`);
+          delete config.id;
         }
 
         const id = generateBlueprintIdFromPath(blueprintPath);

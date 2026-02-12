@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { getModelDisplayLabel } from '@/app/utils/modelIdUtils';
+import {
+    SEGMENT_TYPE_LABELS as SHARED_SEGMENT_TYPE_LABELS,
+    getSegmentPrefix as sharedGetSegmentPrefix,
+    getSegmentValueLabel as sharedGetSegmentValueLabel,
+    getCategoryLabel,
+} from '@/lib/segmentUtils';
 
 // --- Types ---
 
@@ -27,6 +33,8 @@ interface ModelResult {
 
 interface FairnessConcern {
     modelId: string;
+    category?: string;
+    categoryLabel?: string;
     bestSegment: string;
     worstSegment: string;
     gap: number;
@@ -61,6 +69,9 @@ interface DemographicsData {
         modelResults?: ModelResult[];
         disparities?: Array<{
             modelId: string;
+            category?: string;
+            categoryLabel?: string;
+            segmentCount?: number;
             absoluteGap: number;
             bestSegment: { id: string; label: string; score: number };
             worstSegment: { id: string; label: string; score: number };
@@ -68,33 +79,10 @@ interface DemographicsData {
     };
 }
 
-// Segment type prefix → human-readable label
-const SEGMENT_TYPE_LABELS: Record<string, string> = {
-    // Human-readable prefixes (from DTEF pipeline)
-    'ageGroup': 'Age',
-    'gender': 'Gender',
-    'environment': 'Environment',
-    'aiConcern': 'AI Concern',
-    'religion': 'Religion',
-    'country': 'Country',
-    // Legacy O-column prefixes (from raw GD CSVs)
-    'O2': 'Age',
-    'O3': 'Gender',
-    'O4': 'Environment',
-    'O5': 'AI Concern',
-    'O6': 'Religion',
-    'O7': 'Country',
-};
-
-function getSegmentPrefix(segmentId: string): string {
-    return segmentId?.split(':')[0] || segmentId?.substring(0, 2) || '';
-}
-
-function getSegmentValueLabel(segmentLabel: string): string {
-    // Labels like "O2:18-29" → "18-29", "O7:USA" → "USA"
-    const colonIdx = segmentLabel.indexOf(':');
-    return colonIdx !== -1 ? segmentLabel.substring(colonIdx + 1) : segmentLabel;
-}
+// Re-export shared segment utilities for local use
+const SEGMENT_TYPE_LABELS = SHARED_SEGMENT_TYPE_LABELS;
+const getSegmentPrefix = sharedGetSegmentPrefix;
+const getSegmentValueLabel = sharedGetSegmentValueLabel;
 
 function formatModelName(modelId: string): string {
     return getModelDisplayLabel(modelId, {
@@ -414,6 +402,194 @@ function ContextResponsivenessSection({ data }: { data: ContextResponsivenessDat
     );
 }
 
+/** Two-tone gap bar: green portion for worst score, amber for the gap */
+function GapBar({ worst, best }: { worst: number; best: number }) {
+    const worstPct = Math.min(100, worst * 100);
+    const gapPct = Math.min(100 - worstPct, (best - worst) * 100);
+    return (
+        <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 bg-muted rounded-full h-2.5 overflow-hidden flex">
+                <div className="h-full bg-green-500/70 rounded-l-full" style={{ width: `${worstPct}%` }} />
+                <div className="h-full bg-amber-500/70" style={{ width: `${gapPct}%` }} />
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-right font-mono tabular-nums">
+                {((best - worst) * 100).toFixed(1)}%
+            </span>
+        </div>
+    );
+}
+
+/** Expandable drill-down: all segments in a category for a model */
+function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: ModelResult; categoryPrefix: string }) {
+    const segments = useMemo(() => {
+        return (modelResult.segmentScores || [])
+            .filter(s => getSegmentPrefix(s.segmentId) === categoryPrefix)
+            .sort((a, b) => b.avgCoverageExtent - a.avgCoverageExtent);
+    }, [modelResult, categoryPrefix]);
+
+    if (segments.length === 0) return null;
+
+    return (
+        <div className="px-6 py-3 bg-muted/10">
+            <p className="text-xs text-muted-foreground mb-2">
+                All {getCategoryLabel(categoryPrefix)} segments for {formatModelName(modelResult.modelId)}:
+            </p>
+            <ul className="space-y-1.5">
+                {segments.map(seg => (
+                    <li key={seg.segmentId} className="flex items-center gap-3 text-sm">
+                        <span className="w-28 truncate text-foreground">{getSegmentValueLabel(seg.segmentLabel)}</span>
+                        <div className="flex-1">
+                            <ScoreBar score={seg.avgCoverageExtent} />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+/** Sorted table of model x category disparity rows */
+function FairnessAnalysisTable({
+    disparities,
+    modelResults,
+    expandedRow,
+    onToggleRow,
+    showAll,
+    onToggleShowAll,
+}: {
+    disparities: Array<{
+        modelId: string;
+        category?: string;
+        categoryLabel?: string;
+        segmentCount?: number;
+        absoluteGap: number;
+        bestSegment: { id: string; label: string; score: number };
+        worstSegment: { id: string; label: string; score: number };
+    }>;
+    modelResults: ModelResult[];
+    expandedRow: string | null;
+    onToggleRow: (key: string) => void;
+    showAll: boolean;
+    onToggleShowAll: () => void;
+}) {
+    const modelResultMap = useMemo(() => new Map(modelResults.map(m => [m.modelId, m])), [modelResults]);
+
+    // Resolve category for old-format entries that lack it (fallback: extract from segment ID)
+    const rows = useMemo(() => disparities.map(d => {
+        const cat = d.category || getSegmentPrefix(d.bestSegment.id);
+        return {
+            ...d,
+            category: cat,
+            categoryLabel: d.categoryLabel || getCategoryLabel(cat),
+            rowKey: `${d.modelId}::${cat}`,
+        };
+    }), [disparities]);
+
+    const displayed = showAll ? rows : rows.slice(0, 10);
+
+    return (
+        <section>
+            <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold tracking-tight">Fairness Analysis</h3>
+                <p className="text-muted-foreground text-sm mt-1 max-w-2xl mx-auto">
+                    Within-category accuracy gaps ranked by severity. &ldquo;Accuracy&rdquo; is the average coverage
+                    extent score from the LLM evaluator across all evaluation runs for that demographic segment.
+                </p>
+            </div>
+
+            <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">Gap</th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Best Segment</th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Worst Segment</th>
+                            <th className="w-8 px-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {displayed.map((d) => {
+                            const isExpanded = expandedRow === d.rowKey;
+                            const fullModel = modelResultMap.get(d.modelId);
+                            return (
+                                <Fragment key={d.rowKey}>
+                                    <tr
+                                        className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                                        onClick={() => onToggleRow(d.rowKey)}
+                                    >
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[200px]">
+                                            {formatModelName(d.modelId)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <CategoryBadge label={d.categoryLabel} />
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <GapBar worst={d.worstSegment.score} best={d.bestSegment.score} />
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">
+                                            <span className="text-green-600 dark:text-green-400">{getSegmentValueLabel(d.bestSegment.label)}</span>
+                                            <span className="font-mono text-xs ml-1">({(d.bestSegment.score * 100).toFixed(1)}%)</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">
+                                            <span className="text-red-600 dark:text-red-400">{getSegmentValueLabel(d.worstSegment.label)}</span>
+                                            <span className="font-mono text-xs ml-1">({(d.worstSegment.score * 100).toFixed(1)}%)</span>
+                                        </td>
+                                        <td className="px-2 py-3 text-muted-foreground">
+                                            <span className={`text-xs transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                                        </td>
+                                    </tr>
+                                    {isExpanded && fullModel && (
+                                        <tr>
+                                            <td colSpan={6} className="p-0 border-b border-border/30 bg-muted/10">
+                                                <FairnessDrillDown modelResult={fullModel} categoryPrefix={d.category} />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                {rows.length === 0 && (
+                    <p className="text-center text-muted-foreground py-6 text-sm">
+                        No significant within-category disparities detected.
+                    </p>
+                )}
+            </div>
+            {rows.length > 10 && (
+                <div className="text-center mt-3">
+                    <button
+                        onClick={onToggleShowAll}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        {showAll ? 'Show top 10' : `Show all ${rows.length} entries`}
+                    </button>
+                </div>
+            )}
+        </section>
+    );
+}
+
+/** Colored pill showing category name */
+function CategoryBadge({ label }: { label: string }) {
+    const colorMap: Record<string, string> = {
+        Age: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        Gender: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        Country: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        Environment: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+        Religion: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+        'AI Concern': 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
+    };
+    const cls = colorMap[label] || 'bg-muted text-muted-foreground';
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+            {label}
+        </span>
+    );
+}
+
 // --- Main component ---
 
 export default function DemographicLeaderboard() {
@@ -421,6 +597,8 @@ export default function DemographicLeaderboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [expandedModel, setExpandedModel] = useState<string | null>(null);
+    const [expandedFairnessRow, setExpandedFairnessRow] = useState<string | null>(null);
+    const [showAllFairness, setShowAllFairness] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -578,60 +756,16 @@ export default function DemographicLeaderboard() {
                 <ContextResponsivenessSection data={data.contextResponsiveness} />
             )}
 
-            {/* Fairness Analysis */}
-            {(fairnessConcerns.length > 0 || disparities.length > 0) && (
-                <section>
-                    <div className="text-center mb-6">
-                        <h3 className="text-xl font-semibold tracking-tight">Fairness Analysis</h3>
-                        <p className="text-muted-foreground text-sm mt-1">
-                            Models showing significant accuracy gaps between demographic segments
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {disparities.length > 0 ? disparities.map((d) => (
-                            <div key={d.modelId} className="bg-card border border-border/50 rounded-lg p-4">
-                                <div className="flex justify-between items-start mb-3">
-                                    <span className="text-sm font-medium text-foreground">
-                                        {formatModelName(d.modelId)}
-                                    </span>
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
-                                        {(d.absoluteGap * 100).toFixed(1)}% gap
-                                    </span>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-green-600 dark:text-green-400">
-                                            Best: {getSegmentValueLabel(d.bestSegment.label)}
-                                        </span>
-                                        <span className="font-mono">{(d.bestSegment.score * 100).toFixed(1)}%</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-red-600 dark:text-red-400">
-                                            Worst: {getSegmentValueLabel(d.worstSegment.label)}
-                                        </span>
-                                        <span className="font-mono">{(d.worstSegment.score * 100).toFixed(1)}%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )) : fairnessConcerns.map((d, idx) => (
-                            <div key={idx} className="bg-card border border-border/50 rounded-lg p-4">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-sm font-medium text-foreground">
-                                        {formatModelName(d.modelId)}
-                                    </span>
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
-                                        {(d.gap * 100).toFixed(1)}% gap
-                                    </span>
-                                </div>
-                                <div className="text-xs text-muted-foreground space-y-1">
-                                    <div>Best: {d.bestSegment}</div>
-                                    <div>Worst: {d.worstSegment}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+            {/* Fairness Analysis — sorted table with expandable drill-down */}
+            {disparities.length > 0 && (
+                <FairnessAnalysisTable
+                    disparities={disparities}
+                    modelResults={modelResults}
+                    expandedRow={expandedFairnessRow}
+                    onToggleRow={(key) => setExpandedFairnessRow(expandedFairnessRow === key ? null : key)}
+                    showAll={showAllFairness}
+                    onToggleShowAll={() => setShowAllFairness(!showAllFairness)}
+                />
             )}
         </div>
     );

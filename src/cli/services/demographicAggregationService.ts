@@ -12,6 +12,7 @@
 
 import { WevalResult } from '@/types/shared';
 import { DTEFLeaderboardEntry } from '@/types/dtef';
+import { getSegmentPrefix, getCategoryLabel, SEGMENT_TYPE_LABELS } from '@/lib/segmentUtils';
 
 /**
  * Per-segment score for a model.
@@ -49,17 +50,27 @@ export interface AggregatedModelResult {
 }
 
 /**
- * Fairness disparity between segments for a model.
+ * Per-category fairness disparity for a model.
+ * Compares segments WITHIN a single category (e.g. "Male" vs "Female").
  */
-export interface DisparityEntry {
+export interface StrataDisparityEntry {
     modelId: string;
-    /** Ratio of best to worst segment score */
-    disparityRatio: number;
-    /** Absolute gap between best and worst segment */
+    /** Category key, e.g. 'ageGroup', 'gender', 'country' */
+    category: string;
+    /** Human-readable category label, e.g. 'Age', 'Gender', 'Country' */
+    categoryLabel: string;
+    /** Number of segments in this category for this model */
+    segmentCount: number;
+    /** Absolute gap between best and worst segment within the category */
     absoluteGap: number;
     bestSegment: { id: string; label: string; score: number };
     worstSegment: { id: string; label: string; score: number };
 }
+
+/**
+ * @deprecated Use StrataDisparityEntry instead. Kept for backward compatibility.
+ */
+export type DisparityEntry = StrataDisparityEntry;
 
 /**
  * A single (contextCount, score) data point for context responsiveness analysis.
@@ -430,19 +441,39 @@ export class DemographicAggregationService {
         // Sort by overall score descending
         modelResults.sort((a, b) => b.overallScore - a.overallScore);
 
-        // Compute disparities
-        const disparities: DisparityEntry[] = modelResults
-            .filter(m => m.bestSegment && m.worstSegment && m.segmentCount > 1)
-            .map(m => ({
-                modelId: m.modelId,
-                disparityRatio: m.worstSegment!.score > 0
-                    ? m.bestSegment!.score / m.worstSegment!.score
-                    : Infinity,
-                absoluteGap: m.bestSegment!.score - m.worstSegment!.score,
-                bestSegment: m.bestSegment!,
-                worstSegment: m.worstSegment!,
-            }))
-            .sort((a, b) => b.absoluteGap - a.absoluteGap);
+        // Compute per-category disparities (within-category, not cross-category)
+        const disparities: StrataDisparityEntry[] = [];
+        for (const model of modelResults) {
+            // Group this model's segment scores by category prefix
+            const byCategory = new Map<string, { id: string; label: string; score: number }[]>();
+            for (const seg of model.segmentScores) {
+                const prefix = getSegmentPrefix(seg.segmentId);
+                if (!SEGMENT_TYPE_LABELS[prefix]) continue;
+                if (!byCategory.has(prefix)) byCategory.set(prefix, []);
+                byCategory.get(prefix)!.push({
+                    id: seg.segmentId,
+                    label: seg.segmentLabel,
+                    score: seg.avgCoverageExtent,
+                });
+            }
+            // For each category with 2+ segments, compute the within-category gap
+            for (const [prefix, segments] of byCategory) {
+                if (segments.length < 2) continue;
+                segments.sort((a, b) => b.score - a.score);
+                const best = segments[0];
+                const worst = segments[segments.length - 1];
+                disparities.push({
+                    modelId: model.modelId,
+                    category: prefix,
+                    categoryLabel: getCategoryLabel(prefix),
+                    segmentCount: segments.length,
+                    absoluteGap: best.score - worst.score,
+                    bestSegment: best,
+                    worstSegment: worst,
+                });
+            }
+        }
+        disparities.sort((a, b) => b.absoluteGap - a.absoluteGap);
 
         // Build leaderboard
         const leaderboard: DTEFLeaderboardEntry[] = modelResults.map(m => ({

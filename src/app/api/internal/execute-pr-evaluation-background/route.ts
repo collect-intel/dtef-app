@@ -177,8 +177,9 @@ async function runPRPipeline(body: any) {
     await updateStatus('validating', 'Validating blueprint structure...');
     let config = parseAndNormalizeBlueprint(blueprintContent, 'yaml');
 
+    // Strip deprecated 'id' field before assigning PR-specific ID
     if (config.id) {
-      logger.warn(`Blueprint '${blueprintPath}' contains deprecated 'id' field ('${config.id}'). Replacing with PR-specific ID.`);
+      delete config.id;
     }
     const prConfigId = generatePRConfigId(prNumber, blueprintPath);
     logger.info(`Generated PR config ID: '${prConfigId}'`);
