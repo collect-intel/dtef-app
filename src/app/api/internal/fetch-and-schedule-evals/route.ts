@@ -33,17 +33,24 @@ export async function POST(req: NextRequest) {
   const logger = await getLogger('schedule-evals:cron');
   logger.info(`Function triggered (${new Date().toISOString()})`);
 
-  // Parse request body for force flag
+  // Parse request body for force and limit flags
   let force = false;
+  let limit = 0; // 0 = no limit
   try {
     const body = await req.json();
     force = body?.force === true;
+    if (typeof body?.limit === 'number' && body.limit > 0) {
+      limit = body.limit;
+    }
   } catch {
     // No body or invalid JSON — not forced
   }
 
   if (force) {
     logger.info('Force mode enabled — skipping freshness checks');
+  }
+  if (limit > 0) {
+    logger.info(`Batch limit: ${limit} evaluations`);
   }
 
   const githubToken = process.env.GITHUB_TOKEN;
@@ -93,7 +100,16 @@ export async function POST(req: NextRequest) {
 
     logger.info(`Found ${filesInBlueprintDir.length} blueprint files in the repo tree.`);
 
+    let scheduled = 0;
+    let skippedFresh = 0;
+    let skippedOther = 0;
+
     for (const file of filesInBlueprintDir) {
+      // Check batch limit
+      if (limit > 0 && scheduled >= limit) {
+        logger.info(`Batch limit reached (${limit}). Stopping scheduling.`);
+        break;
+      }
       const blueprintPath = file.path.startsWith('blueprints/')
         ? file.path.substring('blueprints/'.length)
         : file.path;
@@ -177,6 +193,7 @@ export async function POST(req: NextRequest) {
               if (runAge < ONE_WEEK_IN_MS) {
                 logger.info(`Blueprint ${currentId} has a recent run. Skipping.`);
                 needsRun = false;
+                skippedFresh++;
               } else {
                 logger.info(`Blueprint ${currentId} has an old run. Scheduling new run.`);
               }
@@ -205,7 +222,8 @@ export async function POST(req: NextRequest) {
             });
 
             if (response.ok) {
-              logger.info(`Successfully invoked background function for ${currentId}`);
+              scheduled++;
+              logger.info(`Successfully invoked background function for ${currentId} (scheduled: ${scheduled})`);
             } else {
               logger.error(`Background function failed for ${currentId}: ${response.status} - ${response.error}`);
               captureError(new Error(`Background function failed: ${response.error}`), { currentId, file: file.path });
@@ -221,9 +239,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    logger.info('Scheduled eval check completed successfully');
+    logger.info(`Scheduled eval check completed: ${scheduled} scheduled, ${skippedFresh} skipped (fresh), ${skippedOther} skipped (other)`);
     await flushSentry();
-    return NextResponse.json({ message: 'Scheduled eval check completed.' });
+    return NextResponse.json({
+      message: 'Scheduled eval check completed.',
+      scheduled,
+      skippedFresh,
+      total: filesInBlueprintDir.length,
+      ...(limit > 0 ? { limit } : {}),
+    });
   } catch (error: any) {
     logger.error('Error in handler', error);
     captureError(error, { handler: 'fetch-and-schedule-evals' });
