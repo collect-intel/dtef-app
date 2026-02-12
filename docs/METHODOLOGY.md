@@ -54,23 +54,23 @@ The model's predicted distribution is compared to the actual (ground truth) dist
 
 ## 4. Core Evaluation Metrics
 
-### 4.1. Jensen-Shannon Divergence Similarity (default)
+### 4.1. Jensen-Shannon Distance (default)
 
-The primary metric is based on the **Jensen-Shannon Divergence (JSD)**, a symmetric and bounded measure of the difference between two probability distributions.
+The primary metric is based on the **Jensen-Shannon Distance (JSD)**, the square root of the Jensen-Shannon Divergence. It is a true metric (satisfies the triangle inequality) and produces scores in a more discriminative range than the raw divergence, which clusters near 1.0 for distributions that are even roughly similar.
 
-*   **Process**: Both the predicted and actual distributions are normalized to sum to 1.0. The JSD is then computed as the average of the Kullback-Leibler divergences of each distribution from their midpoint:
+*   **Process**: Both the predicted and actual distributions are normalized to sum to 1.0. The Jensen-Shannon Divergence is computed as the average of the Kullback-Leibler divergences of each distribution from their midpoint:
     ```math
     \text{JSD}(P \| Q) = \frac{1}{2} D_{\text{KL}}(P \| M) + \frac{1}{2} D_{\text{KL}}(Q \| M)
     ```
     Where $M = \frac{1}{2}(P + Q)$ and $D_{\text{KL}}$ is the Kullback-Leibler divergence using base-2 logarithms.
 
-*   **Similarity conversion**: JSD is bounded in $[0, 1]$ when using $\log_2$. The final similarity score is:
+*   **Distance and similarity conversion**: The Jensen-Shannon Distance is $\sqrt{\text{JSD}}$, bounded in $[0, 1]$. The final similarity score is:
     ```math
-    S_{\text{JSD}} = 1 - \text{JSD}(P \| Q)
+    S = 1 - \sqrt{\text{JSD}(P \| Q)}
     ```
-    A score of 1.0 indicates identical distributions; a score of 0.0 indicates maximally divergent distributions.
+    A score of 1.0 indicates identical distributions; a score of 0.0 indicates maximally divergent distributions. Using the square root spreads scores across a wider range — e.g., a raw divergence of 0.04 yields a distance of 0.20, producing a similarity of 0.80 instead of 0.96.
 
-*   **Why JSD**: Unlike KL divergence, JSD is symmetric ($\text{JSD}(P \| Q) = \text{JSD}(Q \| P)$) and always finite, even when one distribution assigns zero probability to an outcome. This makes it well-suited for comparing survey response distributions where some options may have zero responses.
+*   **Why JS Distance**: Unlike KL divergence, JS divergence is symmetric ($\text{JSD}(P \| Q) = \text{JSD}(Q \| P)$) and always finite, even when one distribution assigns zero probability to an outcome. The square root makes it a proper distance metric and produces more meaningful score differentiation between models.
 
 ### 4.2. Cosine Similarity
 

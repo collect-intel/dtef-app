@@ -207,7 +207,7 @@ export const distribution_metric: PointFunction = (
         case 'js-divergence':
         default:
             score = jsDivergenceSimilarity(predicted, expected);
-            metricName = 'JS Divergence Similarity';
+            metricName = 'Jensen-Shannon Distance';
             break;
     }
 

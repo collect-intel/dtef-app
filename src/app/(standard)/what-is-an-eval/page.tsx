@@ -127,7 +127,7 @@ export default function WhatIsAnEvalPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-2">Score against ground truth</h3>
                   <p className="text-foreground/80">
-                    Predicted distributions are compared to actual survey responses using distribution metrics like Jensen-Shannon divergence, cosine similarity, and earth mover's distance. This produces transparent, quantitative accuracy scores for every model-segment-question combination.
+                    Predicted distributions are compared to actual survey responses using distribution metrics like Jensen-Shannon distance, cosine similarity, and earth mover's distance. This produces transparent, quantitative accuracy scores for every model-segment-question combination.
                   </p>
                 </div>
               </div>
