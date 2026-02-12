@@ -15,7 +15,7 @@ APP_URL := $(or $(APP_URL),http://localhost:3172)
 S3_BUCKET := collect-intel-dtef
 S3_REGION := us-east-1
 
-.PHONY: help rerun-evals rerun-evals-force dev build test test-infra \
+.PHONY: help rerun-evals rerun-evals-force backfill-summary dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest
 
 help: ## Show available commands
@@ -29,6 +29,9 @@ rerun-evals: ## Trigger evaluation scheduler (respects 1-week freshness check)
 		-H "Content-Type: application/json" \
 		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
 		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
+
+backfill-summary: ## Rebuild all summary/aggregate files in S3 from existing results
+	pnpm cli backfill-summary
 
 rerun-evals-force: ## Force rerun ALL periodic evaluations (ignores freshness check)
 	@echo "Force-triggering ALL evaluations at $(APP_URL)..."
