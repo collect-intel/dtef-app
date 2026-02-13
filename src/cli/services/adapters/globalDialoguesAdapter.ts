@@ -14,16 +14,42 @@ import { DTEFSurveyData, SegmentWithResponses, DemographicResponse } from '@/typ
 
 // ── Column classification ──────────────────────────────────────────────
 
-/** Segment column prefixes for demographic categories (O1–O7 and regions) */
-const SEGMENT_PREFIXES: Record<string, string> = {
+/**
+ * Default segment column prefixes for demographic categories (O1–O7).
+ * O1-O4 are consistent across all rounds. O5-O7 vary: most rounds use
+ * O5=aiConcern, O6=religion, O7=country, but GD6UK omits aiConcern
+ * and uses O5=religion, O6=country. We auto-detect O5-O7 from values.
+ */
+const FIXED_SEGMENT_PREFIXES: Record<string, string> = {
   'O1': 'language',
   'O2': 'ageGroup',
   'O3': 'gender',
   'O4': 'environment',
-  'O5': 'aiConcern',
-  'O6': 'religion',
-  'O7': 'country',
 };
+
+/** Known AI concern values (exact match, case-insensitive) */
+const AI_CONCERN_VALUES = new Set([
+  'equally concerned and excited',
+  'more concerned than excited',
+  'more excited than concerned',
+]);
+
+/** Known religion values (substring match, case-insensitive) */
+const RELIGION_INDICATORS = [
+  'buddhism', 'christianity', 'hinduism', 'islam', 'judaism',
+  'sikhism', 'religious group', 'do not identify with any religious',
+];
+
+/**
+ * Detect the category for an O-prefix by examining its values.
+ * Returns 'aiConcern', 'religion', or 'country'.
+ */
+function detectCategory(values: string[]): string {
+  const lower = values.map(v => v.toLowerCase());
+  if (lower.some(v => AI_CONCERN_VALUES.has(v))) return 'aiConcern';
+  if (lower.some(v => RELIGION_INDICATORS.some(r => v.includes(r)))) return 'religion';
+  return 'country';
+}
 
 /**
  * Columns that are metadata, not segment data.
@@ -173,11 +199,39 @@ interface SegmentColumnInfo {
 }
 
 /**
+ * Build a complete prefix→attribute mapping for the given CSV headers.
+ * O1-O4 are fixed. O5-O7 are auto-detected from column values.
+ */
+function buildSegmentPrefixMap(headers: string[]): Record<string, string> {
+  const prefixMap: Record<string, string> = { ...FIXED_SEGMENT_PREFIXES };
+
+  // Collect values per variable O-prefix (O5, O6, O7, etc.)
+  const variablePrefixes: Record<string, string[]> = {};
+  for (const h of headers) {
+    const match = h.match(/^(O\d+): (.+)$/);
+    if (match && !FIXED_SEGMENT_PREFIXES[match[1]]) {
+      if (!variablePrefixes[match[1]]) variablePrefixes[match[1]] = [];
+      variablePrefixes[match[1]].push(match[2]);
+    }
+  }
+
+  // Detect category for each variable prefix
+  for (const [prefix, values] of Object.entries(variablePrefixes)) {
+    prefixMap[prefix] = detectCategory(values);
+  }
+
+  return prefixMap;
+}
+
+/** Module-level prefix map, set by classifySegmentColumn's caller via buildSegmentPrefixMap */
+let activePrefixMap: Record<string, string> = { ...FIXED_SEGMENT_PREFIXES };
+
+/**
  * Classifies a column header as a segment column and extracts its metadata.
  * Returns null if the column is not a recognized segment column.
  */
 function classifySegmentColumn(header: string): SegmentColumnInfo | null {
-  for (const [prefix, attribute] of Object.entries(SEGMENT_PREFIXES)) {
+  for (const [prefix, attribute] of Object.entries(activePrefixMap)) {
     if (header.startsWith(`${prefix}: `)) {
       const value = header.slice(prefix.length + 2).trim();
       return { header, prefix, attribute, value };
@@ -217,6 +271,10 @@ function loadAggregateCSV(filePath: string): { headers: string[]; rows: ParsedRo
   }
 
   const headers = parsed[0];
+
+  // Build prefix map for this CSV (auto-detects O5-O7 categories)
+  activePrefixMap = buildSegmentPrefixMap(headers);
+
   const rows: ParsedRow[] = [];
 
   // Find the index of key columns

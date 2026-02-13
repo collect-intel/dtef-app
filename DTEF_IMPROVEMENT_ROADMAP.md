@@ -154,11 +154,20 @@ These are valuable but depend on earlier tiers being complete and real evaluatio
 
 ### 4.1 Context-Level Comparison Dashboard
 
-The core DTEF research question (DTEF_OVERVIEW.md §3.2) is measuring "evidence-adapting vs stereotype-holding" behavior by comparing zero-context and full-context evaluation results. This needs a dedicated visualization:
+**Status:** ⏳ Partially complete — foundation implemented, drill-down views remaining
 
+The core DTEF research question (DTEF_OVERVIEW.md §3.2) is measuring "evidence-adapting vs stereotype-holding" behavior by comparing zero-context and full-context evaluation results.
+
+**Implemented:**
+- Context Responsiveness spectrum visualization on `/demographics` page (`DemographicLeaderboard.tsx`, lines 373-485)
+- Linear regression slope calculation: accuracy vs context count per model/segment (`demographicAggregationService.ts`, lines 255-348)
+- Color-gradient ranking: positive slope = evidence-adapting, negative = stereotype-reliant
+- Blueprint metadata tracks `contextQuestionCount` for multi-level analysis
+
+**Remaining:**
 - Side-by-side JSD scores for same model × same segment × same question at different context levels
-- Delta calculation showing improvement (evidence-adapting) or stagnation (stereotype-holding)
-- Aggregate view across all segments showing which models benefit most from context
+- Delta calculation showing per-question improvement magnitude
+- Detailed drill-down view: click a model to see context sensitivity per segment/question
 
 ### 4.2 Survey Data Upload UI
 
@@ -171,11 +180,20 @@ Currently survey data must be uploaded via CLI (`dtef import-gd`, `dtef generate
 
 ### 4.3 Intermediate Context Levels
 
-Current system supports zero-context and full-context. Future enhancement: generate blueprints with 5, 10, 25, 50 context questions to plot a learning curve per model/segment.
+**Status:** ⏳ Infrastructure exists, needs testing with real data
+
+The `--context-levels` CLI flag is implemented (`dtef-commands.ts`, lines 94-149) and supports generating blueprints at multiple context levels (e.g., `0,5,10,25,all`). The blueprint service tracks actual context count in metadata with `-c{N}` config ID suffixes. Token budget may constrain actual count below requested.
+
+**Remaining:**
+- Test intermediate levels with real GD data to verify token budget behavior
+- Determine standard level set for production use
+- Generate and publish intermediate-level blueprints for all rounds
 
 ### 4.4 Multi-Round Global Dialogues Analysis
 
-The Global Dialogues submodule contains 8 rounds (GD1-GD7, GD6UK). Currently only GD4 has been tested. Running evaluations across all rounds would reveal:
+**Status:** ⏳ GD1-GD6 deployed, GD7 and GD6UK being added
+
+The Global Dialogues submodule contains 8 rounds (GD1-GD7, GD6UK). GD1-GD6 are deployed with evaluations running. GD7 and GD6UK are being added. Future analysis:
 - Cross-temporal consistency (do model predictions hold across survey years?)
 - Question overlap analysis (same questions across rounds)
 - Expanded segment coverage
@@ -216,10 +234,10 @@ Make evaluation types pluggable. Currently only "Demographic Distribution Predic
 | 3.5 | Fix TypeScript build errors | 3 | ✅ Complete |
 | 3.6 | Error handling improvements | 3 | Not started |
 | 3.7 | Homepage improvements | 3 | Not started |
-| 4.1 | Context-level comparison dashboard | 4 | Not started |
+| 4.1 | Context-level comparison dashboard | 4 | ⏳ Partially complete |
 | 4.2 | Survey data upload UI | 4 | Not started |
-| 4.3 | Intermediate context levels | 4 | Not started |
-| 4.4 | Multi-round GD analysis | 4 | Not started |
+| 4.3 | Intermediate context levels | 4 | ⏳ Infrastructure exists |
+| 4.4 | Multi-round GD analysis | 4 | ⏳ GD7/GD6UK being added |
 | 4.5 | Experiment features for DTEF | 4 | Not started |
 | 4.6 | Evaluation type registry | 4 | Not started |
 
