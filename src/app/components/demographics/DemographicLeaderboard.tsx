@@ -51,6 +51,32 @@ interface ContextResponsivenessData {
     contextLevelsFound: number[];
 }
 
+/** Full context data point with optional run link metadata */
+interface FullContextDataPoint {
+    contextCount: number;
+    score: number;
+    configId?: string;
+    runLabel?: string;
+    timestamp?: string;
+}
+
+interface FullSegmentResponsiveness {
+    segmentId: string;
+    dataPoints: FullContextDataPoint[];
+    slope: number;
+}
+
+interface FullModelResponsiveness {
+    modelId: string;
+    overallSlope: number;
+    segmentResponsiveness: FullSegmentResponsiveness[];
+}
+
+interface FullContextAnalysis {
+    models: FullModelResponsiveness[];
+    contextLevelsFound: number[];
+}
+
 interface DemographicsData {
     status?: string;
     message?: string;
@@ -76,6 +102,7 @@ interface DemographicsData {
             bestSegment: { id: string; label: string; score: number };
             worstSegment: { id: string; label: string; score: number };
         }>;
+        contextAnalysis?: FullContextAnalysis;
     };
 }
 
@@ -400,8 +427,94 @@ function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: numbe
 
 type ContextSortKey = 'model' | 'slope';
 
+/** Expandable drill-down: per-segment context responsiveness for a model */
+function ContextDrillDown({ modelData }: { modelData: FullModelResponsiveness }) {
+    const grouped = useMemo(() => {
+        const groups = new Map<string, FullSegmentResponsiveness[]>();
+        for (const seg of modelData.segmentResponsiveness || []) {
+            const prefix = getSegmentPrefix(seg.segmentId);
+            if (!SEGMENT_TYPE_LABELS[prefix]) continue;
+            if (!groups.has(prefix)) groups.set(prefix, []);
+            groups.get(prefix)!.push(seg);
+        }
+        // Sort each group by slope descending
+        for (const segs of groups.values()) {
+            segs.sort((a, b) => b.slope - a.slope);
+        }
+        return groups;
+    }, [modelData.segmentResponsiveness]);
+
+    if (grouped.size === 0) {
+        return <p className="text-sm text-muted-foreground italic px-4 py-2">No per-segment context data available</p>;
+    }
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+            {Array.from(grouped.entries()).map(([prefix, segments]) => (
+                <div key={prefix} className="bg-muted/30 rounded-lg p-3">
+                    <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        {SEGMENT_TYPE_LABELS[prefix] || prefix}
+                    </h5>
+                    <ul className="space-y-2">
+                        {segments.map(seg => {
+                            const sortedPoints = [...seg.dataPoints].sort((a, b) => a.contextCount - b.contextCount);
+                            return (
+                                <li key={seg.segmentId}>
+                                    <div className="flex justify-between items-center text-sm mb-0.5">
+                                        <span className="truncate mr-2">{getSegmentValueLabel(seg.segmentId)}</span>
+                                        <span className="font-mono text-xs flex-shrink-0 text-muted-foreground">
+                                            slope: {seg.slope >= 0 ? '+' : ''}{(seg.slope * 100).toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {sortedPoints.map((pt, i) => {
+                                            const colorCls = pt.score >= 0.8 ? 'text-green-600 dark:text-green-400'
+                                                : pt.score >= 0.6 ? 'text-yellow-600 dark:text-yellow-400'
+                                                : 'text-red-600 dark:text-red-400';
+                                            const label = `c${pt.contextCount}: ${(pt.score * 100).toFixed(1)}%`;
+
+                                            if (pt.configId && pt.runLabel && pt.timestamp) {
+                                                const href = `/analysis/${encodeURIComponent(pt.configId)}/${encodeURIComponent(pt.runLabel)}/${encodeURIComponent(pt.timestamp)}`;
+                                                return (
+                                                    <a
+                                                        key={i}
+                                                        href={href}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={`font-mono text-xs ${colorCls} underline decoration-dotted hover:decoration-solid`}
+                                                    >
+                                                        {label}
+                                                    </a>
+                                                );
+                                            }
+                                            return (
+                                                <span key={i} className={`font-mono text-xs ${colorCls}`}>
+                                                    {label}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /** Context Responsiveness section: shows how models respond to increasing context */
-function ContextResponsivenessSection({ data }: { data: ContextResponsivenessData }) {
+function ContextResponsivenessSection({
+    data,
+    contextAnalysis,
+    expandedRow,
+    onToggleRow,
+}: {
+    data: ContextResponsivenessData;
+    contextAnalysis?: FullContextAnalysis;
+    expandedRow: string | null;
+    onToggleRow: (key: string) => void;
+}) {
     const models = data.models;
     if (!models || models.length === 0) return null;
 
@@ -419,6 +532,14 @@ function ContextResponsivenessSection({ data }: { data: ContextResponsivenessDat
             default: return 0;
         }
     }), [models, sort]);
+
+    // Build lookup from full context analysis for drill-down
+    const fullModelMap = useMemo(() => {
+        if (!contextAnalysis) return new Map<string, FullModelResponsiveness>();
+        return new Map(contextAnalysis.models.map(m => [m.modelId, m]));
+    }, [contextAnalysis]);
+
+    const hasFullData = fullModelMap.size > 0;
 
     return (
         <section>
@@ -450,19 +571,44 @@ function ContextResponsivenessSection({ data }: { data: ContextResponsivenessDat
                         <tr className="border-b border-border/50 bg-muted/30">
                             <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort} />
                             <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2" />
+                            {hasFullData && <th className="w-8 px-2"></th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {sorted.map((model) => (
-                            <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
-                                    {formatModelName(model.modelId)}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <ResponsivenessBar slope={model.slope} maxSlope={maxAbsSlope} />
-                                </td>
-                            </tr>
-                        ))}
+                        {sorted.map((model) => {
+                            const isExpanded = expandedRow === model.modelId;
+                            const fullModel = fullModelMap.get(model.modelId);
+                            return (
+                                <Fragment key={model.modelId}>
+                                    <tr
+                                        className={`border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors ${hasFullData ? 'cursor-pointer' : ''}`}
+                                        onClick={() => hasFullData && onToggleRow(model.modelId)}
+                                    >
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
+                                            <span className="inline-flex items-center gap-2">
+                                                {formatModelName(model.modelId)}
+                                                {hasFullData && (
+                                                    <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                                        ▾
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <ResponsivenessBar slope={model.slope} maxSlope={maxAbsSlope} />
+                                        </td>
+                                        {hasFullData && <td className="px-2"></td>}
+                                    </tr>
+                                    {isExpanded && fullModel && (
+                                        <tr>
+                                            <td colSpan={hasFullData ? 3 : 2} className="p-0 border-b border-border/30 bg-muted/10">
+                                                <ContextDrillDown modelData={fullModel} />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -690,6 +836,7 @@ export default function DemographicLeaderboard() {
     const [error, setError] = useState<string | null>(null);
     const [expandedModel, setExpandedModel] = useState<string | null>(null);
     const [expandedFairnessRow, setExpandedFairnessRow] = useState<string | null>(null);
+    const [expandedContextRow, setExpandedContextRow] = useState<string | null>(null);
     const [showAllFairness, setShowAllFairness] = useState(false);
     const [lbSort, toggleLbSort] = useSort<LeaderboardSortKey>('score');
 
@@ -869,7 +1016,12 @@ export default function DemographicLeaderboard() {
 
             {/* Context Responsiveness */}
             {data.contextResponsiveness && data.contextResponsiveness.models.length > 0 && (
-                <ContextResponsivenessSection data={data.contextResponsiveness} />
+                <ContextResponsivenessSection
+                    data={data.contextResponsiveness}
+                    contextAnalysis={data.aggregation?.contextAnalysis}
+                    expandedRow={expandedContextRow}
+                    onToggleRow={(key) => setExpandedContextRow(expandedContextRow === key ? null : key)}
+                />
             )}
 
             {/* Fairness Analysis — sorted table with expandable drill-down */}

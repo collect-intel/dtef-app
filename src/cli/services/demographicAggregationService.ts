@@ -78,6 +78,12 @@ export type DisparityEntry = StrataDisparityEntry;
 export interface ContextDataPoint {
     contextCount: number;
     score: number;
+    /** Config ID for linking to evaluation run detail page */
+    configId?: string;
+    /** Run label for linking to evaluation run detail page */
+    runLabel?: string;
+    /** Timestamp for linking to evaluation run detail page */
+    timestamp?: string;
 }
 
 /**
@@ -218,7 +224,7 @@ export class DemographicAggregationService {
      */
     static extractContextCount(result: WevalResult): number | null {
         const ctx = (result.config?.context as any)?.dtef;
-        if (ctx?.contextQuestionCount !== undefined) {
+        if (typeof ctx?.contextQuestionCount === 'number' && ctx.contextQuestionCount >= 0) {
             return ctx.contextQuestionCount;
         }
 
@@ -233,16 +239,14 @@ export class DemographicAggregationService {
             const ids = ctx?.contextQuestionIds;
             if (Array.isArray(ids) && ids.length > 0) return ids.length;
 
-            // Estimate from ground truth distributions (number of prompts ≈ number of questions)
-            const gtd = ctx?.groundTruthDistributions;
-            if (gtd && typeof gtd === 'object') {
-                const promptCount = Object.keys(gtd).length;
-                if (promptCount > 0) return promptCount;
-            }
-
-            // Last resort: use the total prompt count from the config as a reasonable proxy
+            // Count context questions embedded in prompt text as Q: "..." patterns
+            // (buildContextSection renders each as `Q: "question text"\n  Response distribution: ...`)
             const prompts = result.config?.prompts;
-            if (Array.isArray(prompts) && prompts.length > 0) return prompts.length;
+            if (Array.isArray(prompts) && prompts.length > 0) {
+                const text = prompts[0].promptText || '';
+                const matches = text.match(/Q:\s*"/g);
+                if (matches && matches.length > 0) return matches.length;
+            }
 
             // Cannot determine — return null to exclude from context analysis
             return null;
@@ -279,8 +283,11 @@ export class DemographicAggregationService {
      * Groups results by model → segment → context level, then computes regression slopes.
      */
     static computeContextAnalysis(results: WevalResult[]): ContextAnalysis | undefined {
-        // Collect all (model, segment, contextCount, score) tuples
-        const tuples: { modelId: string; segmentId: string; contextCount: number; score: number }[] = [];
+        // Collect all (model, segment, contextCount, score, run metadata) tuples
+        const tuples: {
+            modelId: string; segmentId: string; contextCount: number; score: number;
+            configId?: string; runLabel?: string; timestamp?: string;
+        }[] = [];
         const contextLevels = new Set<number>();
 
         for (const result of results) {
@@ -300,6 +307,9 @@ export class DemographicAggregationService {
                     segmentId: ctx.segmentId,
                     contextCount,
                     score: data.avgScore,
+                    configId: result.configId,
+                    runLabel: result.runLabel,
+                    timestamp: result.timestamp,
                 });
             }
         }
@@ -313,7 +323,10 @@ export class DemographicAggregationService {
             if (!modelMap.has(t.modelId)) modelMap.set(t.modelId, new Map());
             const segMap = modelMap.get(t.modelId)!;
             if (!segMap.has(t.segmentId)) segMap.set(t.segmentId, []);
-            segMap.get(t.segmentId)!.push({ contextCount: t.contextCount, score: t.score });
+            segMap.get(t.segmentId)!.push({
+                contextCount: t.contextCount, score: t.score,
+                configId: t.configId, runLabel: t.runLabel, timestamp: t.timestamp,
+            });
         }
 
         const models: ModelResponsiveness[] = [];
