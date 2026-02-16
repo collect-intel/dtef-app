@@ -4,7 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { KeyvFile } from 'keyv-file';
 
-// Use the /tmp directory for caching, which is writable in serverless environments.
+// Use the /tmp directory for caching.
 const cacheDir = path.resolve('/tmp', '.cache');
 
 // Ensure the cache directory exists

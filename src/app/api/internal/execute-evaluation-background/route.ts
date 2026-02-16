@@ -12,14 +12,10 @@ import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
 import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { configure } from '@/cli/config';
 import { getLogger } from '@/utils/logger';
-import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
+import { captureError, setContext } from '@/utils/sentry';
 import { enqueueEvaluation, getQueueStatus, registerBackfillHandler } from '@/lib/evaluation-queue';
 
-export const maxDuration = 300; // 5 minutes max for Railway
-
 async function runPipeline(requestPayload: any) {
-  initSentry('execute-evaluation-background');
-
   const requestId = crypto.randomUUID();
   const logger = await getLogger(`eval:bg:${requestId}`);
   logger.info('Background evaluation started.');
@@ -127,7 +123,6 @@ async function runPipeline(requestPayload: any) {
   }
 
   logger.info(`Pipeline tasks completed for ${currentId}. Output: ${fileName}`);
-  await flushSentry();
 }
 
 export async function POST(req: NextRequest) {

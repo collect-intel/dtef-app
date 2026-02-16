@@ -9,7 +9,7 @@ import { parseAndNormalizeBlueprint, validateReservedPrefixes } from '@/lib/blue
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import { getLogger } from '@/utils/logger';
-import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
+import { captureError, setContext } from '@/utils/sentry';
 import { callBackgroundFunction } from '@/lib/background-function-client';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
 
@@ -18,11 +18,8 @@ const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
 const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
-  initSentry('fetch-and-schedule-evals');
-
   const authError = checkBackgroundAuth(req);
   if (authError) {
-    await flushSentry();
     return authError;
   }
 
@@ -94,7 +91,6 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(filesInBlueprintDir)) {
       logger.error('Failed to fetch or filter file list from GitHub repo tree.');
       captureError(new Error('Failed to process file list from GitHub repo'), { treeData: treeResponse.data });
-      await flushSentry();
       return NextResponse.json({ error: 'Failed to process file list from GitHub repo.' }, { status: 500 });
     }
 
@@ -240,7 +236,6 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info(`Scheduled eval check completed: ${scheduled} scheduled, ${skippedFresh} skipped (fresh), ${skippedOther} skipped (other)`);
-    await flushSentry();
     return NextResponse.json({
       message: 'Scheduled eval check completed.',
       scheduled,
@@ -251,7 +246,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     logger.error('Error in handler', error);
     captureError(error, { handler: 'fetch-and-schedule-evals' });
-    await flushSentry();
     return NextResponse.json({ error: 'Error processing scheduled eval check.' }, { status: 500 });
   }
 }

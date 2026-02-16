@@ -19,8 +19,10 @@ class RateLimiter {
   constructor(config: RateLimitConfig) {
     this.config = config;
 
-    // Clean up old entries every hour
-    setInterval(() => this.cleanup(), 60 * 60 * 1000);
+    // Clean up old entries every hour. unref() so this doesn't prevent
+    // graceful process shutdown on Railway deploys.
+    const timer = setInterval(() => this.cleanup(), 60 * 60 * 1000);
+    timer.unref();
   }
 
   /**

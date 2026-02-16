@@ -123,7 +123,7 @@ pnpm cli scan-unrun-blueprints [--run] [--limit N]
 openssl rand -hex 32
 ```
 
-Add to your `.env` or Netlify environment variables:
+Add to your `.env` or Railway environment variables:
 ```
 GITHUB_WEBHOOK_SECRET=your_generated_secret_here
 ```
@@ -178,7 +178,7 @@ You need **two webhooks** for the full workflow:
 
 #### Store Private Key in AWS Secrets Manager (Recommended for Production)
 
-⚠️ **Important**: GitHub App private keys are ~1.6-3KB and will cause Netlify Functions to exceed AWS Lambda's 4KB environment variable limit. Store the key in **AWS Secrets Manager** instead.
+For production deployments, you can store the GitHub App private key in **AWS Secrets Manager** for centralized secret management. Alternatively, since Railway has no environment variable size limits, you can set the private key directly as a Railway environment variable.
 
 **Step 1: Create Secret in AWS**
 ```bash
@@ -190,7 +190,7 @@ aws secretsmanager create-secret \
   --region us-east-1
 ```
 
-**Step 2: Set Netlify Environment Variable**
+**Step 2: Set Railway Environment Variable**
 ```bash
 # Instead of storing the full key, just store the secret name
 GITHUB_APP_PRIVATE_KEY_SECRET_NAME=dtef/github-app-private-key
@@ -198,18 +198,16 @@ GITHUB_APP_PRIVATE_KEY_SECRET_NAME=dtef/github-app-private-key
 
 The application will automatically fetch the key from Secrets Manager at runtime using your existing AWS credentials.
 
-**Alternative: Inline Private Key** (Local development only)
+**Alternative: Inline Private Key** (Local development or Railway)
 
-For local development, you can use the inline format:
+You can also set the private key directly as an environment variable. Railway has no size limits on environment variables, so this works in both local development and production:
 ```bash
 # Convert .pem to single-line format
 awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' your-private-key.pem
 
-# Set in .env (wrap in quotes)
+# Set in .env or Railway environment variables (wrap in quotes)
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...your-key...\n-----END RSA PRIVATE KEY-----"
 ```
-
-⚠️ **Don't use this in Netlify** - it will exceed the 4KB limit.
 
 #### Alternative: Personal Access Token (Fallback)
 
@@ -224,13 +222,13 @@ Create at: https://github.com/settings/tokens with scopes:
 
 ### 4. Verify Environment Variables
 
-Ensure these are set in Netlify (or `.env` for local testing):
+Ensure these are set in Railway (or `.env` for local testing):
 
 ```bash
 # GitHub Authentication (GitHub App - Production)
 GITHUB_APP_ID=1234567
 GITHUB_APP_INSTALLATION_ID=12345678
-GITHUB_APP_PRIVATE_KEY_SECRET_NAME=weval/github-app-private-key  # ✅ Recommended for Netlify
+GITHUB_APP_PRIVATE_KEY_SECRET_NAME=weval/github-app-private-key  # Also works via AWS Secrets Manager
 
 # GitHub Authentication (GitHub App - Local Dev)
 # GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA..."  # Only for local .env
@@ -258,7 +256,7 @@ NEXT_PUBLIC_APP_URL=https://digitaltwinseval.org
 ```
 
 **Important Notes:**
-- **Production (Netlify)**: Use `GITHUB_APP_PRIVATE_KEY_SECRET_NAME` to avoid the 4KB Lambda limit
+- **Production (Railway)**: You can use either `GITHUB_APP_PRIVATE_KEY` directly (Railway has no env var size limits) or `GITHUB_APP_PRIVATE_KEY_SECRET_NAME` for AWS Secrets Manager
 - **Local Development**: Use `GITHUB_APP_PRIVATE_KEY` inline in your `.env` file (wrap in quotes)
 - The AWS credentials (`APP_AWS_ACCESS_KEY_ID`, `APP_AWS_SECRET_ACCESS_KEY`) are used for both S3 storage and Secrets Manager access
 
@@ -446,8 +444,8 @@ live/pr-evals/123/alice-medical-qa-eval/
 
 ### Logs
 
-Check Netlify function logs:
-1. Netlify Dashboard → Functions → `execute-pr-evaluation-background`
+Check Railway logs:
+1. Railway Dashboard → Select the dtef-app service → Deployments → View Logs
 2. Filter by PR number or username
 
 ### Status Tracking
@@ -505,9 +503,9 @@ Common errors and solutions:
 
 ### Evaluation stuck
 
-1. Check Netlify function logs
-2. Background functions timeout after 10 minutes
-3. Status should show error state if timeout occurs
+1. Check Railway logs (Dashboard → Service → Deployments → View Logs)
+2. Railway runs a persistent Node.js server with no function timeout limits
+3. Status should show error state if something goes wrong
 
 ### Results not appearing
 
@@ -720,19 +718,22 @@ Total blueprints: 150
 
 ## Comparison: Scheduled vs Event-Driven
 
-### ❌ OLD: Scheduled (Disabled)
+### ❌ OLD: Scheduled via Netlify (Legacy)
 
 ```toml
-# netlify.toml (COMMENTED OUT)
+# netlify.toml (LEGACY - no longer used)
+# Scheduled functions were previously configured here.
+# Now handled by GitHub Actions cron workflow:
+# .github/workflows/weekly-eval-check.yml
 [functions."fetch-and-schedule-evals"]
   schedule = "0 0 * * 0"  # Weekly
 ```
 
-**Problems:**
+**Problems with the old approach:**
 - Runs even when nothing changed
 - Can be expensive
 - Doesn't catch new blueprints immediately
-- Requires `_periodic` tag
+- Required Netlify-specific `_periodic` tag
 
 ### ✅ NEW: Event-Driven
 

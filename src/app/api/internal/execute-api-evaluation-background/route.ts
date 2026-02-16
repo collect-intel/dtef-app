@@ -10,15 +10,11 @@ import { configure } from '@/cli/config';
 import { ComparisonConfig, EvaluationMethod } from '@/cli/types/cli_types';
 import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { getLogger } from '@/utils/logger';
-import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
-
-export const maxDuration = 300;
+import { captureError, setContext } from '@/utils/sentry';
 
 const STORAGE_PREFIX = 'api-runs';
 
 async function runAPIPipeline(requestPayload: { runId: string; config: ComparisonConfig }) {
-  initSentry('execute-api-evaluation-background');
-
   const { runId, config } = requestPayload;
 
   setContext('apiEval', {
@@ -31,7 +27,6 @@ async function runAPIPipeline(requestPayload: { runId: string; config: Compariso
   if (!runId || !config || typeof config !== 'object') {
     logger.error("Invalid or missing 'runId' or 'config' in payload.", { payloadReceived: requestPayload });
     captureError(new Error("Invalid or missing 'runId' or 'config' in payload"), { payloadReceived: requestPayload });
-    await flushSentry();
     return;
   }
 
@@ -151,7 +146,6 @@ async function runAPIPipeline(requestPayload: { runId: string; config: Compariso
     });
   }
 
-  await flushSentry();
 }
 
 export async function POST(req: NextRequest) {

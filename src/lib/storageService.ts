@@ -74,7 +74,7 @@ export interface LatestRunsSummaryFileContent {
 }
 // --- End New Types ---
 
-// Use prefixed environment variables to avoid conflicts with Netlify reserved names
+// Use prefixed environment variables to avoid conflicts with platform reserved names
 const s3BucketName = process.env.APP_S3_BUCKET_NAME;
 const s3Region = process.env.APP_S3_REGION;
 const s3AccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
@@ -87,7 +87,7 @@ if (storageProvider === 's3') {
     console.warn('S3 storage provider configured, but APP_S3_BUCKET_NAME or APP_S3_REGION is not set. S3 operations may fail if credentials are not found elsewhere (e.g. IAM role).');
   } 
   // S3Client will attempt to find credentials from the environment (AWS_ACCESS_KEY_ID, etc.) or shared files if not explicitly passed.
-  // For Netlify, we are providing them via prefixed APP_ variables.
+  // We provide them via prefixed APP_ variables to avoid conflicts.
   const s3ClientOptions: { region: string; credentials?: { accessKeyId: string; secretAccessKey: string } } = {
     region: s3Region! // Region is required
   };

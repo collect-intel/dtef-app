@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBackgroundAuth } from '@/lib/background-function-auth';
 import { getModelResponse } from '@/cli/services/llm-service';
-import { initSentry, captureError, flushSentry } from '@/utils/sentry';
+import { captureError } from '@/utils/sentry';
 import { configure } from '@/cli/config';
-
-export const maxDuration = 120;
 
 interface FactCheckRequest {
   claim: string;
@@ -362,8 +360,6 @@ async function factCheckWithRetries(request: FactCheckRequest): Promise<FactChec
 }
 
 export async function POST(req: NextRequest) {
-  initSentry('factcheck');
-
   // Configure CLI (required for llm-service)
   configure({
     errorHandler: (error: Error) => {
@@ -379,7 +375,6 @@ export async function POST(req: NextRequest) {
 
   const authError = checkBackgroundAuth(req);
   if (authError) {
-    await flushSentry();
     return authError;
   }
 
@@ -404,8 +399,6 @@ export async function POST(req: NextRequest) {
 
     const response = await factCheckWithRetries(request);
 
-    await flushSentry();
-
     return NextResponse.json(response);
 
   } catch (error: any) {
@@ -414,8 +407,6 @@ export async function POST(req: NextRequest) {
     if (!error.message?.includes('attempts across')) {
       captureError(error, { endpoint: 'factcheck' });
     }
-
-    await flushSentry();
 
     return NextResponse.json(
       {

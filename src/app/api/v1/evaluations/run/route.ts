@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Initialize CLI config/logging for serverless context
+        // Initialize CLI config/logging
         try {
             configure({
                 errorHandler: (err: Error) => console.error('[API RUN inline] Error:', err.message),

@@ -11,12 +11,10 @@ import { configure } from '@/cli/config';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
 import { getLogger, Logger } from '@/utils/logger';
-import { initSentry, captureError, setContext, flushSentry } from '@/utils/sentry';
+import { captureError, setContext } from '@/utils/sentry';
 import { applyPREvalLimits, checkPREvalLimits } from '@/lib/pr-eval-limiter';
 import { getConfigSummary, saveConfigSummary, updateSummaryDataWithNewRun } from '@/lib/storageService';
 import { BLUEPRINT_CONFIG_UPSTREAM_OWNER, BLUEPRINT_CONFIG_UPSTREAM_REPO } from '@/lib/configConstants';
-
-export const maxDuration = 300;
 
 const UPSTREAM_OWNER = BLUEPRINT_CONFIG_UPSTREAM_OWNER;
 const UPSTREAM_REPO = BLUEPRINT_CONFIG_UPSTREAM_REPO;
@@ -106,8 +104,6 @@ async function postCompletionComment(
 }
 
 async function runPRPipeline(body: any) {
-  initSentry('execute-pr-evaluation-background');
-
   const { runId, prNumber, blueprintPath, blueprintContent, commitSha, author } = body;
 
   setContext('prEvaluation', {
@@ -139,7 +135,6 @@ async function runPRPipeline(body: any) {
     const errorMsg = 'Missing required parameters';
     logger.error(errorMsg, { runId, prNumber, blueprintPath });
     captureError(new Error(errorMsg), { runId, prNumber, blueprintPath, body });
-    await flushSentry();
     return;
   }
 
@@ -314,7 +309,6 @@ async function runPRPipeline(body: any) {
     ]);
 
     logger.info(`PR evaluation complete for ${blueprintPath}`);
-    await flushSentry();
 
   } catch (error: any) {
     logger.error(`PR evaluation failed:`, error);
@@ -331,7 +325,6 @@ async function runPRPipeline(body: any) {
       logger.error('Failed to update error status:', statusError);
     }
 
-    await flushSentry();
   }
 }
 

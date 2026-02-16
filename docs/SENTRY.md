@@ -1,6 +1,6 @@
 # Sentry Error Tracking Setup
 
-This project uses [Sentry](https://sentry.io) for comprehensive error tracking and observability across **all serverless infrastructure** - both Netlify Functions and Next.js API routes.
+This project uses [Sentry](https://sentry.io) for comprehensive error tracking and observability across **all server infrastructure** - Next.js API routes and background functions.
 
 ## Overview
 
@@ -23,7 +23,7 @@ Sentry integration provides:
 
 ### 2. Configure Environment Variables
 
-Add to your `.env` file (or Netlify environment variables):
+Add to your `.env` file (or Railway environment variables):
 
 ```bash
 # Required - for server-side error tracking
@@ -41,14 +41,7 @@ SENTRY_AUTH_TOKEN=your-auth-token
 SENTRY_RELEASE=git-commit-sha
 ```
 
-To add to Netlify:
-```bash
-# Using Netlify CLI
-netlify env:set SENTRY_DSN "https://your-sentry-dsn@sentry.io/project-id"
-netlify env:set NEXT_PUBLIC_SENTRY_DSN "https://your-sentry-dsn@sentry.io/project-id"
-```
-
-Or via the Netlify UI: **Site Settings → Environment Variables**
+To add to Railway, go to your project in the Railway dashboard: **Service → Variables** and add the variables there.
 
 ### 3. Deploy
 
@@ -63,14 +56,12 @@ That's it! Sentry is now active. Errors will automatically be captured and sent 
 Sentry uses the `environment` field (not different DSNs) to separate data:
 
 ```typescript
-// Automatically set based on context:
-environment: process.env.CONTEXT || process.env.NODE_ENV || 'development'
+// Automatically set based on NODE_ENV:
+environment: process.env.NODE_ENV || 'development'
 ```
 
 **With one DSN, all errors go to the same Sentry project, tagged with:**
-- `production` - Your live Netlify site
-- `deploy-preview` - Netlify preview deploys
-- `branch-deploy` - Netlify branch deploys
+- `production` - Your live Railway deployment
 - `development` - Local development
 
 You can filter by environment in Sentry:
@@ -104,15 +95,13 @@ If `SENTRY_DSN` is not configured or is invalid:
 - ✅ **Helpful warnings** - Console logs inform you that Sentry is disabled
 
 **Protected functions:**
-- `initSentry()` - Returns `null` if DSN missing, logs warning
 - `captureError()` - Silently no-ops if Sentry not initialized
 - `setContext()` - Silently no-ops if Sentry not initialized
-- `flushSentry()` - Silently no-ops if Sentry not initialized
 - `addBreadcrumb()` - Silently no-ops if Sentry not initialized
+- `setUserContext()` - Silently no-ops if Sentry not initialized
 
 **What you'll see in console without DSN:**
 ```
-[Sentry] No SENTRY_DSN configured for execute-story-quick-run-background - error tracking disabled
 [Sentry] Client-side error tracking disabled (no DSN configured)
 [Sentry] Server-side error tracking disabled (no DSN configured)
 ```
@@ -124,9 +113,9 @@ These are **informational messages only** - your app works perfectly.
 # Local .env - DON'T include SENTRY_DSN
 # (Just omit these lines locally)
 
-# Netlify environment - DO include:
-netlify env:set SENTRY_DSN "https://your-dsn@sentry.io/project-id"
-netlify env:set NEXT_PUBLIC_SENTRY_DSN "https://your-dsn@sentry.io/project-id"
+# Railway environment - DO include (set via Railway dashboard → Service → Variables):
+# SENTRY_DSN=https://your-dsn@sentry.io/project-id
+# NEXT_PUBLIC_SENTRY_DSN=https://your-dsn@sentry.io/project-id
 ```
 
 ### When Would You Want Separate DSNs?
@@ -142,40 +131,32 @@ Only if you need:
 
 ### Automatic Integration
 
-This project uses **two Sentry SDKs** for comprehensive coverage:
+Sentry is initialized once via `@sentry/nextjs`, loaded through the Next.js instrumentation hook:
 
-#### 1. **@sentry/nextjs** - API Routes & Client (Automatic)
+- **`instrumentation.ts`** imports `sentry.server.config.ts` on server startup
+- All API routes, server components, and background functions are automatically covered
+- Client-side errors are captured via `sentry.client.config.ts`
 
-All **80+ Next.js API routes** are automatically instrumented with zero code changes:
+**All Next.js API routes** are automatically instrumented with zero code changes:
 - `src/app/api/**/*.ts` - All API routes
 - Client-side errors in the browser
 - Edge runtime functions
 - Server components
 
+**Internal background routes** (under `src/app/api/internal/`):
+- `execute-evaluation-background` - Core evaluation pipeline
+- `execute-api-evaluation-background` - Public API evaluations
+- `execute-pr-evaluation-background` - PR-triggered evaluations
+- `fetch-and-schedule-evals` - Cron-triggered evaluation scheduler
+- `factcheck` - Synchronous fact-check endpoint
+
 **What you get automatically:**
 - Error capture with full request context (URL, headers, params)
+- Rich context (runId, configId, blueprintKey)
+- Breadcrumb trails via logger
 - Performance monitoring (API response times)
 - Session replay for debugging user issues
 - Source maps for readable stack traces
-
-#### 2. **@sentry/node** - Netlify Functions (Manual Integration)
-
-All Netlify background functions have custom Sentry integration:
-
-**Background Functions:**
-- `execute-story-quick-run-background.ts`
-- `execute-sandbox-pipeline-background.ts`
-- `execute-evaluation-background.ts`
-- `execute-api-evaluation-background.ts`
-- `generate-pairs-background.ts`
-
-**Scheduled Functions:**
-- `fetch-and-schedule-evals.ts` (cron: on manual trigger)
-- `cleanup-sandbox-runs.ts` (cron: daily at 2 AM UTC)
-
-**What you get with custom integration:**
-- Rich context (runId, configId, blueprintKey)
-- Breadcrumb trails via logger
 - Custom error filtering
 
 ### Logger Integration
@@ -204,13 +185,11 @@ Every error captured includes:
 ```typescript
 {
   // Function identification
-  function: 'execute-story-quick-run-background',
-  runtime: 'netlify-functions',
+  function: 'execute-evaluation-background',
 
   // Request context
   runId: 'abc123',
-  blueprintKey: 'live/story/runs/abc123/blueprint.yml',
-  awsRequestId: 'lambda-request-id',
+  configId: 'my-config',
 
   // Error details
   message: 'Pipeline failed',
@@ -328,7 +307,7 @@ Source maps are **automatically uploaded** when you build the project with the p
    - Permissions: `Release` (Admin), `Organization` (Read)
    - Copy the auth token
 
-2. Add to your environment (Netlify or local `.env`):
+2. Add to your environment (Railway dashboard or local `.env`):
    ```bash
    SENTRY_ORG=your-org-slug
    SENTRY_PROJECT=your-project-slug
@@ -402,7 +381,7 @@ Use Sentry's search to filter errors:
 runId:abc123
 
 # Find all errors in a specific function
-function:execute-story-quick-run-background
+function:execute-evaluation-background
 
 # Find errors in the last 24 hours with specific text
 is:unresolved message:"Pipeline failed" age:-24h
@@ -418,8 +397,8 @@ is:unresolved message:"Pipeline failed" age:-24h
 console.log('SENTRY_DSN configured:', !!process.env.SENTRY_DSN);
 ```
 
-**Check 2:** Check Netlify function logs
-Look for: `[Sentry] No SENTRY_DSN configured for {functionName} - error tracking disabled`
+**Check 2:** Check Railway logs (Railway dashboard → Service → Logs)
+Look for: `[Sentry] Server-side error tracking disabled (no DSN configured)`
 
 **Check 3:** Verify DSN is correct
 - Should start with `https://`
@@ -427,9 +406,9 @@ Look for: `[Sentry] No SENTRY_DSN configured for {functionName} - error tracking
 
 ### Errors Not Being Captured
 
-**Common cause:** Function exits before Sentry flushes events
+**Common cause:** Error is being filtered by the `beforeSend` hook.
 
-**Solution:** Ensure `await flushSentry()` is called before all return statements (already done in all functions).
+**Solution:** Check the `beforeSend` filter in `src/utils/sentry.ts` and ensure the error type is not being suppressed. Also check Railway logs for any Sentry initialization warnings.
 
 ### Too Many Errors
 
@@ -464,50 +443,36 @@ beforeSend(event, hint) {
 
 ## Best Practices
 
-1. **Always flush Sentry before function exit**
-   - ✅ Already done in all functions
-   - Serverless functions can terminate before events are sent
-
-2. **Add meaningful context to errors**
+1. **Add meaningful context to errors**
    - Include runId, configId, blueprintKey
    - Makes debugging much easier
 
-3. **Use breadcrumbs liberally**
+2. **Use breadcrumbs liberally**
    - The logger automatically creates breadcrumbs
    - Shows the full story of what happened
 
-4. **Filter noisy errors**
+3. **Filter noisy errors**
    - Don't capture expected errors (rate limits, validation errors)
    - Focus on actionable errors
 
-5. **Set up alerts for critical functions**
+4. **Set up alerts for critical functions**
    - Get notified when background jobs fail
    - Monitor error rates in production
 
 ## Development vs Production
 
-Sentry works the same in all environments. To distinguish between them:
+Sentry works the same in all environments. The environment is determined automatically from `NODE_ENV`:
 
-```bash
-# Set in Netlify production environment
-SENTRY_ENVIRONMENT=production
+- **Railway production** sets `NODE_ENV=production` by default
+- **Local development** uses `NODE_ENV=development`
 
-# Set in Netlify preview/branch deploys
-SENTRY_ENVIRONMENT=staging
-
-# Local development
-SENTRY_ENVIRONMENT=development
-```
-
-Errors will be tagged with the environment in Sentry.
-
-**Note:** The code already uses `process.env.CONTEXT` from Netlify, which sets `production`, `deploy-preview`, or `branch-deploy` automatically.
+Errors will be tagged with the environment in Sentry. No additional configuration is needed.
 
 ## Further Reading
 
+- [Sentry Next.js Documentation](https://docs.sentry.io/platforms/javascript/guides/nextjs/)
 - [Sentry Node.js Documentation](https://docs.sentry.io/platforms/node/)
 - [Sentry Best Practices](https://docs.sentry.io/platforms/node/best-practices/)
-- [Sentry Serverless Guide](https://docs.sentry.io/platforms/node/guides/aws-lambda/)
 
 ## Support
 

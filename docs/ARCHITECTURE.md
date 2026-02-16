@@ -22,9 +22,10 @@ graph TD
         A[("fa:fa-user Contributor")] -- Proposes Blueprint --> B{{"fa:fa-github dtef/configs<br>GitHub Repo"}}
     end
 
-    subgraph "Automated Evaluation (Netlify)"
-        C["fa:fa-clock fn: fetch-and-schedule-evals<br>(Weekly Cron Job)"] -- Fetches Blueprints --> B
-        C -- Triggers --> D["fa:fa-cogs fn: execute-evaluation-background"]
+    subgraph "Automated Evaluation (Railway)"
+        C["fa:fa-clock GitHub Actions Cron<br>(Weekly)"] -- Triggers --> SC["/api/internal/fetch-and-schedule-evals"]
+        SC -- Fetches Blueprints --> B
+        SC -- Triggers --> D["/api/internal/execute-evaluation-background"]
         D -- Runs Core Pipeline --> E[Core: comparison-pipeline-service]
         E -- Generates Raw Results --> F[("fa:fa-aws S3 Bucket<br>Raw Results (*_comparison.json)")]
         D -- Calculates Summaries --> G[("fa:fa-aws S3 Bucket<br>Aggregate Summaries")]
@@ -40,7 +41,7 @@ graph TD
     
     class A user;
     class B,H platform;
-    class C,D,E,F,G process;
+    class C,SC,D,E,F,G process;
 ```
 
 ### The Interactive "Developer & Sandbox" Workflow
@@ -49,34 +50,24 @@ This workflow shows the parallel paths for local CLI development and web-based S
 
 ```mermaid
 graph LR
-    subgraph "Path A: Local CLI Development"
+    subgraph "Local CLI Development"
         A[("fa:fa-user Developer")] --> B["pnpm cli run-config"]
         B -- Runs Core Pipeline --> E[Core: comparison-pipeline-service]
         E -- Writes to --> F[("Local Filesystem<br>/.results/")]
     end
 
-    subgraph "Path B: Web Sandbox"
-        C[("fa:fa-user Prompt Engineer")] --> D["fa:fa-flask Sandbox UI"]
-        D -- API Call --> G["Backend API<br>(/api/sandbox/run)"]
-        G -- Triggers --> H["fa:fa-cogs fn: execute-sandbox-pipeline-background"]
-        H -- Runs Core Pipeline --> E
-        H -- Writes to --> I[("fa:fa-aws S3 Bucket<br>/sandbox-runs/")]
-        D -- Polls Status --> G
-        G -- Reads Status From --> I
-    end
-    
-    J[("fa:fa-chart-bar Local Dashboard<br>(pnpm dev)")] -- Reads From --> F & I
+    J[("fa:fa-chart-bar Local Dashboard<br>(pnpm dev)")] -- Reads From --> F
 
     classDef user fill:#fff0e6,stroke:#ffc99e,stroke-width:2px;
     classDef local fill:#f0f4f8,stroke:#d6e0ea,stroke-width:2px;
-    classDef web fill:#e8f0fe,stroke:#a6c8ff,stroke-width:2px;
     classDef core fill:#e6f2ff,stroke:#b3d9ff,stroke-width:2px;
-    
-    class A,C user;
+
+    class A user;
     class B,F local;
-    class D,G,H,I web;
     class E,J core;
 ```
+
+> **Note:** The web-based Sandbox workflow has been deprecated and removed. Local CLI development is the primary interactive workflow.
 
 ## 2. Component Deep Dive
 
@@ -157,13 +148,12 @@ graph TD;
 
 ### Automated Workflow Components
 These components power the public `digitaltwinseval.org` platform.
--   **`fn: fetch-and-schedule-evals`**: A Netlify cron job that runs weekly. It scans the configs repository for new or updated blueprints with the `_periodic` tag and triggers evaluation runs for them.
--   **`fn: execute-evaluation-background`**: The Netlify background function that performs the actual evaluation for the public site. It calls the core services and is responsible for creating both the raw result file and updating the aggregate summary files in S3.
+-   **`/api/internal/fetch-and-schedule-evals`**: A Next.js API route on Railway, triggered weekly by a GitHub Actions cron workflow. It scans the configs repository for new or updated blueprints with the `_periodic` tag and triggers evaluation runs for them.
+-   **`/api/internal/execute-evaluation-background`**: A Next.js API route on Railway that performs the actual evaluation for the public site. It uses a fire-and-forget pattern (returns 202, runs async work in a detached promise). It calls the core services and is responsible for creating both the raw result file and updating the aggregate summary files in S3.
 
 ### Interactive Workflow Components
 These components support the developer and sandbox environments.
 -   **`cli: run-config`**: The main command-line tool for developers. By default, it runs the evaluation pipeline for a local or GitHub-based blueprint and saves the results to the local `/.results/` directory, updating only the per-config summary. When used with the `--update-summaries` flag, it additionally rebuilds platform-wide summaries (homepage leaderboards, model summaries, etc.) using the same logic as the backfill process.
--   **Sandbox UI & Backend API**: A full-stack feature within the Next.js app that provides an interactive, browser-based IDE for blueprint creation. It has its own set of API endpoints (`/api/sandbox`, `/api/github`) and a dedicated background function (`fn: execute-sandbox-pipeline-background`) for running evaluations.
 
 ## 3. Deep Dive: The Core Evaluation Pipeline
 
@@ -253,6 +243,6 @@ graph TD;
 ## 4. Key Architectural Concepts
 
 -   **Separation of Raw Data and Summaries**: The core pipeline still produces a monolithic `*_comparison.json` for complete fidelity, *but* the UI now relies on the artefact bundle (`core.json` + `responses/` + `coverage/`) for 95 % of use-cases.  High-level metrics like the **Hybrid Score** are *not* in either raw form; they are computed afterward by `summaryCalculationUtils.ts` and saved into summary files (e.g. `homepage_summary.json`).
--   **Consistency via Shared Services**: By using the same core services (`comparison-pipeline-service`, `storageService`, etc.) for both the automated Netlify workflow and the manual CLI/Sandbox workflow, the platform ensures that an evaluation produces the same results regardless of how it was triggered.
+-   **Consistency via Shared Services**: By using the same core services (`comparison-pipeline-service`, `storageService`, etc.) for both the automated Railway workflow and the manual CLI workflow, the platform ensures that an evaluation produces the same results regardless of how it was triggered.
 -   **Idempotent, Content-Hashed Runs**: The automated workflow uses a hash of a blueprint's content (including its fully resolved model list) as its `runLabel`. This ensures that identical blueprints are not re-run unnecessarily, saving significant computational resources.
--   **Graceful Fallback & Progressive Enhancement**: The Sandbox is a prime example of this design principle. It is fully functional for anonymous users, with all work saved to local storage. Authenticating with GitHub progressively enhances the experience by enabling cloud-based file management and the ability to contribute back to the public commons.
+-   **Graceful Fallback & Progressive Enhancement**: The platform supports progressive enhancement at multiple levels. The CLI works fully offline with local storage, while the deployed Railway application provides cloud-based evaluation and S3-backed persistence for the public commons.

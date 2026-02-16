@@ -47,7 +47,7 @@ const getComparisonData = cache(async (params: ThisPageProps['params']): Promise
   const timestamp = decodeURIComponent(rawParams.timestamp);
 
   try {
-    // Prefer direct core artefact read (works in SSR/Netlify without localhost fetch)
+    // Prefer direct core artefact read (avoids localhost fetch in SSR)
     const core = await getCoreResult(configId, runLabel, timestamp);
     if (core) {
       console.log(`[Page Fetch] Using core artefact for ${configId}/${runLabel}/${timestamp}`);

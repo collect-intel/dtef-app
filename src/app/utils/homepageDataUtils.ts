@@ -61,8 +61,7 @@ export interface EnhancedComparisonConfigInfo {
 
 const getFullHomepageData = cache(async (): Promise<HomepageSummaryFileContent | null> => {
   console.log("[homepageDataUtils] getFullHomepageData CALLED. This should now only appear once per page render.");
-  // The tmp-file-based cache has been removed as it's not effective on serverless platforms
-  // like Netlify. Caching is now handled by Next.js's Data Cache (ISR via revalidate).
+  // Caching is handled by React's cache() and Next.js's Data Cache (ISR via revalidate).
   try {
     return await getHomepageSummary();
   } catch (error: any) {

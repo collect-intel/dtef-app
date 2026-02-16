@@ -246,15 +246,15 @@ For complete blueprint documentation including rubric syntax, see [Blueprint For
 ```mermaid
 graph LR;
     classDef github fill:#24292e,stroke:#58a6ff,stroke-width:1px,color:#fff;
-    classDef netlify fill:#00c7b7,stroke:#008a7e,stroke-width:1px,color:#000;
+    classDef railway fill:#0B0D0E,stroke:#A855F7,stroke-width:1px,color:#fff;
     classDef aws fill:#232f3e,stroke:#ff9900,stroke-width:2px,color:#fff;
-    classDef webapp fill:#333,stroke:#00c7b7,stroke-width:1px,color:#fff;
+    classDef webapp fill:#333,stroke:#A855F7,stroke-width:1px,color:#fff;
 
     A["fa:fa-github GitHub Repo<br/>(Blueprints)"]:::github;
 
-    subgraph Netlify Platform
-        B["fa:fa-clock Scheduled Function"]:::netlify;
-        C["fa:fa-cogs Background Function"]:::netlify;
+    subgraph Railway Platform
+        B["fa:fa-clock GitHub Actions Cron"]:::railway;
+        C["fa:fa-cogs Next.js API Route"]:::railway;
         B -- Triggers --> C;
     end
 

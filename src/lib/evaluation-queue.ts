@@ -35,7 +35,9 @@ function processNext() {
       active--;
       console.log(`[eval-queue] Finished ${item.id} (active: ${active}, queued: ${queue.length})`);
       scheduleDebouncedBackfill();
-      processNext();
+      // Use setImmediate to avoid deep recursive call stacks when many evals
+      // complete in rapid succession (800+ queued items caused stack overflow)
+      setImmediate(processNext);
     });
   }
 }

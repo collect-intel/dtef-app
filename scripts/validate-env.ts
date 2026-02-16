@@ -68,7 +68,7 @@ const envVars: EnvVar[] = [
   {
     name: 'BACKGROUND_FUNCTION_AUTH_TOKEN',
     required: true,
-    description: 'Authentication token for Netlify background functions',
+    description: 'Authentication token for background API functions',
     validate: (v) => v.length >= 32,
   },
 
@@ -76,7 +76,7 @@ const envVars: EnvVar[] = [
   {
     name: 'URL',
     required: false,
-    description: 'Netlify site URL (set automatically in production)',
+    description: 'Site URL (set automatically in production on Railway)',
   },
   {
     name: 'NEXT_PUBLIC_APP_URL',
