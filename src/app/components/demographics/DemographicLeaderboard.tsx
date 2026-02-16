@@ -148,12 +148,12 @@ function sortedBy<T>(items: T[], key: string, dir: SortDirection, accessor: (ite
     });
 }
 
-/** Clickable column header with sort indicator */
+/** Clickable column header with sort indicator and optional tooltip */
 function SortableHeader<K extends string>({
-    label, sortKey, current, onSort, align = 'left', className = '',
+    label, sortKey, current, onSort, align = 'left', className = '', tooltip,
 }: {
     label: string; sortKey: K; current: SortConfig<K>; onSort: (key: K) => void;
-    align?: 'left' | 'right'; className?: string;
+    align?: 'left' | 'right'; className?: string; tooltip?: string;
 }) {
     const isActive = current.key === sortKey;
     return (
@@ -162,10 +162,12 @@ function SortableHeader<K extends string>({
                 align === 'right' ? 'text-right' : 'text-left'
             } ${isActive ? 'text-foreground' : 'text-muted-foreground'} ${className}`}
             onClick={() => onSort(sortKey)}
+            title={tooltip}
         >
             <span className="inline-flex items-center gap-1">
                 {align === 'right' && <SortIndicator active={isActive} direction={current.direction} />}
                 {label}
+                {tooltip && <span className="text-muted-foreground/50 text-[10px] not-italic">ⓘ</span>}
                 {align !== 'right' && <SortIndicator active={isActive} direction={current.direction} />}
             </span>
         </th>
@@ -262,6 +264,47 @@ function ModelSegmentBreakdown({ model }: { model: ModelResult }) {
 
 type SegmentSortKey = 'label' | 'bestModel' | 'bestScore' | 'avgScore';
 
+/** Expandable drill-down: all model scores for a single segment value */
+function SegmentModelDrillDown({ segmentId, modelResults, activeType }: {
+    segmentId: string;
+    modelResults: ModelResult[];
+    activeType: string;
+}) {
+    const modelScores = useMemo(() => {
+        const scores: Array<{ modelId: string; score: number }> = [];
+        for (const model of modelResults) {
+            for (const seg of model.segmentScores || []) {
+                if (seg.segmentId === segmentId) {
+                    scores.push({ modelId: model.modelId, score: seg.avgCoverageExtent });
+                    break;
+                }
+            }
+        }
+        return scores.sort((a, b) => b.score - a.score);
+    }, [segmentId, modelResults, activeType]);
+
+    if (modelScores.length === 0) return null;
+
+    return (
+        <div className="px-6 py-3 bg-muted/10">
+            <p className="text-xs text-muted-foreground mb-2">
+                All model scores for this segment (sorted by score):
+            </p>
+            <ul className="space-y-1.5">
+                {modelScores.map((ms, i) => (
+                    <li key={ms.modelId} className="flex items-center gap-3 text-sm">
+                        <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
+                        <span className="w-36 truncate text-foreground">{formatModelName(ms.modelId)}</span>
+                        <div className="flex-1">
+                            <ScoreBar score={ms.score} />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 /** Segment Explorer: tabs for each segment type with per-value leaderboards */
 function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     const segmentTypes = useMemo(() => {
@@ -277,6 +320,7 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
 
     const [activeType, setActiveType] = useState<string>(segmentTypes[0] || 'O2');
     const [sort, toggleSort] = useSort<SegmentSortKey>('bestScore');
+    const [expandedSegment, setExpandedSegment] = useState<string | null>(null);
 
     // Build a table: rows = segment values, cols = models, cells = scores
     const segmentData = useMemo(() => {
@@ -318,6 +362,11 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
             };
         });
     }, [modelResults, activeType]);
+
+    // Reset expanded segment when switching tabs
+    useEffect(() => {
+        setExpandedSegment(null);
+    }, [activeType]);
 
     const sortedData = useMemo(() => sortedBy(segmentData, sort.key, sort.direction, (item, key) => {
         switch (key as SegmentSortKey) {
@@ -362,29 +411,69 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <SortableHeader label={SEGMENT_TYPE_LABELS[activeType] || activeType} sortKey="label" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Best Model" sortKey="bestModel" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Best Score" sortKey="bestScore" current={sort} onSort={toggleSort} className="w-1/4" />
-                            <SortableHeader label="Avg Score" sortKey="avgScore" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader
+                                label={SEGMENT_TYPE_LABELS[activeType] || activeType}
+                                sortKey="label" current={sort} onSort={toggleSort}
+                                tooltip="Demographic segment value within the selected category"
+                            />
+                            <SortableHeader
+                                label="Best Model"
+                                sortKey="bestModel" current={sort} onSort={toggleSort}
+                                tooltip="Model with the highest average score for this segment across all evaluations"
+                            />
+                            <SortableHeader
+                                label="Best Score"
+                                sortKey="bestScore" current={sort} onSort={toggleSort} className="w-1/4"
+                                tooltip="Highest average score achieved by any single model for this segment"
+                            />
+                            <SortableHeader
+                                label="Avg Score"
+                                sortKey="avgScore" current={sort} onSort={toggleSort} align="right"
+                                tooltip="Mean score across all models for this segment"
+                            />
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedData.map((row) => (
-                            <tr key={row.segmentId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-foreground">
-                                    {row.label}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-[200px]">
-                                    {formatModelName(row.bestModel)}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <ScoreBar score={row.bestScore} />
-                                </td>
-                                <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-                                    {(row.avgScore * 100).toFixed(1)}%
-                                </td>
-                            </tr>
-                        ))}
+                        {sortedData.map((row) => {
+                            const isExpanded = expandedSegment === row.segmentId;
+                            return (
+                                <Fragment key={row.segmentId}>
+                                    <tr
+                                        className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                                        onClick={() => setExpandedSegment(isExpanded ? null : row.segmentId)}
+                                    >
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground">
+                                            <span className="inline-flex items-center gap-2">
+                                                {row.label}
+                                                <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    ▾
+                                                </span>
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-[200px]">
+                                            {formatModelName(row.bestModel)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <ScoreBar score={row.bestScore} />
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+                                            {(row.avgScore * 100).toFixed(1)}%
+                                        </td>
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr>
+                                            <td colSpan={4} className="p-0 border-b border-border/30 bg-muted/10">
+                                                <SegmentModelDrillDown
+                                                    segmentId={row.segmentId}
+                                                    modelResults={modelResults}
+                                                    activeType={activeType}
+                                                />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
+                            );
+                        })}
                     </tbody>
                 </table>
                 {sortedData.length === 0 && (
@@ -393,6 +482,10 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                     </p>
                 )}
             </div>
+
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+                Each segment&apos;s score is its average coverage extent across all evaluations that include it. Click a row to see all model scores.
+            </p>
         </section>
     );
 }
@@ -569,8 +662,10 @@ function ContextResponsivenessSection({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2" />
+                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort}
+                                tooltip="AI model evaluated" />
+                            <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2"
+                                tooltip="Slope of accuracy vs. context count (linear regression). Positive = accuracy improves with more context questions provided" />
                             {hasFullData && <th className="w-8 px-2"></th>}
                         </tr>
                     </thead>
@@ -735,11 +830,16 @@ function FairnessAnalysisTable({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Category" sortKey="category" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Gap" sortKey="gap" current={sort} onSort={toggleSort} className="w-1/4" />
-                            <SortableHeader label="Best Segment" sortKey="bestScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell" />
-                            <SortableHeader label="Worst Segment" sortKey="worstScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort}
+                                tooltip="AI model evaluated" />
+                            <SortableHeader label="Category" sortKey="category" current={sort} onSort={toggleSort}
+                                tooltip="Demographic category (e.g. Age, Gender) being compared" />
+                            <SortableHeader label="Gap" sortKey="gap" current={sort} onSort={toggleSort} className="w-1/4"
+                                tooltip="Difference between the best and worst segment scores within this category. Larger gap = less fair across this demographic" />
+                            <SortableHeader label="Best Segment" sortKey="bestScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell"
+                                tooltip="Segment with the highest accuracy in this category" />
+                            <SortableHeader label="Worst Segment" sortKey="worstScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell"
+                                tooltip="Segment with the lowest accuracy in this category" />
                             <th className="w-8 px-2"></th>
                         </tr>
                     </thead>
@@ -802,6 +902,10 @@ function FairnessAnalysisTable({
                     </button>
                 </div>
             )}
+
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+                Gap = best segment score minus worst segment score within a demographic category. Click a row to see all segment scores.
+            </p>
         </section>
     );
 }
@@ -943,15 +1047,21 @@ export default function DemographicLeaderboard() {
                 </div>
 
                 {sortedModels.length > 0 ? (
+                    <>
                     <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border/50 bg-muted/30">
-                                    <SortableHeader label="Rank" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-12" />
-                                    <SortableHeader label="Model" sortKey="model" current={lbSort} onSort={toggleLbSort} />
-                                    <SortableHeader label="Score" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-1/4" />
-                                    <SortableHeader label="Consistency" sortKey="consistency" current={lbSort} onSort={toggleLbSort} align="right" />
-                                    <SortableHeader label="Segments" sortKey="segments" current={lbSort} onSort={toggleLbSort} align="right" />
+                                    <SortableHeader label="Rank" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-12"
+                                        tooltip="Position based on overall score" />
+                                    <SortableHeader label="Model" sortKey="model" current={lbSort} onSort={toggleLbSort}
+                                        tooltip="AI model evaluated" />
+                                    <SortableHeader label="Score" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-1/4"
+                                        tooltip="Average coverage extent across all demographic segments — how well the model predicts survey response distributions" />
+                                    <SortableHeader label="Consistency" sortKey="consistency" current={lbSort} onSort={toggleLbSort} align="right"
+                                        tooltip="Standard deviation of scores across segments. Lower = more consistent performance across demographics" />
+                                    <SortableHeader label="Segments" sortKey="segments" current={lbSort} onSort={toggleLbSort} align="right"
+                                        tooltip="Number of demographic segments evaluated for this model" />
                                 </tr>
                             </thead>
                             <tbody>
@@ -1004,6 +1114,10 @@ export default function DemographicLeaderboard() {
                             </tbody>
                         </table>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-3 text-center">
+                        Score = average coverage extent across all demographic segments. Consistency = standard deviation (lower is better). Click a row to see per-segment breakdown.
+                    </p>
+                    </>
                 ) : (
                     <p className="text-center text-muted-foreground py-8">No model results available.</p>
                 )}
