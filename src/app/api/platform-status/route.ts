@@ -4,6 +4,7 @@ import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
 import { getS3Client, getBucketName, getAllBlueprintsSummary, getHomepageSummary } from '@/lib/storageService';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
+import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats } from '@/app/components/platform-status/types';
 
 // Known summary files with their expected purpose
@@ -48,10 +49,9 @@ async function fetchGitHubConfigs(): Promise<Set<string>> {
       !node.path.startsWith('blueprints/pr-evals/') &&
       (node.path.endsWith('.yml') || node.path.endsWith('.yaml') || node.path.endsWith('.json'))
     ) {
-      // Strip 'blueprints/' prefix and file extension
-      const configId = node.path
-        .replace(/^blueprints\//, '')
-        .replace(/\.(yml|yaml|json)$/, '');
+      // Use canonical ID generation (converts / to __ and strips compound extensions)
+      const relativePath = node.path.replace(/^blueprints\//, '');
+      const configId = generateBlueprintIdFromPath(relativePath);
       configIds.add(configId);
     }
   }
@@ -150,7 +150,9 @@ export async function GET() {
           const validLastRun = lastRun && new Date(lastRun).getTime() > 86400000 ? lastRun : null;
           s3ConfigMap.set(config.configId, {
             title: config.configTitle || config.title,
-            runCount: 0, // runs array is empty in all_blueprints_summary
+            // runs array is empty in all_blueprints_summary (space optimization)
+            // but if latestRunTimestamp exists, at least 1 run has happened
+            runCount: validLastRun ? 1 : 0,
             lastRun: validLastRun,
             tags: config.tags,
           });
@@ -161,6 +163,14 @@ export async function GET() {
     }
   } else {
     errors.push(`Summary fetches failed: ${summaryResult.reason?.message || 'Unknown error'}`);
+  }
+
+  // Fix: if a config has lastRun but runCount is 0, it was evaluated at least once
+  // (happens when runs arrays are empty in both summary files for DTEF configs)
+  for (const [, entry] of s3ConfigMap) {
+    if (entry.lastRun && entry.runCount === 0) {
+      entry.runCount = 1;
+    }
   }
 
   // Extract S3 file listings
@@ -220,6 +230,7 @@ export async function GET() {
       name: purpose,
       path: filePath,
       expectedPurpose: purpose,
+      category: 'core',
       found: !!s3File,
       lastModified: s3File?.lastModified?.toISOString(),
       size: s3File?.size,
@@ -237,6 +248,7 @@ export async function GET() {
         name: purpose,
         path: file.key,
         expectedPurpose: purpose,
+        category: 'discovered',
         found: true,
         lastModified: file.lastModified?.toISOString(),
         size: file.size,
@@ -247,6 +259,7 @@ export async function GET() {
         name: 'Unidentified',
         path: file.key,
         expectedPurpose: 'Unidentified',
+        category: 'unidentified',
         found: true,
         lastModified: file.lastModified?.toISOString(),
         size: file.size,

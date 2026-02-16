@@ -12,6 +12,7 @@ export interface SummaryFileItem {
   name: string;
   path: string;
   expectedPurpose: string;
+  category: 'core' | 'discovered' | 'unidentified';
   found: boolean;
   lastModified?: string;
   size?: number;

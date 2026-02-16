@@ -3,6 +3,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem } from './types';
 
+// --- Helpers ---
+
+/** Display configId with / instead of __ for readability */
+function displayConfigId(configId: string): string {
+    return configId.replace(/__/g, '/');
+}
+
 // --- Relative time helper ---
 
 function relativeTime(iso: string | null): string {
@@ -211,14 +218,14 @@ function BlueprintTable({ items, defaultSortKey, defaultSortDir }: {
                     <tbody>
                         {sorted.map(item => (
                             <tr key={item.configId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3 text-sm font-mono text-foreground max-w-[300px] truncate" title={item.configId}>
-                                    {item.configId}
+                                <td className="px-4 py-3 text-sm font-mono text-foreground max-w-[300px] truncate" title={displayConfigId(item.configId)}>
+                                    {displayConfigId(item.configId)}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-muted-foreground max-w-[250px] truncate" title={item.title}>
                                     {item.title || '—'}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
-                                    {item.runCount}
+                                    {item.runCount > 1 ? item.runCount : item.runCount === 1 ? '1+' : '0'}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-muted-foreground" title={item.lastRun || undefined}>
                                     {relativeTime(item.lastRun)}
@@ -239,13 +246,10 @@ function BlueprintTable({ items, defaultSortKey, defaultSortDir }: {
 
 type SummarySortKey = 'name' | 'path' | 'status' | 'lastModified' | 'size';
 
-function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
-    const [sort, toggleSort] = useSort<SummarySortKey>('status', 'asc');
+function SummaryFileTable({ files, showStatus = false }: { files: SummaryFileItem[]; showStatus?: boolean }) {
+    const [sort, toggleSort] = useSort<SummarySortKey>(showStatus ? 'status' : 'name', showStatus ? 'asc' : 'desc');
 
-    const expected = useMemo(() => files.filter(f => f.expectedPurpose !== 'Unidentified'), [files]);
-    const unidentified = useMemo(() => files.filter(f => f.expectedPurpose === 'Unidentified'), [files]);
-
-    const sortedExpected = useMemo(() => sortedBy(expected, sort.key, sort.direction, (item, key) => {
+    const sorted = useMemo(() => sortedBy(files, sort.key, sort.direction, (item, key) => {
         switch (key as SummarySortKey) {
             case 'name': return item.name;
             case 'path': return item.path;
@@ -254,81 +258,73 @@ function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
             case 'size': return item.size || 0;
             default: return 0;
         }
-    }), [expected, sort]);
+    }), [files, sort]);
+
+    if (files.length === 0) return null;
+
+    return (
+        <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <SortableHeader label="Name" sortKey="name" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Path" sortKey="path" current={sort} onSort={toggleSort} />
+                            {showStatus && <SortableHeader label="Status" sortKey="status" current={sort} onSort={toggleSort} />}
+                            <SortableHeader label="Last Modified" sortKey="lastModified" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Size" sortKey="size" current={sort} onSort={toggleSort} align="right" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map(file => (
+                            <tr key={file.path} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                <td className="px-4 py-3 text-sm font-medium text-foreground">{file.name}</td>
+                                <td className="px-4 py-3 text-sm font-mono text-muted-foreground max-w-[300px] truncate" title={file.path}>
+                                    {file.path}
+                                </td>
+                                {showStatus && (
+                                    <td className="px-4 py-3">
+                                        <StatusBadge status={file.found ? 'found' : 'missing'} />
+                                    </td>
+                                )}
+                                <td className="px-4 py-3 text-sm text-muted-foreground">
+                                    {file.lastModified ? relativeTime(file.lastModified) : '—'}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
+                                    {formatBytes(file.size)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
+    const core = useMemo(() => files.filter(f => f.category === 'core'), [files]);
+    const discovered = useMemo(() => files.filter(f => f.category === 'discovered'), [files]);
+    const unidentified = useMemo(() => files.filter(f => f.category === 'unidentified'), [files]);
 
     return (
         <div className="space-y-6">
-            {/* Expected files */}
             <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Expected Files ({expected.length})</h3>
-                <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-border/50 bg-muted/30">
-                                    <SortableHeader label="Name" sortKey="name" current={sort} onSort={toggleSort} />
-                                    <SortableHeader label="Path" sortKey="path" current={sort} onSort={toggleSort} />
-                                    <SortableHeader label="Status" sortKey="status" current={sort} onSort={toggleSort} />
-                                    <SortableHeader label="Last Modified" sortKey="lastModified" current={sort} onSort={toggleSort} />
-                                    <SortableHeader label="Size" sortKey="size" current={sort} onSort={toggleSort} align="right" />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedExpected.map(file => (
-                                    <tr key={file.path} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-foreground">{file.name}</td>
-                                        <td className="px-4 py-3 text-sm font-mono text-muted-foreground max-w-[300px] truncate" title={file.path}>
-                                            {file.path}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <StatusBadge status={file.found ? 'found' : 'missing'} />
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                                            {file.lastModified ? relativeTime(file.lastModified) : '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
-                                            {formatBytes(file.size)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Core Expected Files ({core.length})</h3>
+                <SummaryFileTable files={core} showStatus />
             </div>
 
-            {/* Unidentified files */}
+            {discovered.length > 0 && (
+                <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Discovered Files ({discovered.length})</h3>
+                    <SummaryFileTable files={discovered} />
+                </div>
+            )}
+
             {unidentified.length > 0 && (
                 <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-3">Unidentified Files ({unidentified.length})</h3>
-                    <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border/50 bg-muted/30">
-                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-left text-muted-foreground">Path</th>
-                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-left text-muted-foreground">Last Modified</th>
-                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-right text-muted-foreground">Size</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {unidentified.map(file => (
-                                        <tr key={file.path} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-mono text-muted-foreground max-w-[400px] truncate" title={file.path}>
-                                                {file.path}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                {file.lastModified ? relativeTime(file.lastModified) : '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
-                                                {formatBytes(file.size)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <SummaryFileTable files={unidentified} />
                 </div>
             )}
         </div>
@@ -381,6 +377,7 @@ export default function PlatformStatusDashboard() {
         if (!search) return items;
         const q = search.toLowerCase();
         return items.filter(b =>
+            displayConfigId(b.configId).toLowerCase().includes(q) ||
             b.configId.toLowerCase().includes(q) ||
             (b.title || '').toLowerCase().includes(q) ||
             (b.tags || []).some(t => t.toLowerCase().includes(q))
