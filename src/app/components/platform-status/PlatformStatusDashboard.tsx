@@ -221,8 +221,17 @@ function BlueprintTable({ items, defaultSortKey, defaultSortDir }: {
                                 <td className="px-4 py-3 text-sm font-mono text-foreground max-w-[300px] truncate" title={displayConfigId(item.configId)}>
                                     {displayConfigId(item.configId)}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-muted-foreground max-w-[250px] truncate" title={item.title}>
-                                    {item.title || '—'}
+                                <td className="px-4 py-3 text-sm max-w-[250px] truncate" title={item.title}>
+                                    {item.title ? (
+                                        <a
+                                            href={`/analysis/${encodeURIComponent(item.configId)}`}
+                                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                                        >
+                                            {item.title}
+                                        </a>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
                                     {item.runCount > 1 ? item.runCount : item.runCount === 1 ? '1+' : '0'}
@@ -246,7 +255,11 @@ function BlueprintTable({ items, defaultSortKey, defaultSortDir }: {
 
 type SummarySortKey = 'name' | 'path' | 'status' | 'lastModified' | 'size';
 
-function SummaryFileTable({ files, showStatus = false }: { files: SummaryFileItem[]; showStatus?: boolean }) {
+function SummaryFileTable({ files, showStatus = false, showDescription = false }: {
+    files: SummaryFileItem[];
+    showStatus?: boolean;
+    showDescription?: boolean;
+}) {
     const [sort, toggleSort] = useSort<SummarySortKey>(showStatus ? 'status' : 'name', showStatus ? 'asc' : 'desc');
 
     const sorted = useMemo(() => sortedBy(files, sort.key, sort.direction, (item, key) => {
@@ -269,7 +282,7 @@ function SummaryFileTable({ files, showStatus = false }: { files: SummaryFileIte
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
                             <SortableHeader label="Name" sortKey="name" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Path" sortKey="path" current={sort} onSort={toggleSort} />
+                            {!showDescription && <SortableHeader label="Path" sortKey="path" current={sort} onSort={toggleSort} />}
                             {showStatus && <SortableHeader label="Status" sortKey="status" current={sort} onSort={toggleSort} />}
                             <SortableHeader label="Last Modified" sortKey="lastModified" current={sort} onSort={toggleSort} />
                             <SortableHeader label="Size" sortKey="size" current={sort} onSort={toggleSort} align="right" />
@@ -277,11 +290,36 @@ function SummaryFileTable({ files, showStatus = false }: { files: SummaryFileIte
                     </thead>
                     <tbody>
                         {sorted.map(file => (
-                            <tr key={file.path} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-foreground">{file.name}</td>
-                                <td className="px-4 py-3 text-sm font-mono text-muted-foreground max-w-[300px] truncate" title={file.path}>
-                                    {file.path}
+                            <tr key={file.path} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors align-top">
+                                <td className="px-4 py-3 text-sm">
+                                    <div className="font-medium text-foreground">{file.name}</div>
+                                    {showDescription && (
+                                        <>
+                                            <div className="font-mono text-xs text-muted-foreground/70 mt-0.5">{file.path}</div>
+                                            {file.description && (
+                                                <div className="text-xs text-muted-foreground mt-1">{file.description}</div>
+                                            )}
+                                            {file.pageLinks && file.pageLinks.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                    {file.pageLinks.map(link => (
+                                                        <a
+                                                            key={link.href}
+                                                            href={link.href}
+                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                                        >
+                                                            {link.label}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </td>
+                                {!showDescription && (
+                                    <td className="px-4 py-3 text-sm font-mono text-muted-foreground max-w-[300px] truncate" title={file.path}>
+                                        {file.path}
+                                    </td>
+                                )}
                                 {showStatus && (
                                     <td className="px-4 py-3">
                                         <StatusBadge status={file.found ? 'found' : 'missing'} />
@@ -310,20 +348,27 @@ function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
     return (
         <div className="space-y-6">
             <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Core Expected Files ({core.length})</h3>
-                <SummaryFileTable files={core} showStatus />
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Core Platform Files ({core.length})</h3>
+                <SummaryFileTable files={core} showStatus showDescription />
             </div>
 
             {discovered.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Discovered Files ({discovered.length})</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Per-Entity Files ({discovered.length})</h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        These are dynamically-named files produced per model, blueprint, or survey (e.g. model summaries, model cards, per-survey DTEF results).
+                        The platform generates and consumes these files — they aren&apos;t listed individually above because their filenames vary.
+                    </p>
                     <SummaryFileTable files={discovered} />
                 </div>
             )}
 
             {unidentified.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Unidentified Files ({unidentified.length})</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Unidentified Files ({unidentified.length})</h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        Files in S3 that don&apos;t match any known pattern. These may be leftover from old features or manual uploads.
+                    </p>
                     <SummaryFileTable files={unidentified} />
                 </div>
             )}
