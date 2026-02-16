@@ -632,6 +632,16 @@ export const MODEL_VERSION_REGISTRY: ModelSeries[] = [
         ]
       },
       {
+        id: "xai:grok-4-fast",
+        name: "Grok 4 Fast",
+        releaseDate: "2025-07-09",
+        aliases: [
+          "xai:grok-4-fast",
+          "openrouter:x-ai/grok-4-fast",
+          "openrouter:xai/grok-4-fast"
+        ]
+      },
+      {
         id: "xai:grok-4.1-fast",
         name: "Grok 4.1 Fast",
         releaseDate: "2026-01-01", // Estimated

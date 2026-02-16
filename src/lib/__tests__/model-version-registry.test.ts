@@ -133,6 +133,7 @@ describe('Model Version Registry', () => {
       'openrouter:google/gemini-2.5-flash',
       'openrouter:x-ai/grok-3',
       'openrouter:x-ai/grok-4',
+      'openrouter:x-ai/grok-4-fast',
     ];
 
     const unmatched: string[] = [];
