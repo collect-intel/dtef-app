@@ -185,6 +185,17 @@ function parsePercentage(val: string): number {
   return parseFloat(cleaned);
 }
 
+// ── Segment Value Normalization ─────────────────────────────────────────
+
+/** Standardize segment values that vary across rounds (e.g. Türkiye → Turkey) */
+const SEGMENT_VALUE_ALIASES: Record<string, string> = {
+  'Türkiye': 'Turkey',
+};
+
+function normalizeSegmentValue(value: string): string {
+  return SEGMENT_VALUE_ALIASES[value] ?? value;
+}
+
 // ── Segment Column Classification ──────────────────────────────────────
 
 interface SegmentColumnInfo {
@@ -233,7 +244,7 @@ let activePrefixMap: Record<string, string> = { ...FIXED_SEGMENT_PREFIXES };
 function classifySegmentColumn(header: string): SegmentColumnInfo | null {
   for (const [prefix, attribute] of Object.entries(activePrefixMap)) {
     if (header.startsWith(`${prefix}: `)) {
-      const value = header.slice(prefix.length + 2).trim();
+      const value = normalizeSegmentValue(header.slice(prefix.length + 2).trim());
       return { header, prefix, attribute, value };
     }
   }

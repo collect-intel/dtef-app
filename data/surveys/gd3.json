@@ -18256,10 +18256,10 @@
       ]
     },
     {
-      "id": "country:t-rkiye",
-      "label": "Türkiye",
+      "id": "country:turkey",
+      "label": "Turkey",
       "attributes": {
-        "country": "Türkiye"
+        "country": "Turkey"
       },
       "sampleSize": 10,
       "responses": [
