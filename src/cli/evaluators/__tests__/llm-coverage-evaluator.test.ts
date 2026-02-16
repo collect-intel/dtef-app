@@ -692,7 +692,7 @@ describe('LLMCoverageEvaluator', () => {
             expect(model1Result).not.toHaveProperty('error');
             const successResult = model1Result as Exclude<CoverageResult, { error: string } | null>;
             expect(successResult.pointAssessments?.[0]).toEqual(
-                expect.objectContaining({ keyPointText: 'Display label', isFunction: true })
+                expect.objectContaining({ keyPointText: 'Display label', evaluationType: 'computational' })
             );
         });
 
