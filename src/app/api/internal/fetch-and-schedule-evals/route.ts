@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
 
     let scheduled = 0;
     let skippedFresh = 0;
+    let skippedNonPeriodic = 0;
     let skippedOther = 0;
 
     for (const file of filesInBlueprintDir) {
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
 
         if (!config.tags || !config.tags.includes('_periodic')) {
           logger.info(`Blueprint ${config.id} does not have '_periodic' tag. Skipping.`);
+          skippedNonPeriodic++;
           continue;
         }
 
@@ -237,11 +239,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    logger.info(`Scheduled eval check completed: ${scheduled} scheduled, ${skippedFresh} skipped (fresh), ${skippedOther} skipped (other)`);
+    logger.info(`Scheduled eval check completed: ${scheduled} scheduled, ${skippedFresh} skipped (fresh), ${skippedNonPeriodic} skipped (non-periodic), ${skippedOther} skipped (other)`);
     return NextResponse.json({
       message: 'Scheduled eval check completed.',
       scheduled,
       skippedFresh,
+      skippedNonPeriodic,
       total: filesInBlueprintDir.length,
       ...(limit > 0 ? { limit } : {}),
     });

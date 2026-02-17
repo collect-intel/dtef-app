@@ -302,9 +302,24 @@ export async function GET() {
   const configsWithoutRuns = blueprints.filter(b => b.inGitHub && !b.inS3).length;
   const orphanedConfigs = blueprints.filter(b => !b.inGitHub && b.inS3).length;
   const recentRunConfigs = blueprints.filter(b => {
+    if (!b.inGitHub || !b.lastRun) return false;
+    return new Date(b.lastRun) >= sevenDaysAgo;
+  }).length;
+  const staleRunConfigs = blueprints.filter(b => {
+    if (!b.inGitHub || !b.inS3) return false;
+    if (!b.lastRun) return true; // in S3 but no timestamp = stale
+    return new Date(b.lastRun) < sevenDaysAgo;
+  }).length;
+
+  // Scheduler-aligned stats: periodic configs (what the scheduler actually processes)
+  const periodicBlueprints = blueprints.filter(b => b.inGitHub && b.tags?.includes('_periodic'));
+  const periodicConfigs = periodicBlueprints.length;
+  const periodicWithRecentRuns = periodicBlueprints.filter(b => {
     if (!b.lastRun) return false;
     return new Date(b.lastRun) >= sevenDaysAgo;
   }).length;
+  const periodicNeverRun = periodicBlueprints.filter(b => !b.inS3).length;
+
   const expectedSummaryFiles = Object.keys(KNOWN_SUMMARY_FILES).length;
   const foundSummaryFiles = Object.keys(KNOWN_SUMMARY_FILES).filter(k => s3FileMap.has(k)).length;
 
@@ -314,6 +329,10 @@ export async function GET() {
     configsWithoutRuns,
     orphanedConfigs,
     recentRunConfigs,
+    staleRunConfigs,
+    periodicConfigs,
+    periodicWithRecentRuns,
+    periodicNeverRun,
     expectedSummaryFiles,
     foundSummaryFiles,
     unidentifiedFiles: unidentifiedCount,

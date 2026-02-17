@@ -491,7 +491,7 @@ export default function PlatformStatusDashboard() {
                 </div>
             )}
 
-            {/* Progress cards */}
+            {/* Overall stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <ProgressCard
                     label="Configs with Runs"
@@ -502,14 +502,45 @@ export default function PlatformStatusDashboard() {
                 <ProgressCard
                     label="Recent Runs (7d)"
                     value={stats.recentRunConfigs}
-                    total={stats.totalGitHubConfigs}
+                    total={stats.configsWithRuns}
                     color="blue"
+                />
+                <ProgressCard
+                    label="Stale Runs (>7d)"
+                    value={stats.staleRunConfigs}
+                    color={stats.staleRunConfigs === 0 ? 'green' : 'amber'}
+                    subtitle="In S3 but last run >7 days ago"
                 />
                 <ProgressCard
                     label="Orphaned S3 Configs"
                     value={stats.orphanedConfigs}
                     color={stats.orphanedConfigs === 0 ? 'green' : 'amber'}
                     subtitle={stats.orphanedConfigs === 0 ? 'None found' : 'In S3 but not in GitHub'}
+                />
+            </div>
+
+            {/* Scheduler view */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <ProgressCard
+                    label="Periodic Configs"
+                    value={stats.periodicConfigs}
+                    total={stats.totalGitHubConfigs}
+                    color="blue"
+                    subtitle="Tagged _periodic"
+                />
+                <ProgressCard
+                    label="Periodic Fresh"
+                    value={stats.periodicWithRecentRuns}
+                    total={stats.periodicConfigs}
+                    color="green"
+                    subtitle="Run within 7 days"
+                />
+                <ProgressCard
+                    label="Periodic Needs Run"
+                    value={stats.periodicConfigs - stats.periodicWithRecentRuns}
+                    total={stats.periodicConfigs}
+                    color={stats.periodicConfigs - stats.periodicWithRecentRuns > 0 ? 'amber' : 'green'}
+                    subtitle={stats.periodicNeverRun > 0 ? `${stats.periodicNeverRun} never run` : 'All up to date'}
                 />
                 <ProgressCard
                     label="Summary Files"

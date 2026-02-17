@@ -26,6 +26,10 @@ export interface ProgressStats {
   configsWithoutRuns: number;
   orphanedConfigs: number;
   recentRunConfigs: number; // configs with a run in last 7 days
+  staleRunConfigs: number; // inGitHub + inS3 but lastRun > 7 days ago
+  periodicConfigs: number; // inGitHub configs with _periodic tag
+  periodicWithRecentRuns: number; // periodic + lastRun < 7 days
+  periodicNeverRun: number; // periodic + no runs at all
   expectedSummaryFiles: number;
   foundSummaryFiles: number;
   unidentifiedFiles: number;
