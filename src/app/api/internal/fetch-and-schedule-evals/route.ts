@@ -12,6 +12,7 @@ import { getLogger } from '@/utils/logger';
 import { captureError, setContext } from '@/utils/sentry';
 import { callBackgroundFunction } from '@/lib/background-function-client';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
+import { fromSafeTimestamp } from '@/lib/timestampUtils';
 
 const GITHUB_API_BASE = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}`;
 const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
@@ -185,7 +186,8 @@ export async function POST(req: NextRequest) {
           if (matchingExistingRuns.length > 0) {
             const latestMatchingRun = matchingExistingRuns[0];
             if (latestMatchingRun.timestamp) {
-              const runAge = Date.now() - new Date(latestMatchingRun.timestamp).getTime();
+              const isoTimestamp = fromSafeTimestamp(latestMatchingRun.timestamp);
+              const runAge = Date.now() - new Date(isoTimestamp).getTime();
               if (runAge < ONE_WEEK_IN_MS) {
                 logger.info(`Blueprint ${currentId} has a recent run. Skipping.`);
                 needsRun = false;
