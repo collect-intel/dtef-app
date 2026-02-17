@@ -2069,50 +2069,6 @@ export interface NDeltasIndexContent {
   lastUpdated: string;
 }
 
-// --- Vibes Index Types ---
-export interface VibesIndexModelStats {
-  averageHybrid: number | null;
-  totalRuns: number;
-  uniqueConfigs: number;
-}
-
-export interface VibesIndexContent {
-  models: Record<string, VibesIndexModelStats>;
-  similarity: Record<string, Record<string, { score: number; count: number }>>; // baseA -> baseB -> { score, count }
-  // Optional per-model capability scores (0..1). Shape: modelId -> capabilityId -> { score, contributingRuns }
-  capabilityScores?: Record<string, Record<string, { score: number | null; contributingRuns: number }>>;
-  generatedAt: string;
-}
-
-// --- Compass Index Types and Storage Functions ---
-export interface CompassExemplar {
-  promptId: string;
-  promptText: string; // The actual prompt for context
-  modelId: string;
-  modelResponse: string;
-  coverageScore: number;
-  axisScore: number; // how strongly this response exhibits the pole characteristic
-  configId: string;
-  runLabel: string;
-  timestamp: string;
-}
-
-export interface CompassComparisonPair {
-  promptText: string;
-  positiveExemplar: CompassExemplar;
-  negativeExemplar: CompassExemplar;
-}
-
-export interface CompassAxisExemplars {
-  comparisonPairs?: CompassComparisonPair[];
-}
-
-export interface CompassIndexContent {
-  axes: Record<string, Record<string, { value: number | null; runs: number }>>;
-  axisMetadata?: Record<string, { id: string; positivePole: string; negativePole: string }>;
-  exemplars?: Record<string, CompassAxisExemplars>; // bipolar axis id -> exemplars
-  generatedAt: string;
-}
 
 export async function saveModelNDeltas(modelId: string, data: ModelNDeltasFileContent): Promise<void> {
   const safeModelId = getSafeModelId(modelId);
@@ -2283,60 +2239,7 @@ export async function getNDeltasIndex(): Promise<NDeltasIndexContent | null> {
   }
 }
 
-// --- Vibes Index Storage Functions ---
-const VIBES_INDEX_KEY = path.join(LIVE_DIR, 'models', 'vibes', 'index.json');
-
-export async function saveVibesIndex(index: VibesIndexContent): Promise<void> {
-  const localPath = path.join(RESULTS_DIR, VIBES_INDEX_KEY);
-  const fileContent = JSON.stringify(index, null, 2);
-  if (storageProvider === 's3' && s3Client && s3BucketName) {
-    await s3Client.send(new PutObjectCommand({
-      Bucket: s3BucketName,
-      Key: VIBES_INDEX_KEY,
-      Body: fileContent,
-      ContentType: 'application/json',
-    }));
-    console.log(`[StorageService] Vibes index saved to S3: ${VIBES_INDEX_KEY}`);
-  } else if (storageProvider === 'local') {
-    await fs.mkdir(path.dirname(localPath), { recursive: true });
-    await fs.writeFile(localPath, fileContent, 'utf-8');
-    console.log(`[StorageService] Vibes index saved locally: ${localPath}`);
-  } else {
-    console.warn('[StorageService] No valid storage provider for saveVibesIndex.');
-  }
-}
-
-export async function getVibesIndex(): Promise<VibesIndexContent | null> {
-  const localPath = path.join(RESULTS_DIR, VIBES_INDEX_KEY);
-  let fileContent: string | null = null;
-  if (storageProvider === 's3' && s3Client && s3BucketName) {
-    try {
-      const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: s3BucketName, Key: VIBES_INDEX_KEY }));
-      if (Body) fileContent = await streamToString(Body as Readable);
-    } catch (err: any) {
-      if (err.name === 'NoSuchKey') return null;
-      console.error('[StorageService] Error fetching Vibes index from S3:', err);
-      return null;
-    }
-  } else if (storageProvider === 'local') {
-    try {
-      if (fsSync.existsSync(localPath)) fileContent = await fs.readFile(localPath, 'utf-8'); else return null;
-    } catch (err) {
-      console.error('[StorageService] Error fetching Vibes index locally:', err);
-      return null;
-    }
-  }
-  if (!fileContent) return null;
-  try {
-    return JSON.parse(fileContent) as VibesIndexContent;
-  } catch (err) {
-    console.error('[StorageService] Error parsing Vibes index:', err);
-    return null;
-  }
-}
-
-// --- Macro Canvas Artefacts (index, mappings, tiles) ---
-// Minimal storage context for modules that need direct access to primitives (e.g., macro storage helpers)
+// Minimal storage context for modules that need direct access to primitives
 export function getStorageContext() {
   return {
     storageProvider,
@@ -2346,58 +2249,6 @@ export function getStorageContext() {
     streamToString,
     streamToBuffer,
   } as const;
-}
-
-export * from '@/lib/storage/macro';
-const COMPASS_INDEX_KEY = path.join(LIVE_DIR, 'models', 'compass', 'index.json');
-
-export async function saveCompassIndex(content: CompassIndexContent): Promise<void> {
-  const localPath = path.join(RESULTS_DIR, COMPASS_INDEX_KEY);
-  const fileContent = JSON.stringify(content, null, 2);
-  if (storageProvider === 's3' && s3Client && s3BucketName) {
-    await s3Client.send(new PutObjectCommand({
-      Bucket: s3BucketName,
-      Key: COMPASS_INDEX_KEY,
-      Body: fileContent,
-      ContentType: 'application/json',
-    }));
-    console.log(`[StorageService] Compass index saved to S3: ${COMPASS_INDEX_KEY}`);
-  } else if (storageProvider === 'local') {
-    await fs.mkdir(path.dirname(localPath), { recursive: true });
-    await fs.writeFile(localPath, fileContent, 'utf-8');
-    console.log(`[StorageService] Compass index saved locally: ${localPath}`);
-  } else {
-    console.warn('[StorageService] No valid storage provider for saveCompassIndex.');
-  }
-}
-
-export async function getCompassIndex(): Promise<CompassIndexContent | null> {
-  const localPath = path.join(RESULTS_DIR, COMPASS_INDEX_KEY);
-  let fileContent: string | null = null;
-  if (storageProvider === 's3' && s3Client && s3BucketName) {
-    try {
-      const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: s3BucketName, Key: COMPASS_INDEX_KEY }));
-      if (Body) fileContent = await streamToString(Body as Readable);
-    } catch (err: any) {
-      if (err.name === 'NoSuchKey') return null;
-      console.error('[StorageService] Error fetching Compass index from S3:', err);
-      return null;
-    }
-  } else if (storageProvider === 'local') {
-    try {
-      if (fsSync.existsSync(localPath)) fileContent = await fs.readFile(localPath, 'utf-8'); else return null;
-    } catch (err) {
-      console.error('[StorageService] Error fetching Compass index locally:', err);
-      return null;
-    }
-  }
-  if (!fileContent) return null;
-  try {
-    return JSON.parse(fileContent) as CompassIndexContent;
-  } catch (err) {
-    console.error('[StorageService] Error parsing Compass index:', err);
-    return null;
-  }
 }
 
 // --- Model Card Storage Functions ---
@@ -3377,10 +3228,6 @@ export async function appendRedlinesFeed(entry: RedlinesAnnotation, maxItems: nu
   current.lastUpdated = new Date().toISOString();
   await saveRedlinesFeed(current);
 }
-
-// --- Macro Canvas Artefacts (index, mappings, tiles) ---
-
-export const MACRO_DIR = path.join(LIVE_DIR, 'macro');
 
 /**
  * Saves an arbitrary JSON object to a specified path in the configured storage provider.

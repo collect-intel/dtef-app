@@ -50,25 +50,10 @@ const KNOWN_SUMMARY_FILES: Record<string, CoreFileInfo> = {
     description: 'Aggregated evaluation pain points and common failure patterns across models.',
     pageLinks: [],
   },
-  'live/aggregates/compass-index.json': {
-    name: 'Compass Index',
-    description: 'Legacy weval feature for AI personality trait visualization. Deprecated.',
-    pageLinks: [{ label: 'Compass (deprecated)', href: '/compass' }],
-  },
-  'live/aggregates/macro/index.json': {
-    name: 'Macro Canvas Index',
-    description: 'Legacy tiled macro canvas index. Deprecated in favor of flat storage.',
-    pageLinks: [{ label: 'Macro (deprecated)', href: '/experiments/macro' }],
-  },
   'live/models/ndeltas/manifest.json': {
     name: 'N-Deltas Manifest',
     description: 'Manifest for n-delta model comparison metrics. Currently CLI-only, not exposed in UI.',
     pageLinks: [],
-  },
-  'live/models/vibes/index.json': {
-    name: 'Vibes Index',
-    description: 'Legacy weval feature for model similarity visualization. Deprecated.',
-    pageLinks: [{ label: 'Vibes (deprecated)', href: '/vibes' }],
   },
 };
 
@@ -78,8 +63,6 @@ function classifyS3Key(key: string): string | null {
   if (key.match(/^live\/models\/summaries\/.+\.json$/)) return 'Model Summary';
   if (key.match(/^live\/models\/ndeltas\/.+\.json$/) && !key.endsWith('manifest.json')) return 'Model N-Delta';
   if (key.match(/^live\/models\/cards\/.+\.json$/)) return 'Model Card';
-  if (key.match(/^live\/aggregates\/macro\/configs\/.+\.json$/)) return 'Macro Config Mapping';
-  if (key.match(/^live\/aggregates\/macro\/flat\//)) return 'Macro Flat Data';
   return null;
 }
 
