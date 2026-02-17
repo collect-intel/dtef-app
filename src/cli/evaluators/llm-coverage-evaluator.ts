@@ -25,7 +25,7 @@ import pLimit from '@/lib/pLimit';
 import { AdaptiveRateLimiter } from '@/lib/adaptive-rate-limiter';
 import { extractProviderFromModelId, getProviderProfile } from '@/lib/provider-rate-limits';
 
-const DEFAULT_JUDGE_CONCURRENCY = 20;
+const DEFAULT_JUDGE_CONCURRENCY = 80;
 
 type Logger = ReturnType<typeof getConfig>['logger'];
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus } from './types';
+import * as d3 from 'd3';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry } from './types';
 
 // --- Helpers ---
 
@@ -139,12 +140,13 @@ function getBlueprintStatus(item: BlueprintStatusItem): 'recent' | 'stale' | 'or
 
 // --- Progress card ---
 
-function ProgressCard({ label, value, total, color, subtitle }: {
+function ProgressCard({ label, value, total, color, subtitle, suffix }: {
     label: string;
     value: number;
     total?: number;
     color: 'green' | 'blue' | 'amber' | 'red';
     subtitle?: string;
+    suffix?: string;
 }) {
     const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
     const barColors = {
@@ -157,7 +159,7 @@ function ProgressCard({ label, value, total, color, subtitle }: {
         <div className="bg-card border border-border/50 rounded-lg p-4">
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-2xl font-bold mt-1">
-                {value}{total !== undefined ? <span className="text-muted-foreground text-base font-normal"> / {total}</span> : ''}
+                {value}{suffix ? <span className="text-base font-normal text-muted-foreground">{suffix}</span> : ''}{total !== undefined ? <span className="text-muted-foreground text-base font-normal"> / {total}</span> : ''}
             </p>
             {pct !== null && (
                 <div className="mt-2">
@@ -174,7 +176,7 @@ function ProgressCard({ label, value, total, color, subtitle }: {
 
 // --- Tab types ---
 
-type TabId = 'with-runs' | 'no-runs' | 'orphaned' | 'summary-files';
+type TabId = 'timing' | 'with-runs' | 'no-runs' | 'orphaned' | 'summary-files';
 
 // --- Blueprint table ---
 
@@ -376,6 +378,339 @@ function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
     );
 }
 
+// --- Timing helpers ---
+
+function formatMs(ms: number): string {
+    if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.round(ms)}ms`;
+}
+
+function formatDurationLong(ms: number): string {
+    const totalSec = Math.floor(ms / 1000);
+    if (totalSec < 60) return `${totalSec}s`;
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    if (min < 60) return `${min}m ${sec}s`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h}h ${m}m`;
+}
+
+// --- Timing chart (D3 stacked bar) ---
+
+function TimingChart({ runs }: { runs: TimingRunPoint[] }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const [width, setWidth] = useState(600);
+    const height = 280;
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(el);
+        setWidth(el.clientWidth);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (!svgRef.current || runs.length === 0) return;
+
+        const svg = d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+
+        const margin = { top: 12, right: 16, bottom: 40, left: 56 };
+        const w = width - margin.left - margin.right;
+        const h = height - margin.top - margin.bottom;
+
+        const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand<number>()
+            .domain(runs.map((_, i) => i))
+            .range([0, w])
+            .padding(0.2);
+
+        const maxTotal = d3.max(runs, r => r.totalDurationMs) || 1;
+        const y = d3.scaleLinear().domain([0, maxTotal]).nice().range([h, 0]);
+
+        // X axis
+        const xAxis = g.append('g').attr('transform', `translate(0,${h})`);
+        // Show tick labels only if <= 20 runs; otherwise too crowded
+        if (runs.length <= 20) {
+            xAxis.call(
+                d3.axisBottom(d3.scaleBand<number>().domain(runs.map((_, i) => i)).range([0, w]).padding(0.2))
+                    .tickFormat(i => {
+                        const d = new Date(runs[i as number].timestamp);
+                        return d3.timeFormat('%b %d')(d);
+                    })
+            );
+        } else {
+            // Show every Nth label
+            const step = Math.ceil(runs.length / 10);
+            xAxis.call(
+                d3.axisBottom(d3.scaleBand<number>().domain(runs.map((_, i) => i)).range([0, w]).padding(0.2))
+                    .tickValues(runs.map((_, i) => i).filter((_, i) => i % step === 0))
+                    .tickFormat(i => {
+                        const d = new Date(runs[i as number].timestamp);
+                        return d3.timeFormat('%b %d')(d);
+                    })
+            );
+        }
+        xAxis.selectAll('text').attr('class', 'fill-muted-foreground text-[10px]');
+        xAxis.selectAll('line, path').attr('stroke', 'currentColor').attr('class', 'text-border');
+
+        // Y axis
+        const yAxis = g.append('g').call(
+            d3.axisLeft(y).ticks(5).tickFormat(d => `${(+d / 1000).toFixed(0)}s`)
+        );
+        yAxis.selectAll('text').attr('class', 'fill-muted-foreground text-[10px]');
+        yAxis.selectAll('line, path').attr('stroke', 'currentColor').attr('class', 'text-border');
+
+        // Grid lines
+        g.append('g')
+            .attr('class', 'text-border/30')
+            .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(() => ''))
+            .selectAll('line').attr('stroke', 'currentColor').attr('opacity', 0.3);
+        g.select('.domain').remove();
+
+        const phases: { key: keyof TimingRunPoint; color: string; label: string }[] = [
+            { key: 'generationDurationMs', color: '#3B82F6', label: 'Generation' },
+            { key: 'evaluationDurationMs', color: '#8B5CF6', label: 'Evaluation' },
+            { key: 'saveDurationMs', color: '#22C55E', label: 'Save' },
+        ];
+
+        // Stacked bars
+        for (let runIdx = 0; runIdx < runs.length; runIdx++) {
+            const run = runs[runIdx];
+            let cumY = 0;
+            for (const phase of phases) {
+                const val = run[phase.key] as number;
+                g.append('rect')
+                    .attr('x', x(runIdx)!)
+                    .attr('y', y(cumY + val))
+                    .attr('width', x.bandwidth())
+                    .attr('height', Math.max(0, y(cumY) - y(cumY + val)))
+                    .attr('fill', phase.color)
+                    .attr('rx', 1);
+                cumY += val;
+            }
+            // Invisible overlay for tooltip
+            g.append('rect')
+                .attr('x', x(runIdx)!)
+                .attr('y', 0)
+                .attr('width', x.bandwidth())
+                .attr('height', h)
+                .attr('fill', 'transparent')
+                .attr('cursor', 'pointer')
+                .on('mouseenter', (event) => {
+                    const tooltip = tooltipRef.current;
+                    if (!tooltip) return;
+                    const pct = (v: number) => run.totalDurationMs > 0 ? Math.round(v / run.totalDurationMs * 100) : 0;
+                    tooltip.innerHTML = `
+                        <div class="font-medium text-foreground text-xs mb-1">${run.configTitle || run.configId}</div>
+                        <div class="text-[10px] text-muted-foreground mb-1.5">${new Date(run.timestamp).toLocaleDateString()}</div>
+                        <div class="text-xs space-y-0.5">
+                            <div><span style="color:#3B82F6">■</span> Generation: ${formatMs(run.generationDurationMs)} (${pct(run.generationDurationMs)}%)</div>
+                            <div><span style="color:#8B5CF6">■</span> Evaluation: ${formatMs(run.evaluationDurationMs)} (${pct(run.evaluationDurationMs)}%)</div>
+                            <div><span style="color:#22C55E">■</span> Save: ${formatMs(run.saveDurationMs)} (${pct(run.saveDurationMs)}%)</div>
+                            <div class="pt-1 border-t border-border/50 font-medium">Total: ${formatMs(run.totalDurationMs)}</div>
+                            ${run.slowestModel ? `<div class="text-muted-foreground">Slowest: ${run.slowestModel.modelId} (${formatMs(run.slowestModel.avgMs)})</div>` : ''}
+                        </div>
+                    `;
+                    tooltip.style.display = 'block';
+                    const rect = containerRef.current!.getBoundingClientRect();
+                    const barX = margin.left + (x(runIdx) || 0) + x.bandwidth() / 2;
+                    tooltip.style.left = `${Math.min(barX, rect.width - 220)}px`;
+                    tooltip.style.top = `${margin.top + y(run.totalDurationMs) - 8}px`;
+                })
+                .on('mouseleave', () => {
+                    if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+                });
+        }
+
+        // Trend line (only if 5+ runs)
+        if (runs.length >= 5) {
+            const lineGen = d3.line<[number, number]>()
+                .x(d => x(d[0])! + x.bandwidth() / 2)
+                .y(d => y(d[1]))
+                .curve(d3.curveMonotoneX);
+            g.append('path')
+                .datum(runs.map((r, i) => [i, r.totalDurationMs] as [number, number]))
+                .attr('fill', 'none')
+                .attr('stroke', 'currentColor')
+                .attr('class', 'text-foreground/40')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-dasharray', '4 3')
+                .attr('d', lineGen);
+        }
+
+        // Legend
+        const legend = svg.append('g').attr('transform', `translate(${margin.left + 4}, ${height - 8})`);
+        phases.forEach((phase, i) => {
+            const lg = legend.append('g').attr('transform', `translate(${i * 100}, 0)`);
+            lg.append('rect').attr('width', 8).attr('height', 8).attr('rx', 1).attr('fill', phase.color);
+            lg.append('text').attr('x', 12).attr('y', 8).attr('class', 'fill-muted-foreground text-[10px]').text(phase.label);
+        });
+
+    }, [runs, width]);
+
+    if (runs.length === 0) {
+        return (
+            <div className="bg-card border border-border/50 rounded-lg p-8 text-center text-sm text-muted-foreground">
+                No timing data available yet.
+            </div>
+        );
+    }
+
+    return (
+        <div ref={containerRef} className="bg-card border border-border/50 rounded-lg p-4 relative">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Run Duration Over Time</h3>
+            <svg ref={svgRef} width={width} height={height} className="overflow-visible" />
+            <div
+                ref={tooltipRef}
+                className="absolute z-10 bg-popover border border-border rounded-lg shadow-lg p-2.5 pointer-events-none"
+                style={{ display: 'none', maxWidth: 220 }}
+            />
+        </div>
+    );
+}
+
+// --- Model speed table ---
+
+type ModelSpeedSortKey = 'modelId' | 'avgMs' | 'appearances' | 'wasSlowest' | 'wasFastest';
+
+function ModelSpeedTable({ models }: { models: ModelSpeedEntry[] }) {
+    const [sort, toggleSort] = useSort<ModelSpeedSortKey>('avgMs', 'desc');
+
+    const sorted = useMemo(() => sortedBy(models, sort.key, sort.direction, (item, key) => {
+        switch (key as ModelSpeedSortKey) {
+            case 'modelId': return item.modelId;
+            case 'avgMs': return item.avgMs;
+            case 'appearances': return item.appearances;
+            case 'wasSlowest': return item.wasSlowest;
+            case 'wasFastest': return item.wasFastest;
+            default: return 0;
+        }
+    }), [models, sort]);
+
+    if (models.length === 0) return null;
+
+    return (
+        <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/50">
+                <h3 className="text-sm font-medium text-muted-foreground">Model Response Times</h3>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <SortableHeader label="Model" sortKey="modelId" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Avg Response" sortKey="avgMs" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Appearances" sortKey="appearances" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Slowest In" sortKey="wasSlowest" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Fastest In" sortKey="wasFastest" current={sort} onSort={toggleSort} align="right" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map(model => (
+                            <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                <td className="px-4 py-3 text-sm font-mono text-foreground">{model.modelId}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatMs(model.avgMs)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{model.appearances}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums">
+                                    {model.wasSlowest > 0
+                                        ? <span className="text-red-500">{model.wasSlowest}</span>
+                                        : <span className="text-muted-foreground">0</span>
+                                    }
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums">
+                                    {model.wasFastest > 0
+                                        ? <span className="text-green-500">{model.wasFastest}</span>
+                                        : <span className="text-muted-foreground">0</span>
+                                    }
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// --- Timing section ---
+
+function TimingSection({ insights }: { insights: TimingInsights | null }) {
+    if (!insights || insights.runs.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-muted-foreground text-sm">
+                    No timing data available yet. Timing is recorded for runs executed after instrumentation was added.
+                </p>
+            </div>
+        );
+    }
+
+    const { stats, runs, modelSpeeds } = insights;
+
+    return (
+        <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <ProgressCard
+                    label="Avg Run Duration"
+                    value={Math.round(stats.avgDurationMs / 1000)}
+                    suffix="s"
+                    color="blue"
+                    subtitle={`Median: ${formatDurationLong(stats.medianDurationMs)}`}
+                />
+                <ProgressCard
+                    label="Runs with Timing"
+                    value={stats.runsWithTiming}
+                    total={stats.totalRuns}
+                    color="green"
+                />
+                <ProgressCard
+                    label="Total Time Spent"
+                    value={Math.round(stats.totalTimeSpentMs / 60000)}
+                    suffix="m"
+                    color="amber"
+                    subtitle={`across ${stats.runsWithTiming} runs`}
+                />
+                {/* Phase breakdown card */}
+                <div className="bg-card border border-border/50 rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground">Phase Breakdown</p>
+                    <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="h-2 rounded-full" style={{ width: `${stats.avgGenerationPct}%`, backgroundColor: '#3B82F6', minWidth: 4 }} />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">Gen {stats.avgGenerationPct}%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="h-2 rounded-full" style={{ width: `${stats.avgEvaluationPct}%`, backgroundColor: '#8B5CF6', minWidth: 4 }} />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">Eval {stats.avgEvaluationPct}%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="h-2 rounded-full" style={{ width: `${stats.avgSavePct}%`, backgroundColor: '#22C55E', minWidth: 4 }} />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">Save {stats.avgSavePct}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Timeline chart */}
+            <TimingChart runs={runs} />
+
+            {/* Model speed table */}
+            <ModelSpeedTable models={modelSpeeds} />
+        </div>
+    );
+}
+
 // --- Queue status banner ---
 
 function formatDuration(seconds: number): string {
@@ -464,7 +799,7 @@ export default function PlatformStatusDashboard() {
     const [data, setData] = useState<PlatformStatusResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<TabId>('with-runs');
+    const [activeTab, setActiveTab] = useState<TabId>('timing');
     const [search, setSearch] = useState('');
 
     const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -566,7 +901,10 @@ export default function PlatformStatusDashboard() {
 
     const { stats } = data;
 
+    const timingRunCount = data.timingInsights?.runs.length ?? 0;
+
     const tabs: { id: TabId; label: string; count: number }[] = [
+        { id: 'timing', label: 'Timing', count: timingRunCount },
         { id: 'with-runs', label: 'With Runs', count: filteredWithRuns.length },
         { id: 'no-runs', label: 'No Runs', count: filteredNoRuns.length },
         { id: 'orphaned', label: 'Orphaned', count: filteredOrphaned.length },
@@ -679,6 +1017,9 @@ export default function PlatformStatusDashboard() {
             </div>
 
             {/* Tab content */}
+            {activeTab === 'timing' && (
+                <TimingSection insights={data.timingInsights} />
+            )}
             {activeTab === 'with-runs' && (
                 <BlueprintTable items={filteredWithRuns} defaultSortKey="lastRun" defaultSortDir="desc" />
             )}

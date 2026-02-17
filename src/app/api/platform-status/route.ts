@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
-import { getS3Client, getBucketName, getAllBlueprintsSummary, getHomepageSummary } from '@/lib/storageService';
+import { getS3Client, getBucketName, getAllBlueprintsSummary, getHomepageSummary, getLatestRunsSummary, LatestRunSummaryItem } from '@/lib/storageService';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import { getQueueStatus } from '@/lib/evaluation-queue';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats, QueueStatus } from '@/app/components/platform-status/types';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry } from '@/app/components/platform-status/types';
 
 // Known summary files with metadata
 interface CoreFileInfo {
@@ -122,18 +122,102 @@ async function listS3Objects(prefix: string): Promise<S3FileInfo[]> {
   return files;
 }
 
+function computeTimingInsights(runs: LatestRunSummaryItem[]): TimingInsights | null {
+  const timedRuns = runs.filter(r => r.timingSummary);
+  if (timedRuns.length === 0) return null;
+
+  // Sort by timestamp ascending for chart
+  timedRuns.sort((a, b) => {
+    const ta = fromSafeTimestamp(a.timestamp);
+    const tb = fromSafeTimestamp(b.timestamp);
+    return new Date(ta).getTime() - new Date(tb).getTime();
+  });
+
+  const runPoints: TimingRunPoint[] = timedRuns.map(r => ({
+    timestamp: fromSafeTimestamp(r.timestamp),
+    configId: r.configId,
+    configTitle: r.configTitle,
+    totalDurationMs: r.timingSummary!.totalDurationMs,
+    generationDurationMs: r.timingSummary!.generationDurationMs,
+    evaluationDurationMs: r.timingSummary!.evaluationDurationMs,
+    saveDurationMs: r.timingSummary!.saveDurationMs,
+    slowestModel: r.timingSummary!.slowestModel,
+    fastestModel: r.timingSummary!.fastestModel,
+  }));
+
+  // Aggregate model speeds
+  const modelMap = new Map<string, { totalMs: number; count: number; slowest: number; fastest: number }>();
+  for (const r of timedRuns) {
+    const ts = r.timingSummary!;
+    if (ts.slowestModel) {
+      const entry = modelMap.get(ts.slowestModel.modelId) || { totalMs: 0, count: 0, slowest: 0, fastest: 0 };
+      entry.totalMs += ts.slowestModel.avgMs;
+      entry.count++;
+      entry.slowest++;
+      modelMap.set(ts.slowestModel.modelId, entry);
+    }
+    if (ts.fastestModel) {
+      const entry = modelMap.get(ts.fastestModel.modelId) || { totalMs: 0, count: 0, slowest: 0, fastest: 0 };
+      // Only add to totalMs/count if this model wasn't already counted as slowest in same run
+      if (!ts.slowestModel || ts.fastestModel.modelId !== ts.slowestModel.modelId) {
+        entry.totalMs += ts.fastestModel.avgMs;
+        entry.count++;
+      }
+      entry.fastest++;
+      modelMap.set(ts.fastestModel.modelId, entry);
+    }
+  }
+  const modelSpeeds: ModelSpeedEntry[] = Array.from(modelMap.entries()).map(([modelId, data]) => ({
+    modelId,
+    avgMs: data.count > 0 ? Math.round(data.totalMs / data.count) : 0,
+    appearances: data.count,
+    wasSlowest: data.slowest,
+    wasFastest: data.fastest,
+  }));
+
+  // Compute stats
+  const durations = runPoints.map(r => r.totalDurationMs);
+  const sortedDurations = [...durations].sort((a, b) => a - b);
+  const median = sortedDurations.length % 2 === 0
+    ? (sortedDurations[sortedDurations.length / 2 - 1] + sortedDurations[sortedDurations.length / 2]) / 2
+    : sortedDurations[Math.floor(sortedDurations.length / 2)];
+
+  const totalTimeSpentMs = durations.reduce((s, d) => s + d, 0);
+
+  const avgGenPct = runPoints.reduce((s, r) => s + (r.totalDurationMs > 0 ? r.generationDurationMs / r.totalDurationMs * 100 : 0), 0) / runPoints.length;
+  const avgEvalPct = runPoints.reduce((s, r) => s + (r.totalDurationMs > 0 ? r.evaluationDurationMs / r.totalDurationMs * 100 : 0), 0) / runPoints.length;
+  const avgSavePct = runPoints.reduce((s, r) => s + (r.totalDurationMs > 0 ? r.saveDurationMs / r.totalDurationMs * 100 : 0), 0) / runPoints.length;
+
+  return {
+    runs: runPoints,
+    modelSpeeds,
+    stats: {
+      runsWithTiming: timedRuns.length,
+      totalRuns: runs.length,
+      avgDurationMs: Math.round(totalTimeSpentMs / runPoints.length),
+      medianDurationMs: Math.round(median),
+      totalTimeSpentMs,
+      avgGenerationPct: Math.round(avgGenPct * 10) / 10,
+      avgEvaluationPct: Math.round(avgEvalPct * 10) / 10,
+      avgSavePct: Math.round(avgSavePct * 10) / 10,
+    },
+  };
+}
+
 export async function GET() {
   const errors: string[] = [];
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  // Three parallel data fetches
-  const [githubResult, summaryResult, s3FilesResult] = await Promise.allSettled([
+  // Four parallel data fetches
+  const [githubResult, summaryResult, s3FilesResult, latestRunsResult] = await Promise.allSettled([
     fetchGitHubConfigs(),
     // Fetch both summaries for cross-referencing
     Promise.allSettled([getAllBlueprintsSummary(), getHomepageSummary()]),
     // List S3 summary/model files
     Promise.allSettled([listS3Objects('live/aggregates/'), listS3Objects('live/models/')]),
+    // Fetch latest runs for timing insights
+    getLatestRunsSummary(),
   ]);
 
   // Extract GitHub config IDs
@@ -341,11 +425,20 @@ export async function GET() {
 
   const queue = getQueueStatus() as QueueStatus;
 
+  // Compute timing insights from latest runs
+  let timingInsights: TimingInsights | null = null;
+  if (latestRunsResult.status === 'fulfilled' && latestRunsResult.value) {
+    timingInsights = computeTimingInsights(latestRunsResult.value.runs);
+  } else if (latestRunsResult.status === 'rejected') {
+    errors.push(`Latest runs summary fetch failed: ${latestRunsResult.reason?.message || 'Unknown'}`);
+  }
+
   const response: PlatformStatusResponse = {
     blueprints,
     summaryFiles,
     stats,
     queue,
+    timingInsights,
     generatedAt: now.toISOString(),
     errors,
   };

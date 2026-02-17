@@ -21,7 +21,7 @@ import { extractProviderFromModelId, getProviderProfile, parseConcurrencyOverrid
 
 export type ProgressCallback = (completed: number, total: number) => Promise<void>;
 
-const DEFAULT_GENERATION_CONCURRENCY = 30;
+const DEFAULT_GENERATION_CONCURRENCY = 100;
 const FAILURE_THRESHOLD = 10; // Consecutive failures to trip circuit breaker
 
 export async function generateAllResponses(
@@ -204,6 +204,7 @@ export async function generateAllResponses(
                         const generatedAssistantTexts: string[] = [];
                         let fixtureUsed: boolean = false;
                         let fixtureSource: 'final' | 'turns' | undefined;
+                        let totalApiCallMs = 0;
 
                         try {
                             const workingHistory: ConversationMessage[] = [];
@@ -223,6 +224,7 @@ export async function generateAllResponses(
                                             fixtureSource = 'turns';
                                         }
                                         if (!genText) {
+                                            const callStart = Date.now();
                                             genText = await getModelResponse({
                                                 modelId: modelId,
                                                 messages: [...workingHistory],
@@ -232,6 +234,7 @@ export async function generateAllResponses(
                                                 timeout: genOptions?.genTimeoutMs,
                                                 retries: genOptions?.genRetries,
                                             });
+                                            totalApiCallMs += Date.now() - callStart;
                                         }
                                         if (!genText || genText.trim() === '') {
                                             throw new Error('Model returned an empty or whitespace-only response.');
@@ -275,6 +278,7 @@ export async function generateAllResponses(
                                     fixtureSource = 'final';
                                 }
                                 if (!genText) {
+                                    const callStart = Date.now();
                                     genText = await getModelResponse({
                                         modelId: modelId,
                                         messages: workingHistory,
@@ -284,6 +288,7 @@ export async function generateAllResponses(
                                         timeout: genOptions?.genTimeoutMs,
                                         retries: genOptions?.genRetries,
                                     });
+                                    totalApiCallMs += Date.now() - callStart;
                                 }
                                 if (!genText || genText.trim() === '') {
                                     throw new Error('Model returned an empty or whitespace-only response.');
@@ -319,6 +324,7 @@ export async function generateAllResponses(
                                         fixtureSource = 'final';
                                     }
                                     if (!genText) {
+                                        const callStart = Date.now();
                                         genText = await getModelResponse({
                                             modelId: modelId,
                                             messages: workingHistory,
@@ -328,6 +334,7 @@ export async function generateAllResponses(
                                             timeout: genOptions?.genTimeoutMs,
                                             retries: genOptions?.genRetries,
                                         });
+                                        totalApiCallMs += Date.now() - callStart;
                                     }
                                     if (!genText || genText.trim() === '') {
                                         throw new Error('Model returned an empty or whitespace-only response.');
@@ -405,7 +412,8 @@ export async function generateAllResponses(
                             generatedAssistantIndices,
                             generatedAssistantTexts,
                             fixtureUsed: fixtureUsed || undefined,
-                            fixtureSource
+                            fixtureSource,
+                            responseTimeMs: totalApiCallMs > 0 ? totalApiCallMs : undefined,
                         };
                         generatedCount++;
                         logger.info(`[PipelineService] Generated ${generatedCount}/${totalResponsesToGenerate} responses.`);

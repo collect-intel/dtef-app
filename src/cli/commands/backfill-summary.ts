@@ -192,6 +192,23 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                     }
                     // --- End "lite" coverage scores ---
 
+                    // Build timing summary from pipeline timing data if available
+                    const timing = (resultData as any).timing;
+                    let timingSummary: EnhancedRunInfo['timingSummary'] = undefined;
+                    if (timing?.phases) {
+                        const sorted = timing.perModelTiming?.length > 0
+                            ? [...timing.perModelTiming].sort((a: any, b: any) => b.avgMs - a.avgMs)
+                            : [];
+                        timingSummary = {
+                            totalDurationMs: timing.totalDurationMs,
+                            generationDurationMs: timing.phases.generation?.durationMs,
+                            evaluationDurationMs: timing.phases.evaluation?.durationMs,
+                            saveDurationMs: timing.phases.save?.durationMs,
+                            slowestModel: sorted.length > 0 ? { modelId: sorted[0].modelId, avgMs: sorted[0].avgMs } : undefined,
+                            fastestModel: sorted.length > 0 ? { modelId: sorted[sorted.length - 1].modelId, avgMs: sorted[sorted.length - 1].avgMs } : undefined,
+                        };
+                    }
+
                     processedRuns.push({
                         runLabel: resultData.runLabel,
                         timestamp: resultData.timestamp,
@@ -206,6 +223,7 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                         tags: resultData.config.tags,
                         models: resultData.effectiveModels,
                         promptIds: resultData.promptIds,
+                        timingSummary,
                     });
 
                     // Track the latest result data to use for top-level config metadata

@@ -302,6 +302,9 @@ export interface WevalResult {
     executiveSummary?: ExecutiveSummary;
     article?: WevalArticle;
 
+    /** Pipeline timing metrics (generation, evaluation, save phases + per-model stats) */
+    timing?: PipelineTimingMetrics;
+
     /** DTEF demographic evaluation metadata (present only for DTEF blueprints) */
     dtefMetadata?: DTEFResultMetadata;
 }
@@ -310,6 +313,37 @@ export interface WevalResult {
  * DTEF-specific metadata attached to evaluation results.
  * Contains demographic segment info and distribution prediction data.
  */
+/** Per-model aggregate response time statistics */
+export interface ModelTimingStats {
+    modelId: string;
+    callCount: number;
+    avgMs: number;
+    minMs: number;
+    maxMs: number;
+    medianMs: number;
+    p95Ms: number;
+    totalMs: number;
+    errorCount: number;
+}
+
+/** Pipeline timing metrics, embedded in WevalResult */
+export interface PipelineTimingMetrics {
+    totalDurationMs: number;
+    phases: {
+        generation: { durationMs: number; startedAt: string; completedAt: string };
+        evaluation: { durationMs: number; startedAt: string; completedAt: string };
+        evaluators?: Array<{ method: string; durationMs: number }>;
+        save: { durationMs: number; startedAt: string; completedAt: string };
+    };
+    perModelTiming: ModelTimingStats[];
+    apiCallStats: {
+        totalAttempted: number;
+        totalSucceeded: number;
+        totalFailed: number;
+        totalFromFixtures: number;
+    };
+}
+
 export interface DTEFResultMetadata {
     /** Survey ID this evaluation belongs to */
     surveyId: string;
@@ -465,4 +499,6 @@ export type ModelResponseDetail = {
     // Sequential generation metadata (when assistant:null placeholders are used)
     generatedAssistantIndices?: number[];
     generatedAssistantTexts?: string[];
+    // Total API call time in milliseconds (excludes fixture responses)
+    responseTimeMs?: number;
 }; 

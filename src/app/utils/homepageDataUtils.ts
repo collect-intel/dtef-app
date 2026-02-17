@@ -42,6 +42,14 @@ export interface EnhancedRunInfo {
   allCoverageScores?: AllCoverageScores | null;
   models?: string[];
   promptIds?: string[];
+  timingSummary?: {
+    totalDurationMs: number;
+    generationDurationMs: number;
+    evaluationDurationMs: number;
+    saveDurationMs: number;
+    slowestModel?: { modelId: string; avgMs: number };
+    fastestModel?: { modelId: string; avgMs: number };
+  };
 }
 
 export interface EnhancedComparisonConfigInfo {

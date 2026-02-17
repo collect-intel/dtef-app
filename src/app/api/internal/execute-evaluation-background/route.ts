@@ -86,6 +86,7 @@ async function runPipeline(requestPayload: any) {
 
   logger.info(`Executing pipeline with evalMethods: ${evalMethods.join(', ')} and cache enabled.`);
 
+  const pipelineStartMs = Date.now();
   const pipelineConfig = { ...config, models: modelIdsToRun };
   const { fileName } = await executeComparisonPipeline(
     pipelineConfig,
@@ -97,6 +98,8 @@ async function runPipeline(requestPayload: any) {
     useCache,
     commitSha
   );
+  const pipelineDurationMs = Date.now() - pipelineStartMs;
+  logger.info(`Pipeline completed for ${currentId} in ${Math.round(pipelineDurationMs / 1000)}s`);
 
   let newResultData: FetchedComparisonData | null = null;
 

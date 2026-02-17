@@ -1,6 +1,6 @@
 import { getConfig } from '../config';
 import { ComparisonConfig, EvaluationMethod, PromptResponseData, EvaluationInput, FinalComparisonOutputV2, Evaluator, IDEAL_MODEL_ID } from '../types/cli_types';
-import { ConversationMessage } from '@/types/shared';
+import { ConversationMessage, PipelineTimingMetrics, ModelTimingStats } from '@/types/shared';
 import { EmbeddingEvaluator } from '@/cli/evaluators/embedding-evaluator';
 import { LLMCoverageEvaluator } from '@/cli/evaluators/llm-coverage-evaluator';
 import { saveResult as saveResultToStorage } from '@/lib/storageService';
@@ -31,6 +31,7 @@ async function aggregateAndSaveResults(
     noSave?: boolean,
     generationApproach?: any,
     customBasePath?: string,
+    timing?: PipelineTimingMetrics,
 ): Promise<{ data: FinalComparisonOutputV2, fileName: string | null }> {
     logger.info('[PipelineService] Aggregating results...');
     logger.info(`[PipelineService] Received blueprint ID for saving: '${config.id}'`);
@@ -138,6 +139,10 @@ async function aggregateAndSaveResults(
         (finalOutput as any).generationApproach = generationApproach;
     }
 
+    if (timing) {
+        finalOutput.timing = timing;
+    }
+
     // Optionally generate executive summary
     if (skipExecutiveSummary) {
         if (requireExecutiveSummary) {
@@ -179,6 +184,77 @@ async function aggregateAndSaveResults(
 }
 
 /**
+ * Compute per-model timing stats from response data.
+ */
+function computePerModelTiming(allResponsesMap: Map<string, PromptResponseData>): ModelTimingStats[] {
+    const timingByModel = new Map<string, { times: number[]; errorCount: number }>();
+
+    for (const promptData of allResponsesMap.values()) {
+        for (const [effectiveModelId, responseData] of Object.entries(promptData.modelResponses)) {
+            // Extract base model ID (strip [temp:...][sp_idx:...] suffixes)
+            const baseModelId = effectiveModelId.replace(/\[.*$/, '');
+            if (!timingByModel.has(baseModelId)) {
+                timingByModel.set(baseModelId, { times: [], errorCount: 0 });
+            }
+            const entry = timingByModel.get(baseModelId)!;
+            if (responseData.responseTimeMs && responseData.responseTimeMs > 0) {
+                entry.times.push(responseData.responseTimeMs);
+            }
+            if (responseData.hasError) {
+                entry.errorCount++;
+            }
+        }
+    }
+
+    const stats: ModelTimingStats[] = [];
+    for (const [modelId, data] of timingByModel.entries()) {
+        if (data.times.length === 0) continue;
+        const sorted = [...data.times].sort((a, b) => a - b);
+        const total = sorted.reduce((s, v) => s + v, 0);
+        const p95Idx = Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1);
+        const medianIdx = Math.floor(sorted.length / 2);
+        stats.push({
+            modelId,
+            callCount: sorted.length,
+            avgMs: Math.round(total / sorted.length),
+            minMs: sorted[0],
+            maxMs: sorted[sorted.length - 1],
+            medianMs: sorted[medianIdx],
+            p95Ms: sorted[p95Idx],
+            totalMs: total,
+            errorCount: data.errorCount,
+        });
+    }
+
+    return stats.sort((a, b) => b.avgMs - a.avgMs);
+}
+
+/**
+ * Compute API call stats from response data.
+ */
+function computeApiCallStats(allResponsesMap: Map<string, PromptResponseData>): PipelineTimingMetrics['apiCallStats'] {
+    let totalAttempted = 0;
+    let totalSucceeded = 0;
+    let totalFailed = 0;
+    let totalFromFixtures = 0;
+
+    for (const promptData of allResponsesMap.values()) {
+        for (const responseData of Object.values(promptData.modelResponses)) {
+            totalAttempted++;
+            if (responseData.fixtureUsed) {
+                totalFromFixtures++;
+            } else if (responseData.hasError) {
+                totalFailed++;
+            } else {
+                totalSucceeded++;
+            }
+        }
+    }
+
+    return { totalAttempted, totalSucceeded, totalFailed, totalFromFixtures };
+}
+
+/**
  * Main service function to execute the full comparison pipeline.
  * @param config - The comparison configuration.
  * @param runLabel - The label for the current run.
@@ -211,8 +287,11 @@ export async function executeComparisonPipeline(
     customBasePath?: string,
 ): Promise<{ data: FinalComparisonOutputV2, fileName: string | null }> {
     logger.info(`[PipelineService] Starting comparison pipeline for configId: '${config.id || config.configId}' runLabel: '${runLabel}'`);
-    
+    const pipelineStartMs = Date.now();
+
     // Step 0: If consumer:* models exist and no existingResponsesMap provided, collect consumer responses first, then generate API ones
+    const generationStartedAt = new Date().toISOString();
+    const generationStartMs = Date.now();
     let allResponsesMap: Map<string, PromptResponseData>;
     if (existingResponsesMap) {
         allResponsesMap = existingResponsesMap;
@@ -382,6 +461,9 @@ export async function executeComparisonPipeline(
         }
     }
     
+    const generationDurationMs = Date.now() - generationStartMs;
+    const generationCompletedAt = new Date().toISOString();
+
     // Step 2: Prepare for evaluation
     const evaluationInputs: EvaluationInput[] = [];
 
@@ -412,8 +494,13 @@ export async function executeComparisonPipeline(
         extractedKeyPoints: {}
     };
 
+    const evaluationStartedAt = new Date().toISOString();
+    const evaluationStartMs = Date.now();
+    const evaluatorTimings: Array<{ method: string; durationMs: number }> = [];
+
     for (const evaluator of chosenEvaluators) {
         logger.info(`[PipelineService] --- Running ${evaluator.getMethodName()} evaluator ---`);
+        const evalStartMs = Date.now();
         let inputsForThisEvaluator = evaluationInputs;
         if (evaluator.getMethodName() === 'llm-coverage' && prefilledCoverage) {
             // Filter out models that already have prefilled coverage
@@ -454,7 +541,8 @@ export async function executeComparisonPipeline(
             (results as any).llmCoverageScores = dest;
         }
         combinedEvaluationResults = { ...combinedEvaluationResults, ...results };
-        logger.info(`[PipelineService] --- Finished ${evaluator.getMethodName()} evaluator ---`);
+        evaluatorTimings.push({ method: evaluator.getMethodName(), durationMs: Date.now() - evalStartMs });
+        logger.info(`[PipelineService] --- Finished ${evaluator.getMethodName()} evaluator (${Math.round((Date.now() - evalStartMs) / 1000)}s) ---`);
         
         // Early validation: Check if embedding evaluation failed completely
         if (evaluator.getMethodName() === 'embedding' && results.perPromptSimilarities) {
@@ -490,8 +578,30 @@ export async function executeComparisonPipeline(
         }
     }
 
+    const evaluationDurationMs = Date.now() - evaluationStartMs;
+    const evaluationCompletedAt = new Date().toISOString();
+
     // Step 4: Aggregate and save results
+    const saveStartedAt = new Date().toISOString();
+    const saveStartMs = Date.now();
     const genApproach = (config as any).__generationApproach || undefined;
+
+    // Compute timing metrics
+    const perModelTiming = computePerModelTiming(allResponsesMap);
+    const apiCallStats = computeApiCallStats(allResponsesMap);
+
+    const pipelineTiming: PipelineTimingMetrics = {
+        totalDurationMs: 0, // will be set after save
+        phases: {
+            generation: { durationMs: generationDurationMs, startedAt: generationStartedAt, completedAt: generationCompletedAt },
+            evaluation: { durationMs: evaluationDurationMs, startedAt: evaluationStartedAt, completedAt: evaluationCompletedAt },
+            evaluators: evaluatorTimings.length > 0 ? evaluatorTimings : undefined,
+            save: { durationMs: 0, startedAt: saveStartedAt, completedAt: '' }, // will be set after save
+        },
+        perModelTiming,
+        apiCallStats,
+    };
+
     const finalResult = await aggregateAndSaveResults(
         config,
         runLabel,
@@ -506,7 +616,21 @@ export async function executeComparisonPipeline(
         noSave,
         genApproach,
         customBasePath,
+        pipelineTiming,
     );
+
+    // Finalize timing (save phase + total)
+    const saveDurationMs = Date.now() - saveStartMs;
+    const saveCompletedAt = new Date().toISOString();
+    const totalDurationMs = Date.now() - pipelineStartMs;
+
+    if (finalResult.data.timing) {
+        finalResult.data.timing.phases.save.durationMs = saveDurationMs;
+        finalResult.data.timing.phases.save.completedAt = saveCompletedAt;
+        finalResult.data.timing.totalDurationMs = totalDurationMs;
+    }
+
+    logger.info(`[PipelineService] Pipeline timing: total=${Math.round(totalDurationMs / 1000)}s, generation=${Math.round(generationDurationMs / 1000)}s, evaluation=${Math.round(evaluationDurationMs / 1000)}s, save=${Math.round(saveDurationMs / 1000)}s`);
     logger.info(`[PipelineService] executeComparisonPipeline finished successfully. Results at: ${finalResult.fileName}`);
     return finalResult;
 }

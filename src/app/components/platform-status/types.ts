@@ -49,11 +49,49 @@ export interface QueueStatus {
   uptimeSeconds: number;
 }
 
+export interface TimingRunPoint {
+  timestamp: string;
+  configId: string;
+  configTitle?: string;
+  totalDurationMs: number;
+  generationDurationMs: number;
+  evaluationDurationMs: number;
+  saveDurationMs: number;
+  slowestModel?: { modelId: string; avgMs: number };
+  fastestModel?: { modelId: string; avgMs: number };
+}
+
+export interface ModelSpeedEntry {
+  modelId: string;
+  avgMs: number;
+  appearances: number;
+  wasSlowest: number;
+  wasFastest: number;
+}
+
+export interface TimingStats {
+  runsWithTiming: number;
+  totalRuns: number;
+  avgDurationMs: number;
+  medianDurationMs: number;
+  totalTimeSpentMs: number;
+  avgGenerationPct: number;
+  avgEvaluationPct: number;
+  avgSavePct: number;
+}
+
+export interface TimingInsights {
+  runs: TimingRunPoint[];
+  modelSpeeds: ModelSpeedEntry[];
+  stats: TimingStats;
+}
+
 export interface PlatformStatusResponse {
   blueprints: BlueprintStatusItem[];
   summaryFiles: SummaryFileItem[];
   stats: ProgressStats;
   queue: QueueStatus;
+  timingInsights: TimingInsights | null;
   generatedAt: string;
   errors: string[];
 }
