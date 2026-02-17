@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NavigationEvents } from '@/app/components/NavigationEvents';
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://dtef-app-production.up.railway.app'),
   title: 'DTEF',
   description: 'Digital Twin Evaluation Framework - measuring AI alignment with human perspectives.',
 };
