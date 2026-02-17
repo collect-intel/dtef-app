@@ -25,7 +25,7 @@ const KNOWN_SUMMARY_FILES: Record<string, CoreFileInfo> = {
     description: 'Most recent evaluation runs across all models and blueprints.',
     pageLinks: [{ label: 'Homepage', href: '/' }, { label: 'Latest Runs', href: '/latest' }],
   },
-  'live/aggregates/regressions_summary.json': {
+  'live/aggregates/regressions-summary.json': {
     name: 'Regressions Summary',
     description: 'Tracks model performance regressions and improvements across versions, grouped by maker and tier.',
     pageLinks: [{ label: 'Regressions', href: '/regressions' }],
