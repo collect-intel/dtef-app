@@ -28,6 +28,16 @@ let backfillFn: (() => Promise<void>) | null = null;
 let backfillRunning = false;
 let completionsSinceLastBackfill = 0;
 
+// Lifetime stats (since process start)
+let totalEnqueued = 0;
+let totalCompleted = 0;
+let totalFailed = 0;
+let lastCompletedId: string | null = null;
+let lastCompletedAt: number | null = null;
+let lastFailedId: string | null = null;
+let lastFailedAt: number | null = null;
+const processStartedAt = Date.now();
+
 function processNext() {
   while (active < MAX_CONCURRENT && queue.length > 0) {
     const item = queue.shift()!;
@@ -35,7 +45,16 @@ function processNext() {
     const waitTime = Date.now() - item.enqueuedAt;
     console.log(`[eval-queue] Starting ${item.id} (waited ${Math.round(waitTime / 1000)}s, active: ${active}, queued: ${queue.length})`);
 
-    item.fn().finally(() => {
+    item.fn().then(() => {
+      totalCompleted++;
+      lastCompletedId = item.id;
+      lastCompletedAt = Date.now();
+    }).catch((err) => {
+      totalFailed++;
+      lastFailedId = item.id;
+      lastFailedAt = Date.now();
+      console.error(`[eval-queue] Eval failed for ${item.id}:`, err?.message || err);
+    }).finally(() => {
       active--;
       completionsSinceLastBackfill++;
       console.log(`[eval-queue] Finished ${item.id} (active: ${active}, queued: ${queue.length}, since backfill: ${completionsSinceLastBackfill})`);
@@ -111,6 +130,7 @@ export function registerBackfillHandler(fn: () => Promise<void>) {
  */
 export function enqueueEvaluation(id: string, fn: () => Promise<void>): { position: number; queueLength: number } {
   queue.push({ id, fn, enqueuedAt: Date.now() });
+  totalEnqueued++;
   const position = queue.length;
   console.log(`[eval-queue] Enqueued ${id} (position: ${position}, active: ${active})`);
   processNext();
@@ -118,8 +138,21 @@ export function enqueueEvaluation(id: string, fn: () => Promise<void>): { positi
 }
 
 /**
- * Get current queue status.
+ * Get current queue status including lifetime stats.
  */
-export function getQueueStatus(): { active: number; queued: number; completionsSinceBackfill: number } {
-  return { active, queued: queue.length, completionsSinceBackfill: completionsSinceLastBackfill };
+export function getQueueStatus() {
+  return {
+    active,
+    queued: queue.length,
+    completionsSinceBackfill: completionsSinceLastBackfill,
+    totalEnqueued,
+    totalCompleted,
+    totalFailed,
+    lastCompletedId,
+    lastCompletedAt: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
+    lastFailedId,
+    lastFailedAt: lastFailedAt ? new Date(lastFailedAt).toISOString() : null,
+    processStartedAt: new Date(processStartedAt).toISOString(),
+    uptimeSeconds: Math.round((Date.now() - processStartedAt) / 1000),
+  };
 }

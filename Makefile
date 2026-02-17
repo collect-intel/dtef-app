@@ -15,7 +15,7 @@ APP_URL := $(or $(APP_URL),http://localhost:3172)
 S3_BUCKET := collect-intel-dtef
 S3_REGION := us-east-1
 
-.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch backfill-summary dev build test test-infra \
+.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest
 
 help: ## Show available commands
@@ -49,6 +49,21 @@ rerun-evals-force: ## Force rerun ALL periodic evaluations (ignores freshness ch
 		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
 		-d '{"force": true}' \
 		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
+
+queue-status: ## Check evaluation queue status (active, queued, completed, failures)
+	@curl -s "$(APP_URL)/api/internal/queue-status" \
+		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
+		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
+
+queue-watch: ## Watch queue status (refreshes every 15s, ctrl-c to stop)
+	@echo "Watching evaluation queue (every 15s)..."
+	@while true; do \
+		echo "------- $$(date) -------"; \
+		curl -s "$(APP_URL)/api/internal/queue-status" \
+			-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
+			| python3 -c "import json,sys; d=json.load(sys.stdin); print(f'Active: {d[\"active\"]}  Queued: {d[\"queued\"]}  Completed: {d[\"totalCompleted\"]}  Failed: {d[\"totalFailed\"]}  Enqueued: {d[\"totalEnqueued\"]}  Uptime: {d[\"uptimeSeconds\"]}s'); print(f'Last completed: {d[\"lastCompletedId\"] or \"(none)\"} at {d[\"lastCompletedAt\"] or \"(never)\"}'); print(f'Last failed: {d[\"lastFailedId\"] or \"(none)\"} at {d[\"lastFailedAt\"] or \"(never)\"}')" 2>/dev/null || echo "(no response)"; \
+		sleep 15; \
+	done
 
 # --- S3 ---
 
