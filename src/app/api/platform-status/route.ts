@@ -50,11 +50,6 @@ const KNOWN_SUMMARY_FILES: Record<string, CoreFileInfo> = {
     description: 'Aggregated evaluation pain points and common failure patterns across models.',
     pageLinks: [],
   },
-  'live/models/ndeltas/manifest.json': {
-    name: 'N-Deltas Manifest',
-    description: 'Manifest for n-delta model comparison metrics. Currently CLI-only, not exposed in UI.',
-    pageLinks: [],
-  },
 };
 
 // Pattern-based classification for files not in the known list
