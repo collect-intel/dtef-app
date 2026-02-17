@@ -132,6 +132,34 @@ export interface DemographicAggregation {
 }
 
 /**
+ * Normalize segment IDs and labels that vary across data sources.
+ * E.g. GD1-2 use "Turkey" while GD3+ use "Türkiye" — standardize to US English.
+ */
+const SEGMENT_LABEL_ALIASES: Record<string, string> = {
+    'Türkiye': 'Turkey',
+};
+
+const SEGMENT_ID_ALIASES: Record<string, string> = {
+    'country:t-rkiye': 'country:turkey',
+};
+
+function normalizeSegmentId(id: string): string {
+    return SEGMENT_ID_ALIASES[id] ?? id;
+}
+
+function normalizeSegmentLabel(label: string): string {
+    return SEGMENT_LABEL_ALIASES[label] ?? label;
+}
+
+function normalizeSegmentAttributes(attrs: Record<string, string>): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const [k, v] of Object.entries(attrs)) {
+        result[k] = SEGMENT_LABEL_ALIASES[v] ?? v;
+    }
+    return result;
+}
+
+/**
  * Aggregates DTEF evaluation results by demographic segment.
  */
 export class DemographicAggregationService {
@@ -147,6 +175,7 @@ export class DemographicAggregationService {
     /**
      * Extract DTEF metadata from a WevalResult.
      * Metadata can be in the config context (from blueprint) or in dtefMetadata (post-processing).
+     * Normalizes segment IDs/labels to handle cross-round inconsistencies.
      */
     static extractDTEFContext(result: WevalResult): {
         surveyId: string;
@@ -158,18 +187,20 @@ export class DemographicAggregationService {
         if (ctx) {
             return {
                 surveyId: ctx.surveyId,
-                segmentId: ctx.segmentId,
-                segmentLabel: ctx.segmentLabel || ctx.segmentId,
-                segmentAttributes: ctx.segmentAttributes || {},
+                segmentId: normalizeSegmentId(ctx.segmentId),
+                segmentLabel: normalizeSegmentLabel(ctx.segmentLabel || ctx.segmentId),
+                segmentAttributes: normalizeSegmentAttributes(ctx.segmentAttributes || {}),
             };
         }
 
         if (result.dtefMetadata) {
+            const rawId = result.dtefMetadata.segmentIds[0] || 'unknown';
+            const rawLabel = result.dtefMetadata.segmentLabels?.[0] || rawId;
             return {
                 surveyId: result.dtefMetadata.surveyId,
-                segmentId: result.dtefMetadata.segmentIds[0] || 'unknown',
-                segmentLabel: result.dtefMetadata.segmentLabels?.[0] || result.dtefMetadata.segmentIds[0] || 'unknown',
-                segmentAttributes: result.dtefMetadata.segmentAttributes || {},
+                segmentId: normalizeSegmentId(rawId),
+                segmentLabel: normalizeSegmentLabel(rawLabel),
+                segmentAttributes: normalizeSegmentAttributes(result.dtefMetadata.segmentAttributes || {}),
             };
         }
 
