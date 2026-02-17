@@ -30,26 +30,21 @@ export async function POST(req: NextRequest) {
   const logger = await getLogger('schedule-evals:cron');
   logger.info(`Function triggered (${new Date().toISOString()})`);
 
-  // Parse request body for force, limit, and all flags
+  // Parse request body for force and limit flags
   let force = false;
-  let all = false;
   let limit = 0; // 0 = no limit
   try {
     const body = await req.json();
     force = body?.force === true;
-    all = body?.all === true;
     if (typeof body?.limit === 'number' && body.limit > 0) {
       limit = body.limit;
     }
   } catch {
-    // No body or invalid JSON — defaults
+    // No body or invalid JSON — not forced
   }
 
   if (force) {
     logger.info('Force mode enabled — skipping freshness checks');
-  }
-  if (all) {
-    logger.info('All mode enabled — ignoring _periodic tag requirement');
   }
   if (limit > 0) {
     logger.info(`Batch limit: ${limit} evaluations`);
@@ -153,7 +148,7 @@ export async function POST(req: NextRequest) {
           config.title = config.id;
         }
 
-        if (!all && (!config.tags || !config.tags.includes('_periodic'))) {
+        if (!config.tags || !config.tags.includes('_periodic')) {
           logger.info(`Blueprint ${config.id} does not have '_periodic' tag. Skipping.`);
           continue;
         }
@@ -247,7 +242,6 @@ export async function POST(req: NextRequest) {
       skippedFresh,
       total: filesInBlueprintDir.length,
       ...(limit > 0 ? { limit } : {}),
-      ...(all ? { all: true } : {}),
     });
   } catch (error: any) {
     logger.error('Error in handler', error);
