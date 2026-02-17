@@ -35,10 +35,25 @@ export interface ProgressStats {
   unidentifiedFiles: number;
 }
 
+export interface QueueStatus {
+  active: number;
+  queued: number;
+  totalEnqueued: number;
+  totalCompleted: number;
+  totalFailed: number;
+  lastCompletedId: string | null;
+  lastCompletedAt: string | null;
+  lastFailedId: string | null;
+  lastFailedAt: string | null;
+  processStartedAt: string;
+  uptimeSeconds: number;
+}
+
 export interface PlatformStatusResponse {
   blueprints: BlueprintStatusItem[];
   summaryFiles: SummaryFileItem[];
   stats: ProgressStats;
+  queue: QueueStatus;
   generatedAt: string;
   errors: string[];
 }

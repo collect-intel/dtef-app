@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem } from './types';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus } from './types';
 
 // --- Helpers ---
 
@@ -376,6 +376,87 @@ function SummaryFilesSection({ files }: { files: SummaryFileItem[] }) {
     );
 }
 
+// --- Queue status banner ---
+
+function formatDuration(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+}
+
+function QueueStatusBanner({ queue }: { queue: QueueStatus }) {
+    const isActive = queue.active > 0 || queue.queued > 0;
+    const hasHistory = queue.totalEnqueued > 0;
+
+    if (!isActive && !hasHistory) {
+        return (
+            <div className="bg-card border border-border/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/30" />
+                    Evaluation queue idle. No evaluations have been scheduled since the server started ({formatDuration(queue.uptimeSeconds)} ago).
+                </div>
+            </div>
+        );
+    }
+
+    if (!isActive && hasHistory) {
+        return (
+            <div className="bg-card border border-border/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                    Queue idle.
+                    {' '}{queue.totalCompleted} completed{queue.totalFailed > 0 ? `, ${queue.totalFailed} failed` : ''} since server start ({formatDuration(queue.uptimeSeconds)} ago).
+                    {queue.lastCompletedAt && (
+                        <> Last completed: <span className="font-mono text-xs">{queue.lastCompletedId}</span> {relativeTime(queue.lastCompletedAt)}.</>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // Active
+    const total = queue.totalCompleted + queue.totalFailed + queue.active + queue.queued;
+    const done = queue.totalCompleted + queue.totalFailed;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    return (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                Evaluations running
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                    <span className="text-muted-foreground">Active: </span>
+                    <span className="font-medium text-foreground">{queue.active}</span>
+                </div>
+                <div>
+                    <span className="text-muted-foreground">Queued: </span>
+                    <span className="font-medium text-foreground">{queue.queued}</span>
+                </div>
+                <div>
+                    <span className="text-muted-foreground">Completed: </span>
+                    <span className="font-medium text-green-600 dark:text-green-400">{queue.totalCompleted}</span>
+                </div>
+                <div>
+                    <span className="text-muted-foreground">Failed: </span>
+                    <span className={`font-medium ${queue.totalFailed > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{queue.totalFailed}</span>
+                </div>
+            </div>
+            {total > 0 && (
+                <div>
+                    <div className="bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{done} / {total} ({pct}%)</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // --- Main component ---
 
 export default function PlatformStatusDashboard() {
@@ -490,6 +571,9 @@ export default function PlatformStatusDashboard() {
                     </ul>
                 </div>
             )}
+
+            {/* Queue status */}
+            <QueueStatusBanner queue={data.queue} />
 
             {/* Overall stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

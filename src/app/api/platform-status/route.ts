@@ -5,7 +5,8 @@ import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
 import { getS3Client, getBucketName, getAllBlueprintsSummary, getHomepageSummary } from '@/lib/storageService';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats } from '@/app/components/platform-status/types';
+import { getQueueStatus } from '@/lib/evaluation-queue';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats, QueueStatus } from '@/app/components/platform-status/types';
 
 // Known summary files with metadata
 interface CoreFileInfo {
@@ -338,10 +339,13 @@ export async function GET() {
     unidentifiedFiles: unidentifiedCount,
   };
 
+  const queue = getQueueStatus() as QueueStatus;
+
   const response: PlatformStatusResponse = {
     blueprints,
     summaryFiles,
     stats,
+    queue,
     generatedAt: now.toISOString(),
     errors,
   };
