@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus } from './types';
 
 // --- Helpers ---
@@ -466,21 +466,35 @@ export default function PlatformStatusDashboard() {
     const [activeTab, setActiveTab] = useState<TabId>('with-runs');
     const [search, setSearch] = useState('');
 
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const response = await fetch('/api/platform-status');
-                if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-                const json = await response.json();
-                setData(json);
-            } catch (e: any) {
-                setError(e.message);
-            } finally {
-                setLoading(false);
-            }
+    const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchData = useCallback(async (isPolling = false) => {
+        try {
+            const response = await fetch('/api/platform-status');
+            if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+            const json = await response.json();
+            setData(json);
+            if (!isPolling) setError(null);
+        } catch (e: any) {
+            if (!isPolling) setError(e.message);
+        } finally {
+            if (!isPolling) setLoading(false);
         }
-        fetchData();
     }, []);
+
+    // Initial fetch
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Auto-poll every 10s when queue is active
+    useEffect(() => {
+        const queueActive = data?.queue && (data.queue.active > 0 || data.queue.queued > 0);
+        if (queueActive) {
+            pollRef.current = setInterval(() => fetchData(true), 10_000);
+        }
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [data?.queue?.active, data?.queue?.queued, fetchData]);
 
     // Filtered blueprint lists
     const withRuns = useMemo(() => {
