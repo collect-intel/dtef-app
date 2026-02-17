@@ -13,7 +13,7 @@
 
 const MAX_CONCURRENT = 10;
 const BACKFILL_DEBOUNCE_MS = 30_000; // 30s after last eval completes
-const BACKFILL_INTERVAL_COMPLETIONS = 25; // run backfill every N completions
+const BACKFILL_INTERVAL_COMPLETIONS = 100; // run backfill every N completions
 
 interface QueueItem {
   id: string;
