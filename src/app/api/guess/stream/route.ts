@@ -16,7 +16,7 @@ const THOROUGH_MODELS = [
     'openrouter:openai/gpt-4.1',
     'openrouter:openai/gpt-5',
     'openrouter:anthropic/claude-sonnet-4.5',
-    'openrouter:x-ai/grok-4-fast',
+    'openrouter:x-ai/grok-4.1-fast',
     'openrouter:mistralai/mistral-medium-3',
     'openrouter:deepseek/deepseek-r1',
     'openrouter:deepseek/deepseek-v3.2',
