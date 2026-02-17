@@ -13,7 +13,8 @@ import { resolveModelsInConfig } from '@/lib/blueprint-service';
 import { configure } from '@/cli/config';
 import { getLogger } from '@/utils/logger';
 import { captureError, setContext } from '@/utils/sentry';
-import { enqueueEvaluation, getQueueStatus, registerBackfillHandler } from '@/lib/evaluation-queue';
+import { enqueueEvaluation, getQueueStatus, registerBackfillHandler, registerQueueDrainedHandler } from '@/lib/evaluation-queue';
+import { callBackgroundFunction } from '@/lib/background-function-client';
 
 async function runPipeline(requestPayload: any) {
   const requestId = crypto.randomUUID();
@@ -141,6 +142,31 @@ export async function POST(req: NextRequest) {
   }
 
   const configId = body.config.id || 'unknown';
+
+  // Register auto-continuation: when the queue fully drains, re-trigger
+  // the scheduler to pick up any remaining unprocessed configs.
+  // This makes the system self-healing after OOM crashes or partial batches.
+  registerQueueDrainedHandler(async () => {
+    console.log('[eval-continuation] Queue drained. Auto-triggering scheduler for remaining configs...');
+    try {
+      const response = await callBackgroundFunction({
+        functionName: 'fetch-and-schedule-evals',
+        body: {},
+        timeout: 300_000, // 5 min — scheduler loops through all configs
+      });
+      if (response.ok) {
+        const data = response.data;
+        console.log(`[eval-continuation] Scheduler result: ${data?.scheduled || 0} scheduled, ${data?.skippedFresh || 0} skipped (fresh), ${data?.total || '?'} total`);
+        if (data?.scheduled === 0) {
+          console.log('[eval-continuation] All evaluations complete. No more configs need runs.');
+        }
+      } else {
+        console.error(`[eval-continuation] Scheduler returned error: ${response.error}`);
+      }
+    } catch (err: any) {
+      console.error(`[eval-continuation] Failed to call scheduler: ${err.message}`);
+    }
+  });
 
   // Enqueue with concurrency limiting
   const { position, queueLength } = enqueueEvaluation(configId, () =>

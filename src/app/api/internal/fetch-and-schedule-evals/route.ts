@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { checkBackgroundAuth } from '@/lib/background-function-auth';
 import { ComparisonConfig } from '@/cli/types/cli_types';
-import { generateConfigContentHash } from '@/lib/hash-utils';
 import { listRunsForConfig } from '@/lib/storageService';
 import { resolveModelsInConfig, SimpleLogger } from '@/lib/blueprint-service';
 import { parseAndNormalizeBlueprint, validateReservedPrefixes } from '@/lib/blueprint-parser';
@@ -101,6 +100,8 @@ export async function POST(req: NextRequest) {
     let skippedFresh = 0;
     let skippedNonPeriodic = 0;
     let skippedOther = 0;
+    let processed = 0;
+    const totalFiles = filesInBlueprintDir.length;
 
     for (const file of filesInBlueprintDir) {
       // Check batch limit
@@ -111,8 +112,6 @@ export async function POST(req: NextRequest) {
       const blueprintPath = file.path.startsWith('blueprints/')
         ? file.path.substring('blueprints/'.length)
         : file.path;
-
-      logger.info(`Processing config file: ${file.path} (path for ID: ${blueprintPath})`);
 
       try {
         const configFileResponse = await axios.get(file.url, { headers: rawContentHeaders });
@@ -135,7 +134,6 @@ export async function POST(req: NextRequest) {
         }
 
         const id = generateBlueprintIdFromPath(blueprintPath);
-        logger.info(`Derived ID from path '${blueprintPath}': '${id}'`);
 
         try {
           validateReservedPrefixes(id);
@@ -151,7 +149,6 @@ export async function POST(req: NextRequest) {
         }
 
         if (!config.tags || !config.tags.includes('_periodic')) {
-          logger.info(`Blueprint ${config.id} does not have '_periodic' tag. Skipping.`);
           skippedNonPeriodic++;
           continue;
         }
@@ -168,15 +165,11 @@ export async function POST(req: NextRequest) {
         const currentId = config.id!;
 
         config = await resolveModelsInConfig(config, githubToken, logger as any);
-        logger.info(`Models for ${currentId} after resolution: ${config.models.length}`);
 
         if (config.models.length === 0) {
           logger.warn(`Blueprint ${file.path} (id: ${currentId}) has no models after resolution. Skipping.`);
           continue;
         }
-
-        const contentHash = generateConfigContentHash(config);
-        const baseRunLabelForCheck = contentHash;
 
         const existingRuns = await listRunsForConfig(currentId);
         let needsRun = true;
@@ -184,22 +177,21 @@ export async function POST(req: NextRequest) {
         if (force) {
           logger.info(`Force mode: scheduling run for ${currentId} regardless of history.`);
         } else if (existingRuns && existingRuns.length > 0) {
-          const matchingExistingRuns = existingRuns.filter(run => run.runLabel === baseRunLabelForCheck);
-          if (matchingExistingRuns.length > 0) {
-            const latestMatchingRun = matchingExistingRuns[0];
-            if (latestMatchingRun.timestamp) {
-              const isoTimestamp = fromSafeTimestamp(latestMatchingRun.timestamp);
-              const runAge = Date.now() - new Date(isoTimestamp).getTime();
-              if (runAge < ONE_WEEK_IN_MS) {
-                logger.info(`Blueprint ${currentId} has a recent run. Skipping.`);
-                needsRun = false;
-                skippedFresh++;
-              } else {
-                logger.info(`Blueprint ${currentId} has an old run. Scheduling new run.`);
-              }
+          // Hash-agnostic freshness check: skip if ANY run is recent,
+          // regardless of content hash. This prevents re-running configs
+          // when model groups change (which changes the hash).
+          const latestRun = existingRuns[0]; // Already sorted newest-first
+          if (latestRun.timestamp) {
+            const isoTimestamp = fromSafeTimestamp(latestRun.timestamp);
+            const runAge = Date.now() - new Date(isoTimestamp).getTime();
+            if (runAge < ONE_WEEK_IN_MS) {
+              needsRun = false;
+              skippedFresh++;
+            } else {
+              logger.info(`Blueprint ${currentId}: latest run is ${Math.round(runAge / 86400000)}d old (hash: ${latestRun.runLabel}). Scheduling new run.`);
             }
           } else {
-            logger.info(`No existing run with hash ${contentHash} for ${currentId}. Scheduling new run.`);
+            logger.info(`Blueprint ${currentId} has runs but no valid timestamp. Scheduling new run.`);
           }
         } else {
           logger.info(`No existing runs for ${currentId}. Scheduling new run.`);
@@ -236,6 +228,12 @@ export async function POST(req: NextRequest) {
       } catch (fetchConfigError: any) {
         logger.error(`Error fetching or processing blueprint file ${file.path}: ${fetchConfigError?.message || fetchConfigError}`, fetchConfigError?.stack);
         captureError(fetchConfigError, { file: file.path });
+      }
+
+      processed++;
+      // Log progress every 100 configs
+      if (processed % 100 === 0) {
+        logger.info(`Progress: ${processed}/${totalFiles} configs processed (${scheduled} scheduled, ${skippedFresh} fresh, ${skippedNonPeriodic} non-periodic)`);
       }
     }
 

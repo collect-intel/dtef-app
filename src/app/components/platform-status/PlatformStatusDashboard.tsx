@@ -403,7 +403,7 @@ function QueueStatusBanner({ queue }: { queue: QueueStatus }) {
 
     if (!isActive && hasHistory) {
         return (
-            <div className="bg-card border border-border/50 rounded-lg p-4">
+            <div className="bg-card border border-border/50 rounded-lg p-4 space-y-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
                     Queue idle.
@@ -412,6 +412,7 @@ function QueueStatusBanner({ queue }: { queue: QueueStatus }) {
                         <> Last completed: <span className="font-mono text-xs">{queue.lastCompletedId}</span> {relativeTime(queue.lastCompletedAt)}.</>
                     )}
                 </div>
+                <p className="text-xs text-muted-foreground/70 pl-4">Auto-continuation enabled: scheduler will re-trigger in ~45s to check for remaining configs.</p>
             </div>
         );
     }
