@@ -12,6 +12,8 @@ export interface SummaryFileItem {
   name: string;
   path: string;
   expectedPurpose: string;
+  description?: string;
+  pageLinks?: { label: string; href: string }[];
   category: 'core' | 'discovered' | 'unidentified';
   found: boolean;
   lastModified?: string;

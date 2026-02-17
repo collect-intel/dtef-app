@@ -7,19 +7,69 @@ import { fromSafeTimestamp } from '@/lib/timestampUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats } from '@/app/components/platform-status/types';
 
-// Known summary files with their expected purpose
-const KNOWN_SUMMARY_FILES: Record<string, string> = {
-  'live/aggregates/homepage_summary.json': 'Homepage Summary',
-  'live/aggregates/latest_runs_summary.json': 'Latest Runs Summary',
-  'live/aggregates/regressions_summary.json': 'Regressions Summary',
-  'live/aggregates/all_blueprints_summary.json': 'All Blueprints Summary',
-  'live/aggregates/dtef_summary.json': 'DTEF Demographics Summary',
-  'live/aggregates/search-index.json': 'Search Index',
-  'live/aggregates/pain-points.json': 'Pain Points',
-  'live/aggregates/compass-index.json': 'Compass Index',
-  'live/aggregates/macro/index.json': 'Macro Canvas Index',
-  'live/models/ndeltas/manifest.json': 'N-Deltas Manifest',
-  'live/models/vibes/index.json': 'Vibes Index',
+// Known summary files with metadata
+interface CoreFileInfo {
+  name: string;
+  description: string;
+  pageLinks: { label: string; href: string }[];
+}
+
+const KNOWN_SUMMARY_FILES: Record<string, CoreFileInfo> = {
+  'live/aggregates/homepage_summary.json': {
+    name: 'Homepage Summary',
+    description: 'Aggregate stats, model drift indicators, featured blueprints, and leaderboard data for the main dashboard.',
+    pageLinks: [{ label: 'Homepage', href: '/' }],
+  },
+  'live/aggregates/latest_runs_summary.json': {
+    name: 'Latest Runs Summary',
+    description: 'Most recent evaluation runs across all models and blueprints.',
+    pageLinks: [{ label: 'Homepage', href: '/' }, { label: 'Latest Runs', href: '/latest' }],
+  },
+  'live/aggregates/regressions_summary.json': {
+    name: 'Regressions Summary',
+    description: 'Tracks model performance regressions and improvements across versions, grouped by maker and tier.',
+    pageLinks: [{ label: 'Regressions', href: '/regressions' }],
+  },
+  'live/aggregates/all_blueprints_summary.json': {
+    name: 'All Blueprints Summary',
+    description: 'Metadata for every blueprint config. Used as fallback for homepage and powers the browse/filter views.',
+    pageLinks: [{ label: 'All Models', href: '/all' }, { label: 'Model Cards', href: '/cards' }],
+  },
+  'live/aggregates/dtef_summary.json': {
+    name: 'DTEF Demographics Summary',
+    description: 'Aggregated demographic evaluation results showing model accuracy across demographic segments.',
+    pageLinks: [{ label: 'Demographics', href: '/demographics' }],
+  },
+  'live/aggregates/search-index.json': {
+    name: 'Search Index',
+    description: 'Full-text search index for blueprint configs and metadata, powered by Fuse.js.',
+    pageLinks: [{ label: 'Search (global)', href: '/api/search' }],
+  },
+  'live/aggregates/pain-points.json': {
+    name: 'Pain Points',
+    description: 'Aggregated evaluation pain points and common failure patterns across models.',
+    pageLinks: [],
+  },
+  'live/aggregates/compass-index.json': {
+    name: 'Compass Index',
+    description: 'Legacy weval feature for AI personality trait visualization. Deprecated.',
+    pageLinks: [{ label: 'Compass (deprecated)', href: '/compass' }],
+  },
+  'live/aggregates/macro/index.json': {
+    name: 'Macro Canvas Index',
+    description: 'Legacy tiled macro canvas index. Deprecated in favor of flat storage.',
+    pageLinks: [{ label: 'Macro (deprecated)', href: '/experiments/macro' }],
+  },
+  'live/models/ndeltas/manifest.json': {
+    name: 'N-Deltas Manifest',
+    description: 'Manifest for n-delta model comparison metrics. Currently CLI-only, not exposed in UI.',
+    pageLinks: [],
+  },
+  'live/models/vibes/index.json': {
+    name: 'Vibes Index',
+    description: 'Legacy weval feature for model similarity visualization. Deprecated.',
+    pageLinks: [{ label: 'Vibes (deprecated)', href: '/vibes' }],
+  },
 };
 
 // Pattern-based classification for files not in the known list
@@ -224,12 +274,14 @@ export async function GET() {
   const summaryFiles: SummaryFileItem[] = [];
 
   // Check known expected files
-  for (const [filePath, purpose] of Object.entries(KNOWN_SUMMARY_FILES)) {
+  for (const [filePath, info] of Object.entries(KNOWN_SUMMARY_FILES)) {
     const s3File = s3FileMap.get(filePath);
     summaryFiles.push({
-      name: purpose,
+      name: info.name,
       path: filePath,
-      expectedPurpose: purpose,
+      expectedPurpose: info.name,
+      description: info.description,
+      pageLinks: info.pageLinks,
       category: 'core',
       found: !!s3File,
       lastModified: s3File?.lastModified?.toISOString(),
