@@ -226,7 +226,9 @@ async function runBlueprintEvaluation(
 
     const modelIds = config.models?.map((m: any) => typeof m === 'string' ? m : m.id) || [];
     const runLabel = blueprintInfo.contentHash;
-    const evalMethods: EvaluationMethod[] = ['embedding', 'llm-coverage'];
+    // Embedding eval disabled — contributes 0% to hybrid score, adds log noise + API calls.
+    // To re-enable: ['embedding', 'llm-coverage']
+    const evalMethods: EvaluationMethod[] = ['llm-coverage'];
 
     logger.info(`  Models: ${modelIds.length}, Prompts: ${config.prompts?.length || 0}`);
 

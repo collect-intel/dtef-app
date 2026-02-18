@@ -81,7 +81,9 @@ async function runPipeline(requestPayload: any) {
     logger.info(`Received commit SHA: ${commitSha}`);
   }
 
-  const evalMethods: EvaluationMethod[] = ['embedding', 'llm-coverage'];
+  // Embedding eval disabled — contributes 0% to hybrid score, adds log noise + API calls.
+  // To re-enable: ['embedding', 'llm-coverage']
+  const evalMethods: EvaluationMethod[] = ['llm-coverage'];
   const useCache = true;
 
   logger.info(`Executing pipeline with evalMethods: ${evalMethods.join(', ')} and cache enabled.`);
