@@ -49,6 +49,7 @@ export interface EnhancedRunInfo {
     saveDurationMs: number;
     slowestModel?: { modelId: string; avgMs: number };
     fastestModel?: { modelId: string; avgMs: number };
+    perModelTiming?: { modelId: string; avgMs: number; callCount: number; medianMs: number; p95Ms: number; errorCount: number }[];
   };
 }
 
@@ -61,6 +62,7 @@ export interface EnhancedComparisonConfigInfo {
   author?: string | { name: string; url?: string; image_url?: string };
   reference?: string | { title: string; url?: string };
   runs: EnhancedRunInfo[];
+  totalRunCount?: number;
   latestRunTimestamp: string;
   overallAverageHybridScore?: number | null;
   hybridScoreStdDev?: number | null;

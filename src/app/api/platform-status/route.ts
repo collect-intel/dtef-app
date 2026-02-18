@@ -153,35 +153,69 @@ function computeTimingInsights(runs: LatestRunSummaryItem[]): TimingInsights | n
     };
   });
 
-  // Aggregate model speeds
-  const modelMap = new Map<string, { totalMs: number; count: number; slowest: number; fastest: number }>();
+  // Aggregate model speeds from perModelTiming (full data) with fallback to slowest/fastest
+  const modelMap = new Map<string, { totalMs: number; totalCalls: number; allAvgs: number[]; allMedians: number[]; allP95s: number[]; runs: number; slowest: number; fastest: number; errors: number }>();
+
   for (const r of timedRuns) {
     const ts = r.timingSummary!;
-    if (ts.slowestModel) {
-      const entry = modelMap.get(ts.slowestModel.modelId) || { totalMs: 0, count: 0, slowest: 0, fastest: 0 };
-      entry.totalMs += ts.slowestModel.avgMs;
-      entry.count++;
-      entry.slowest++;
-      modelMap.set(ts.slowestModel.modelId, entry);
-    }
-    if (ts.fastestModel) {
-      const entry = modelMap.get(ts.fastestModel.modelId) || { totalMs: 0, count: 0, slowest: 0, fastest: 0 };
-      // Only add to totalMs/count if this model wasn't already counted as slowest in same run
-      if (!ts.slowestModel || ts.fastestModel.modelId !== ts.slowestModel.modelId) {
-        entry.totalMs += ts.fastestModel.avgMs;
-        entry.count++;
+
+    if (ts.perModelTiming && ts.perModelTiming.length > 0) {
+      // Rich per-model data available
+      const sorted = [...ts.perModelTiming].sort((a: any, b: any) => b.avgMs - a.avgMs);
+      const slowestId = sorted[0]?.modelId;
+      const fastestId = sorted[sorted.length - 1]?.modelId;
+
+      for (const m of ts.perModelTiming) {
+        const entry = modelMap.get(m.modelId) || { totalMs: 0, totalCalls: 0, allAvgs: [], allMedians: [], allP95s: [], runs: 0, slowest: 0, fastest: 0, errors: 0 };
+        entry.totalMs += m.avgMs * (m.callCount || 1);
+        entry.totalCalls += m.callCount || 1;
+        entry.allAvgs.push(m.avgMs);
+        if (m.medianMs) entry.allMedians.push(m.medianMs);
+        if (m.p95Ms) entry.allP95s.push(m.p95Ms);
+        entry.runs++;
+        entry.errors += m.errorCount || 0;
+        if (m.modelId === slowestId) entry.slowest++;
+        if (m.modelId === fastestId) entry.fastest++;
+        modelMap.set(m.modelId, entry);
       }
-      entry.fastest++;
-      modelMap.set(ts.fastestModel.modelId, entry);
+    } else {
+      // Fallback: only slowest/fastest available
+      if (ts.slowestModel) {
+        const entry = modelMap.get(ts.slowestModel.modelId) || { totalMs: 0, totalCalls: 0, allAvgs: [], allMedians: [], allP95s: [], runs: 0, slowest: 0, fastest: 0, errors: 0 };
+        entry.allAvgs.push(ts.slowestModel.avgMs);
+        entry.runs++;
+        entry.slowest++;
+        modelMap.set(ts.slowestModel.modelId, entry);
+      }
+      if (ts.fastestModel && (!ts.slowestModel || ts.fastestModel.modelId !== ts.slowestModel.modelId)) {
+        const entry = modelMap.get(ts.fastestModel.modelId) || { totalMs: 0, totalCalls: 0, allAvgs: [], allMedians: [], allP95s: [], runs: 0, slowest: 0, fastest: 0, errors: 0 };
+        entry.allAvgs.push(ts.fastestModel.avgMs);
+        entry.runs++;
+        entry.fastest++;
+        modelMap.set(ts.fastestModel.modelId, entry);
+      }
     }
   }
-  const modelSpeeds: ModelSpeedEntry[] = Array.from(modelMap.entries()).map(([modelId, data]) => ({
-    modelId,
-    avgMs: data.count > 0 ? Math.round(data.totalMs / data.count) : 0,
-    appearances: data.count,
-    wasSlowest: data.slowest,
-    wasFastest: data.fastest,
-  }));
+
+  const modelSpeeds: ModelSpeedEntry[] = Array.from(modelMap.entries()).map(([modelId, data]) => {
+    const avgOfAvgs = data.allAvgs.length > 0 ? Math.round(data.allAvgs.reduce((s, v) => s + v, 0) / data.allAvgs.length) : 0;
+    const medianOfMedians = data.allMedians.length > 0
+      ? Math.round(data.allMedians.sort((a, b) => a - b)[Math.floor(data.allMedians.length / 2)])
+      : avgOfAvgs;
+    const avgP95 = data.allP95s.length > 0 ? Math.round(data.allP95s.reduce((s, v) => s + v, 0) / data.allP95s.length) : avgOfAvgs;
+
+    return {
+      modelId,
+      avgMs: avgOfAvgs,
+      medianMs: medianOfMedians,
+      p95Ms: avgP95,
+      totalCalls: data.totalCalls,
+      appearances: data.runs,
+      wasSlowest: data.slowest,
+      wasFastest: data.fastest,
+      errorCount: data.errors,
+    };
+  });
 
   // Compute stats
   const durations = runPoints.map(r => r.totalDurationMs);
@@ -252,7 +286,7 @@ export async function GET() {
         const validLastRun = lastRun && new Date(lastRun).getTime() > 86400000 ? lastRun : null;
         s3ConfigMap.set(config.configId, {
           title: config.configTitle || config.title,
-          runCount: config.runs?.length || 0,
+          runCount: config.totalRunCount || config.runs?.length || 0,
           lastRun: validLastRun,
           tags: config.tags,
         });

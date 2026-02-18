@@ -64,9 +64,13 @@ export interface TimingRunPoint {
 export interface ModelSpeedEntry {
   modelId: string;
   avgMs: number;
-  appearances: number;
+  medianMs: number;
+  p95Ms: number;
+  totalCalls: number;
+  appearances: number; // number of runs this model appeared in
   wasSlowest: number;
   wasFastest: number;
+  errorCount: number;
 }
 
 export interface TimingStats {

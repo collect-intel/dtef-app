@@ -236,7 +236,7 @@ function BlueprintTable({ items, defaultSortKey, defaultSortDir }: {
                                     )}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-right text-muted-foreground tabular-nums">
-                                    {item.runCount > 1 ? item.runCount : item.runCount === 1 ? '1+' : '0'}
+                                    {item.runCount || '0'}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-muted-foreground" title={item.lastRun || undefined}>
                                     {relativeTime(item.lastRun)}
@@ -586,7 +586,7 @@ function TimingChart({ runs }: { runs: TimingRunPoint[] }) {
 
 // --- Model speed table ---
 
-type ModelSpeedSortKey = 'modelId' | 'avgMs' | 'appearances' | 'wasSlowest' | 'wasFastest';
+type ModelSpeedSortKey = 'modelId' | 'avgMs' | 'medianMs' | 'p95Ms' | 'totalCalls' | 'appearances' | 'wasSlowest' | 'wasFastest';
 
 function ModelSpeedTable({ models }: { models: ModelSpeedEntry[] }) {
     const [sort, toggleSort] = useSort<ModelSpeedSortKey>('avgMs', 'desc');
@@ -595,6 +595,9 @@ function ModelSpeedTable({ models }: { models: ModelSpeedEntry[] }) {
         switch (key as ModelSpeedSortKey) {
             case 'modelId': return item.modelId;
             case 'avgMs': return item.avgMs;
+            case 'medianMs': return item.medianMs;
+            case 'p95Ms': return item.p95Ms;
+            case 'totalCalls': return item.totalCalls;
             case 'appearances': return item.appearances;
             case 'wasSlowest': return item.wasSlowest;
             case 'wasFastest': return item.wasFastest;
@@ -607,15 +610,18 @@ function ModelSpeedTable({ models }: { models: ModelSpeedEntry[] }) {
     return (
         <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border/50">
-                <h3 className="text-sm font-medium text-muted-foreground">Model Response Times</h3>
+                <h3 className="text-sm font-medium text-muted-foreground">Model Response Times (across {models.reduce((s, m) => s + m.appearances, 0)} runs)</h3>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
                             <SortableHeader label="Model" sortKey="modelId" current={sort} onSort={toggleSort} />
-                            <SortableHeader label="Avg Response" sortKey="avgMs" current={sort} onSort={toggleSort} align="right" />
-                            <SortableHeader label="Appearances" sortKey="appearances" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Avg" sortKey="avgMs" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Median" sortKey="medianMs" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="P95" sortKey="p95Ms" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="API Calls" sortKey="totalCalls" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Runs" sortKey="appearances" current={sort} onSort={toggleSort} align="right" />
                             <SortableHeader label="Slowest In" sortKey="wasSlowest" current={sort} onSort={toggleSort} align="right" />
                             <SortableHeader label="Fastest In" sortKey="wasFastest" current={sort} onSort={toggleSort} align="right" />
                         </tr>
@@ -623,8 +629,11 @@ function ModelSpeedTable({ models }: { models: ModelSpeedEntry[] }) {
                     <tbody>
                         {sorted.map(model => (
                             <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3 text-sm font-mono text-foreground">{model.modelId}</td>
+                                <td className="px-4 py-3 text-sm font-mono text-foreground">{model.modelId.replace(/^openrouter:/, '')}</td>
                                 <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatMs(model.avgMs)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatMs(model.medianMs)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatMs(model.p95Ms)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{model.totalCalls || '—'}</td>
                                 <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{model.appearances}</td>
                                 <td className="px-4 py-3 text-sm text-right tabular-nums">
                                     {model.wasSlowest > 0

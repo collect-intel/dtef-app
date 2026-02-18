@@ -206,6 +206,14 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                             saveDurationMs: timing.phases.save?.durationMs,
                             slowestModel: sorted.length > 0 ? { modelId: sorted[0].modelId, avgMs: sorted[0].avgMs } : undefined,
                             fastestModel: sorted.length > 0 ? { modelId: sorted[sorted.length - 1].modelId, avgMs: sorted[sorted.length - 1].avgMs } : undefined,
+                            perModelTiming: sorted.length > 0 ? sorted.map((m: any) => ({
+                                modelId: m.modelId,
+                                avgMs: m.avgMs,
+                                callCount: m.callCount,
+                                medianMs: m.medianMs,
+                                p95Ms: m.p95Ms,
+                                errorCount: m.errorCount || 0,
+                            })) : undefined,
                         };
                     }
 
@@ -262,6 +270,7 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
                     title: latestResultDataForConfig.configTitle || latestResultDataForConfig.config.title || configId,
                     description: latestResultDataForConfig.config?.description || '',
                     runs: processedRuns,
+                    totalRunCount: processedRuns.length,
                     latestRunTimestamp: processedRuns[0].timestamp,
                     tags: (() => {
                         // Combine manual config tags with auto tags from executive summary
