@@ -12,7 +12,6 @@ import { captureError, setContext } from '@/utils/sentry';
 import { callBackgroundFunction } from '@/lib/background-function-client';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
-import { generateConfigContentHash } from '@/lib/hash-utils';
 
 const GITHUB_API_BASE = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}`;
 const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
@@ -100,7 +99,6 @@ export async function POST(req: NextRequest) {
     let scheduled = 0;
     let skippedFresh = 0;
     let skippedNonPeriodic = 0;
-    let scheduledHashChanged = 0;
     let skippedOther = 0;
     let processed = 0;
     const totalFiles = filesInBlueprintDir.length;
@@ -173,30 +171,23 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Compute expected content hash for this config (with resolved models)
-        const modelIds = config.models.map((m: any) => (typeof m === 'string' ? m : m.id));
-        const expectedHash = generateConfigContentHash({ ...config, models: modelIds });
-
         const existingRuns = await listRunsForConfig(currentId);
         let needsRun = true;
 
         if (force) {
           logger.info(`Force mode: scheduling run for ${currentId} regardless of history.`);
         } else if (existingRuns && existingRuns.length > 0) {
+          // Hash-agnostic freshness check: skip if ANY run is recent,
+          // regardless of content hash. This prevents unnecessary re-runs
+          // when model groups change (e.g. CORE_FAST subset already covered
+          // by a recent run with the full CORE list).
           const latestRun = existingRuns[0]; // Already sorted newest-first
           if (latestRun.timestamp) {
             const isoTimestamp = fromSafeTimestamp(latestRun.timestamp);
             const runAge = Date.now() - new Date(isoTimestamp).getTime();
-            const hashMatches = latestRun.runLabel === expectedHash;
-
-            if (runAge < ONE_WEEK_IN_MS && hashMatches) {
-              // Recent run with matching config — truly fresh
+            if (runAge < ONE_WEEK_IN_MS) {
               needsRun = false;
               skippedFresh++;
-            } else if (runAge < ONE_WEEK_IN_MS && !hashMatches) {
-              // Recent run but config changed (e.g. model list updated) — stale
-              scheduledHashChanged++;
-              logger.info(`Blueprint ${currentId}: config changed (hash ${latestRun.runLabel} → ${expectedHash}). Scheduling new run.`);
             } else {
               logger.info(`Blueprint ${currentId}: latest run is ${Math.round(runAge / 86400000)}d old (hash: ${latestRun.runLabel}). Scheduling new run.`);
             }
@@ -247,11 +238,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    logger.info(`Scheduled eval check completed: ${scheduled} scheduled (${scheduledHashChanged} config-changed), ${skippedFresh} skipped (fresh), ${skippedNonPeriodic} skipped (non-periodic), ${skippedOther} skipped (other)`);
+    logger.info(`Scheduled eval check completed: ${scheduled} scheduled, ${skippedFresh} skipped (fresh), ${skippedNonPeriodic} skipped (non-periodic), ${skippedOther} skipped (other)`);
     return NextResponse.json({
       message: 'Scheduled eval check completed.',
       scheduled,
-      scheduledHashChanged,
       skippedFresh,
       skippedNonPeriodic,
       total: filesInBlueprintDir.length,
