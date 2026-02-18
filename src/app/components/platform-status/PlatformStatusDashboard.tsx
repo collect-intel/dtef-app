@@ -435,7 +435,11 @@ function TimingChart({ runs }: { runs: TimingRunPoint[] }) {
             .range([0, w])
             .padding(0.2);
 
-        const maxTotal = d3.max(runs, r => r.totalDurationMs) || 1;
+        // Use max of (total, phase sum) to handle cases where totalDurationMs is 0 but phases have values
+        const maxTotal = d3.max(runs, r => Math.max(
+            r.totalDurationMs,
+            r.generationDurationMs + r.evaluationDurationMs + r.saveDurationMs
+        )) || 1;
         const y = d3.scaleLinear().domain([0, maxTotal]).nice().range([h, 0]);
 
         // X axis
@@ -568,9 +572,9 @@ function TimingChart({ runs }: { runs: TimingRunPoint[] }) {
     }
 
     return (
-        <div ref={containerRef} className="bg-card border border-border/50 rounded-lg p-4 relative">
+        <div ref={containerRef} className="bg-card border border-border/50 rounded-lg p-4 relative overflow-hidden">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Run Duration Over Time</h3>
-            <svg ref={svgRef} width={width} height={height} className="overflow-visible" />
+            <svg ref={svgRef} width={width} height={height} className="overflow-hidden" />
             <div
                 ref={tooltipRef}
                 className="absolute z-10 bg-popover border border-border rounded-lg shadow-lg p-2.5 pointer-events-none"

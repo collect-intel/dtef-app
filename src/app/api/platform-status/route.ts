@@ -133,17 +133,25 @@ function computeTimingInsights(runs: LatestRunSummaryItem[]): TimingInsights | n
     return new Date(ta).getTime() - new Date(tb).getTime();
   });
 
-  const runPoints: TimingRunPoint[] = timedRuns.map(r => ({
-    timestamp: fromSafeTimestamp(r.timestamp),
-    configId: r.configId,
-    configTitle: r.configTitle,
-    totalDurationMs: r.timingSummary!.totalDurationMs,
-    generationDurationMs: r.timingSummary!.generationDurationMs,
-    evaluationDurationMs: r.timingSummary!.evaluationDurationMs,
-    saveDurationMs: r.timingSummary!.saveDurationMs,
-    slowestModel: r.timingSummary!.slowestModel,
-    fastestModel: r.timingSummary!.fastestModel,
-  }));
+  const runPoints: TimingRunPoint[] = timedRuns.map(r => {
+    const ts = r.timingSummary!;
+    const gen = ts.generationDurationMs || 0;
+    const eval_ = ts.evaluationDurationMs || 0;
+    const save = ts.saveDurationMs || 0;
+    // Pipeline saves timing before totalDurationMs is computed — fall back to phase sum
+    const total = ts.totalDurationMs || (gen + eval_ + save);
+    return {
+      timestamp: fromSafeTimestamp(r.timestamp),
+      configId: r.configId,
+      configTitle: r.configTitle,
+      totalDurationMs: total,
+      generationDurationMs: gen,
+      evaluationDurationMs: eval_,
+      saveDurationMs: save,
+      slowestModel: ts.slowestModel,
+      fastestModel: ts.fastestModel,
+    };
+  });
 
   // Aggregate model speeds
   const modelMap = new Map<string, { totalMs: number; count: number; slowest: number; fastest: number }>();

@@ -591,12 +591,13 @@ export async function executeComparisonPipeline(
     const apiCallStats = computeApiCallStats(allResponsesMap);
 
     const pipelineTiming: PipelineTimingMetrics = {
-        totalDurationMs: 0, // will be set after save
+        // Pre-compute total from known phases; save duration added after save completes
+        totalDurationMs: generationDurationMs + evaluationDurationMs,
         phases: {
             generation: { durationMs: generationDurationMs, startedAt: generationStartedAt, completedAt: generationCompletedAt },
             evaluation: { durationMs: evaluationDurationMs, startedAt: evaluationStartedAt, completedAt: evaluationCompletedAt },
             evaluators: evaluatorTimings.length > 0 ? evaluatorTimings : undefined,
-            save: { durationMs: 0, startedAt: saveStartedAt, completedAt: '' }, // will be set after save
+            save: { durationMs: 0, startedAt: saveStartedAt, completedAt: '' }, // updated after save
         },
         perModelTiming,
         apiCallStats,
