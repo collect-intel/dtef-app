@@ -86,7 +86,13 @@ async function runPipeline(requestPayload: any) {
   const evalMethods: EvaluationMethod[] = ['llm-coverage'];
   const useCache = true;
 
-  logger.info(`Executing pipeline with evalMethods: ${evalMethods.join(', ')} and cache enabled.`);
+  // Per-call timeout: defaults to 30s (HTTP client default) if not set.
+  // Set GEN_TIMEOUT_MS in env to override (e.g. 15000 for CORE_FAST, 60000 for CORE_SLOW).
+  const genTimeoutMs = process.env.GEN_TIMEOUT_MS ? parseInt(process.env.GEN_TIMEOUT_MS, 10) : undefined;
+  const genRetries = process.env.GEN_RETRIES ? parseInt(process.env.GEN_RETRIES, 10) : undefined;
+  const genOptions = (genTimeoutMs || genRetries) ? { genTimeoutMs, genRetries } : undefined;
+
+  logger.info(`Executing pipeline with evalMethods: ${evalMethods.join(', ')}, cache enabled${genTimeoutMs ? `, timeout=${genTimeoutMs}ms` : ''}.`);
 
   const pipelineStartMs = Date.now();
   const pipelineConfig = { ...config, models: modelIdsToRun };
@@ -95,10 +101,14 @@ async function runPipeline(requestPayload: any) {
     runLabel,
     evalMethods,
     logger,
-    undefined,
-    undefined,
+    undefined,        // existingResponsesMap
+    undefined,        // forcePointwiseKeyEval
     useCache,
-    commitSha
+    commitSha,
+    undefined,        // blueprintFileName
+    undefined,        // requireExecutiveSummary
+    undefined,        // skipExecutiveSummary
+    genOptions,
   );
   const pipelineDurationMs = Date.now() - pipelineStartMs;
   logger.info(`Pipeline completed for ${currentId} in ${Math.round(pipelineDurationMs / 1000)}s`);
