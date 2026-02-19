@@ -276,28 +276,27 @@ export async function GET() {
   if (summaryResult.status === 'fulfilled') {
     const [bpResult, hpResult] = summaryResult.value;
 
-    // Homepage summary has full runs arrays — use for run counts
-    if (hpResult.status === 'fulfilled' && hpResult.value) {
-      for (const config of hpResult.value.configs) {
+    // all_blueprints_summary is incrementally updated per-eval — prefer it for fresh data
+    if (bpResult.status === 'fulfilled' && bpResult.value) {
+      for (const config of bpResult.value.configs) {
         const lastRun = config.latestRunTimestamp
           ? fromSafeTimestamp(config.latestRunTimestamp)
           : null;
-        // Avoid epoch fallback from fromSafeTimestamp
         const validLastRun = lastRun && new Date(lastRun).getTime() > 86400000 ? lastRun : null;
         s3ConfigMap.set(config.configId, {
           title: config.configTitle || config.title,
-          runCount: config.totalRunCount || config.runs?.length || 0,
+          runCount: config.totalRunCount || config.runs?.length || (validLastRun ? 1 : 0),
           lastRun: validLastRun,
           tags: config.tags,
         });
       }
-    } else if (hpResult.status === 'rejected') {
-      errors.push(`Homepage summary fetch failed: ${hpResult.reason?.message || 'Unknown'}`);
+    } else if (bpResult.status === 'rejected') {
+      errors.push(`All blueprints summary fetch failed: ${bpResult.reason?.message || 'Unknown'}`);
     }
 
-    // All blueprints summary may have configs not in homepage (no runs but listed)
-    if (bpResult.status === 'fulfilled' && bpResult.value) {
-      for (const config of bpResult.value.configs) {
+    // Homepage summary fills gaps (has run count data for configs not yet in all_blueprints)
+    if (hpResult.status === 'fulfilled' && hpResult.value) {
+      for (const config of hpResult.value.configs) {
         if (!s3ConfigMap.has(config.configId)) {
           const lastRun = config.latestRunTimestamp
             ? fromSafeTimestamp(config.latestRunTimestamp)
@@ -305,16 +304,14 @@ export async function GET() {
           const validLastRun = lastRun && new Date(lastRun).getTime() > 86400000 ? lastRun : null;
           s3ConfigMap.set(config.configId, {
             title: config.configTitle || config.title,
-            // runs array is empty in all_blueprints_summary (space optimization)
-            // but if latestRunTimestamp exists, at least 1 run has happened
-            runCount: validLastRun ? 1 : 0,
+            runCount: config.totalRunCount || config.runs?.length || 0,
             lastRun: validLastRun,
             tags: config.tags,
           });
         }
       }
-    } else if (bpResult.status === 'rejected') {
-      errors.push(`All blueprints summary fetch failed: ${bpResult.reason?.message || 'Unknown'}`);
+    } else if (hpResult.status === 'rejected') {
+      errors.push(`Homepage summary fetch failed: ${hpResult.reason?.message || 'Unknown'}`);
     }
   } else {
     errors.push(`Summary fetches failed: ${summaryResult.reason?.message || 'Unknown error'}`);

@@ -5,8 +5,9 @@ import { generateConfigContentHash } from '@/lib/hash-utils';
 import { ComparisonConfig, EvaluationMethod } from '@/cli/types/cli_types';
 import { getResultByFileName } from '@/lib/storageService';
 import { ComparisonDataV2 as FetchedComparisonData } from '@/app/utils/types';
-import { actionBackfillSummary } from '@/cli/commands/backfill-summary';
+import { lightweightBackfill } from '@/cli/commands/backfill-summary';
 import { normalizeTag } from '@/app/utils/tagUtils';
+import { incrementalSummaryUpdate } from '@/lib/incremental-summary-update';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
 import { registerCustomModels } from '@/lib/llm-clients/client-dispatcher';
 import { resolveModelsInConfig } from '@/lib/blueprint-service';
@@ -127,15 +128,16 @@ async function runPipeline(requestPayload: any) {
     throw new Error(`Pipeline execution for ${currentId} did not yield a valid output file.`);
   }
 
-  // Register backfill handler — the eval queue will debounce it so that
-  // rapid-fire eval completions trigger only one backfill instead of N.
+  // Incremental summary update — updates dashboard immediately
+  // (per-config summary, all_blueprints_summary, latest_runs_summary)
   if (newResultData && process.env.STORAGE_PROVIDER === 's3') {
-    registerBackfillHandler(async () => {
-      const bfLogger = await getLogger('eval:backfill:debounced');
-      bfLogger.info('Running debounced summary backfill after eval batch...');
-      await actionBackfillSummary({ verbose: false, dryRun: false });
-      bfLogger.info('Debounced summary backfill completed.');
-    });
+    try {
+      await incrementalSummaryUpdate(currentId, newResultData, fileName, logger);
+      logger.info(`Incremental summary update completed for ${currentId}`);
+    } catch (err: any) {
+      // Non-fatal: raw result already saved, drain-time rebuild will catch up
+      logger.error(`Incremental summary update failed for ${currentId}: ${err.message}`);
+    }
   }
 
   logger.info(`Pipeline tasks completed for ${currentId}. Output: ${fileName}`);
@@ -157,6 +159,16 @@ export async function POST(req: NextRequest) {
   }
 
   const configId = body.config.id || 'unknown';
+
+  // Register lightweight backfill handler — runs when queue drains (no active evals).
+  // Reads per-config summaries (~20KB each) instead of raw results (50-500KB each).
+  // Memory: ~20-40MB vs 500MB+ for the old full backfill.
+  registerBackfillHandler(async () => {
+    const bfLogger = await getLogger('eval:backfill:lightweight');
+    bfLogger.info('Running lightweight summary rebuild after eval batch...');
+    await lightweightBackfill();
+    bfLogger.info('Lightweight summary rebuild completed.');
+  });
 
   // Register auto-continuation: when the queue fully drains, re-trigger
   // the scheduler to pick up any remaining unprocessed configs.

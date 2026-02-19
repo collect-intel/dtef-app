@@ -6,6 +6,7 @@ import {
     listConfigIds,
     listRunsForConfig,
     getResultByFileName,
+    getConfigSummary,
     saveHomepageSummary,
     updateSummaryDataWithNewRun,
     HomepageSummaryFileContent,
@@ -561,6 +562,196 @@ async function actionBackfillSummary(options: { verbose?: boolean; configId?: st
             logger.error(error.stack);
         }
     }
+}
+
+/**
+ * Lightweight backfill — reads per-config summaries (~20KB each) instead of
+ * raw result files (50-500KB each). Memory: ~20-40MB vs 500MB+.
+ *
+ * Builds: homepage_summary.json, model summaries, DTEF summaries.
+ * Does NOT rebuild per-config summaries or all_blueprints_summary
+ * (those are updated incrementally after each eval).
+ */
+export async function lightweightBackfill(): Promise<void> {
+    const startMs = Date.now();
+    console.log('[lightweight-backfill] Starting...');
+
+    const configIds = await listConfigIds();
+    if (!configIds || configIds.length === 0) {
+        console.log('[lightweight-backfill] No configs found. Nothing to rebuild.');
+        return;
+    }
+    console.log(`[lightweight-backfill] Found ${configIds.length} config IDs. Reading per-config summaries...`);
+
+    // Read all per-config summaries (small files, ~20KB each)
+    const limit = pLimit(20);
+    const summaryPromises = configIds.map(id =>
+        limit(async () => {
+            try {
+                return await getConfigSummary(id);
+            } catch (err: any) {
+                console.error(`[lightweight-backfill] Failed to read summary for ${id}: ${err.message}`);
+                return null;
+            }
+        })
+    );
+    const allSummaries = (await Promise.all(summaryPromises)).filter(
+        (s): s is EnhancedComparisonConfigInfo => s !== null
+    );
+    console.log(`[lightweight-backfill] Read ${allSummaries.length} per-config summaries.`);
+
+    // Filter out _public_api configs from homepage
+    const homepageConfigs = allSummaries.filter(c => !c.tags?.includes('_public_api'));
+
+    // Build topic/model score maps from per-config summary data
+    // (summaries already have perModelScores in each run — no need to re-download results)
+    const topicModelScores = new Map<string, Map<string, { scores: Array<{ score: number; configId: string; configTitle: string; runLabel: string; timestamp: string; }>; uniqueConfigs: Set<string> }>>();
+
+    for (const config of homepageConfigs) {
+        const latestRun = config.runs[0];
+        if (!latestRun) continue;
+
+        const allTags = config.tags || [];
+        if (allTags.length === 0) continue;
+
+        // Rehydrate perModelScores if needed
+        if (latestRun.perModelScores && !(latestRun.perModelScores instanceof Map)) {
+            latestRun.perModelScores = new Map(Object.entries(latestRun.perModelScores));
+        }
+        if (!latestRun.perModelScores) continue;
+
+        for (const tag of allTags) {
+            const normalizedTag = normalizeTag(tag);
+            if (!normalizedTag || normalizedTag === 'test' || normalizedTag === '_public_api' || normalizedTag === '_featured') continue;
+
+            if (!topicModelScores.has(normalizedTag)) {
+                topicModelScores.set(normalizedTag, new Map());
+            }
+            const modelMap = topicModelScores.get(normalizedTag)!;
+
+            latestRun.perModelScores.forEach((scoreData, modelId) => {
+                if (modelId === 'ideal') return;
+                const score = scoreData.hybrid?.average;
+                if (score === null || score === undefined) return;
+
+                if (!modelMap.has(modelId)) {
+                    modelMap.set(modelId, { scores: [], uniqueConfigs: new Set() });
+                }
+                const entry = modelMap.get(modelId)!;
+                entry.scores.push({
+                    score,
+                    configId: config.configId,
+                    configTitle: config.title || config.configTitle,
+                    runLabel: latestRun.runLabel,
+                    timestamp: latestRun.timestamp,
+                });
+                entry.uniqueConfigs.add(config.configId);
+            });
+        }
+    }
+
+    // Calculate stats — pass empty dimension grades map (dimension leaderboards are commented out on homepage)
+    const emptyDimensionGrades = new Map<string, Map<string, { totalScore: number; count: number; uniqueConfigs: Set<string>; scores: Array<{ score: number; configTitle: string; runLabel: string; timestamp: string; configId: string; }> }>>();
+    const headlineStats = calculateHeadlineStats(homepageConfigs, emptyDimensionGrades, topicModelScores);
+    const driftDetectionResult = calculatePotentialModelDrift(homepageConfigs);
+    const topicChampions = calculateTopicChampions(topicModelScores);
+    const modelCardMappings = await buildModelCardMappings();
+
+    // Build homepage configs array (same structure as full backfill)
+    const homepageConfigsForSave = homepageConfigs.map(config => {
+        if (config.tags?.includes('_featured')) {
+            const latestRun = config.runs.length > 0 ? [config.runs[0]] : [];
+            return { ...config, runs: latestRun };
+        }
+        return { ...config, runs: [] };
+    });
+
+    // DTEF summaries — only for configs with 'dtef' tag (typically ~20 configs)
+    // For these few, we need raw results to build demographic data.
+    // But for the lightweight backfill, we skip DTEF summary rebuilding since
+    // it's rarely needed and the incremental update handles per-config data.
+    // The existing DTEF summary files remain valid until a full backfill runs.
+
+    const finalHomepageSummary: HomepageSummaryFileContent = {
+        configs: homepageConfigsForSave,
+        headlineStats,
+        driftDetectionResult,
+        topicChampions,
+        modelCardMappings: Object.keys(modelCardMappings).length > 0 ? modelCardMappings : undefined,
+        lastUpdated: new Date().toISOString(),
+    };
+
+    await saveHomepageSummary(finalHomepageSummary);
+    console.log(`[lightweight-backfill] homepage_summary.json saved (${homepageConfigsForSave.length} configs).`);
+
+    // Build and save model summaries
+    const modelRunData = new Map<string, ModelRunPerformance[]>();
+    homepageConfigs.forEach(config => {
+        config.runs.forEach(run => {
+            if (run.perModelScores && !(run.perModelScores instanceof Map)) {
+                run.perModelScores = new Map(Object.entries(run.perModelScores));
+            }
+            if (!run.perModelScores) return;
+
+            run.perModelScores.forEach((scoreData, effectiveModelId) => {
+                if (scoreData.hybrid.average === null || scoreData.hybrid.average === undefined) return;
+                const { baseId } = parseModelIdForDisplay(effectiveModelId);
+                const currentRuns = modelRunData.get(baseId) || [];
+                currentRuns.push({
+                    configId: config.configId,
+                    configTitle: config.title || config.configTitle,
+                    runLabel: run.runLabel,
+                    timestamp: run.timestamp,
+                    hybridScore: scoreData.hybrid.average,
+                });
+                modelRunData.set(baseId, currentRuns);
+            });
+        });
+    });
+
+    let modelSummaryCount = 0;
+    for (const [baseModelId, runs] of modelRunData.entries()) {
+        const blueprintsParticipated = new Set(runs.map(r => r.configId));
+        const validScores = runs.map(r => r.hybridScore).filter(s => s !== null) as number[];
+        const averageHybridScore = validScores.length > 0 ? validScores.reduce((a, b) => a + b, 0) / validScores.length : null;
+
+        const blueprintScores = new Map<string, { scores: number[], title: string }>();
+        runs.forEach(run => {
+            if (run.hybridScore !== null) {
+                const existing = blueprintScores.get(run.configId) || { scores: [], title: run.configTitle };
+                existing.scores.push(run.hybridScore);
+                blueprintScores.set(run.configId, existing);
+            }
+        });
+
+        const avgBlueprintScores = Array.from(blueprintScores.entries()).map(([configId, data]) => ({
+            configId,
+            configTitle: data.title,
+            score: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+        })).sort((a, b) => b.score - a.score);
+
+        const modelSummary: ModelSummary = {
+            modelId: baseModelId,
+            displayName: getModelDisplayLabel(baseModelId),
+            provider: baseModelId.split(':')[0] || 'unknown',
+            overallStats: {
+                averageHybridScore,
+                totalRuns: runs.length,
+                totalBlueprints: blueprintsParticipated.size,
+            },
+            strengthsAndWeaknesses: {
+                topPerforming: avgBlueprintScores.slice(0, 3),
+                weakestPerforming: avgBlueprintScores.slice(-3).reverse(),
+            },
+            runs: runs.sort((a, b) => new Date(fromSafeTimestamp(b.timestamp)).getTime() - new Date(fromSafeTimestamp(a.timestamp)).getTime()),
+            lastUpdated: new Date().toISOString(),
+        };
+        await saveModelSummary(baseModelId, modelSummary);
+        modelSummaryCount++;
+    }
+
+    const durationSec = Math.round((Date.now() - startMs) / 1000);
+    console.log(`[lightweight-backfill] Complete in ${durationSec}s. Saved homepage_summary + ${modelSummaryCount} model summaries.`);
 }
 
 export const backfillSummaryCommand = new Command('backfill-summary')

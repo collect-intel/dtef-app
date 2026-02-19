@@ -10,11 +10,12 @@
  * it runs backfill (to update aggregate summaries), then re-triggers the
  * scheduler to pick up any remaining configs.
  *
- * Backfill strategy: runs ONLY when the queue drains (no active evals),
- * to avoid OOM from running backfill alongside eval pipelines. Each eval
- * uses ~600MB; backfill scans all 1300+ configs and needs the full heap.
- * Running backfill mid-batch (while evals are active) caused repeated
- * OOM crashes — the V8 heap exhausted during JSON parsing of result files.
+ * Summary update strategy:
+ *   Tier 1 (per-eval): incrementalSummaryUpdate() runs after each eval,
+ *     updating per-config summary, all_blueprints_summary, latest_runs_summary.
+ *   Tier 2 (drain-time): lightweightBackfill() reads per-config summaries
+ *     (~20KB each, ~20-40MB total) to rebuild homepage_summary + model summaries.
+ *     Old full backfill downloaded all raw results (500MB+) causing OOM.
  */
 
 const MAX_CONCURRENT = 3; // Reduced from 5 — leaves memory headroom for backfill
@@ -85,11 +86,8 @@ function processNext() {
 }
 
 /**
- * When the queue drains: run backfill first (to update aggregate summaries),
- * then trigger continuation (to schedule more evals).
- *
- * Backfill MUST run while no evals are active — it scans all 1300+ configs
- * from S3 and would OOM if running alongside eval pipelines (~600MB each).
+ * When the queue drains: run lightweight backfill (reads per-config summaries,
+ * ~20-40MB) then trigger continuation (to schedule more evals).
  */
 function scheduleDrainHandler() {
   if (drainTimer) {

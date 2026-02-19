@@ -1376,6 +1376,27 @@ export function updateSummaryDataWithNewRun(
   const perModelScores = calculatePerModelScoreStatsForRun(newResultData);
   const hybridScoreStats = calculateAverageHybridScoreForRun(newResultData);
 
+  // Build timing summary if available
+  const timing = (newResultData as any).timing;
+  let timingSummary: EnhancedRunInfo['timingSummary'] = undefined;
+  if (timing?.phases) {
+    const sorted = timing.perModelTiming?.length > 0
+      ? [...timing.perModelTiming].sort((a: any, b: any) => b.avgMs - a.avgMs)
+      : [];
+    timingSummary = {
+      totalDurationMs: timing.totalDurationMs,
+      generationDurationMs: timing.phases.generation?.durationMs,
+      evaluationDurationMs: timing.phases.evaluation?.durationMs,
+      saveDurationMs: timing.phases.save?.durationMs,
+      slowestModel: sorted.length > 0 ? { modelId: sorted[0].modelId, avgMs: sorted[0].avgMs } : undefined,
+      fastestModel: sorted.length > 0 ? { modelId: sorted[sorted.length - 1].modelId, avgMs: sorted[sorted.length - 1].avgMs } : undefined,
+      perModelTiming: sorted.length > 0 ? sorted.map((m: any) => ({
+        modelId: m.modelId, avgMs: m.avgMs, callCount: m.callCount,
+        medianMs: m.medianMs, p95Ms: m.p95Ms, errorCount: m.errorCount || 0,
+      })) : undefined,
+    };
+  }
+
   const newRunInfo: EnhancedRunInfo = {
     runLabel: runLabel,
     timestamp: timestamp,
@@ -1389,6 +1410,7 @@ export function updateSummaryDataWithNewRun(
     tags: unifiedTags,
     models: newResultData.effectiveModels,
     promptIds: newResultData.promptIds,
+    timingSummary,
   };
 
   const runExists = configSummary.runs.some(
