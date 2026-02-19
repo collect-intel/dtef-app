@@ -38,13 +38,16 @@ export interface ProgressStats {
 export interface QueueStatus {
   active: number;
   queued: number;
+  backfillRunning: boolean;
   totalEnqueued: number;
   totalCompleted: number;
   totalFailed: number;
+  totalBackfills: number;
   lastCompletedId: string | null;
   lastCompletedAt: string | null;
   lastFailedId: string | null;
   lastFailedAt: string | null;
+  lastBackfillAt: string | null;
   processStartedAt: string;
   uptimeSeconds: number;
 }

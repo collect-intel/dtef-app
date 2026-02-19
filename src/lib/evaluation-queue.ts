@@ -1,25 +1,24 @@
 /**
- * In-process evaluation queue with concurrency limiting, periodic backfill,
+ * In-process evaluation queue with concurrency limiting, drain-time backfill,
  * and auto-continuation.
  *
  * Prevents OOM crashes from concurrent evaluation pipelines by processing
  * them in controlled batches. Queued items survive as long as the process
- * is alive; on restart the weekly cron will re-discover any lost items.
+ * is alive; on restart the cron will re-discover any lost items.
  *
  * Auto-continuation: when the queue fully drains after processing evals,
- * it automatically re-triggers the scheduler to pick up any remaining
- * configs that haven't been evaluated yet. This makes the system self-healing
- * after OOM crashes or partial batches.
+ * it runs backfill (to update aggregate summaries), then re-triggers the
+ * scheduler to pick up any remaining configs.
  *
- * Backfill strategy: runs every BACKFILL_INTERVAL_COMPLETIONS evals and
- * also 30s after the last eval completes (to catch the tail end).
- * A lock prevents overlapping backfills.
+ * Backfill strategy: runs ONLY when the queue drains (no active evals),
+ * to avoid OOM from running backfill alongside eval pipelines. Each eval
+ * uses ~600MB; backfill scans all 1300+ configs and needs the full heap.
+ * Running backfill mid-batch (while evals are active) caused repeated
+ * OOM crashes — the V8 heap exhausted during JSON parsing of result files.
  */
 
-const MAX_CONCURRENT = 5; // Reduced from 10 to prevent OOM (~600MB per eval)
-const BACKFILL_DEBOUNCE_MS = 30_000; // 30s after last eval completes
-const BACKFILL_INTERVAL_COMPLETIONS = 100; // run backfill every N completions
-const CONTINUATION_DELAY_MS = 45_000; // wait for backfill before continuation
+const MAX_CONCURRENT = 3; // Reduced from 5 — leaves memory headroom for backfill
+const DRAIN_DELAY_MS = 15_000; // 15s after queue drains before starting backfill
 
 interface QueueItem {
   id: string;
@@ -29,27 +28,31 @@ interface QueueItem {
 
 let active = 0;
 const queue: QueueItem[] = [];
-let backfillTimer: ReturnType<typeof setTimeout> | null = null;
 let backfillFn: (() => Promise<void>) | null = null;
 let backfillRunning = false;
-let completionsSinceLastBackfill = 0;
 
-// Auto-continuation: re-trigger scheduler when queue drains
+// Queue drain: backfill + auto-continuation
 let queueDrainedFn: (() => Promise<void>) | null = null;
+let drainTimer: ReturnType<typeof setTimeout> | null = null;
 let drainHandlerRunning = false;
-let continuationTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Lifetime stats (since process start)
 let totalEnqueued = 0;
 let totalCompleted = 0;
 let totalFailed = 0;
+let totalBackfills = 0;
 let lastCompletedId: string | null = null;
 let lastCompletedAt: number | null = null;
 let lastFailedId: string | null = null;
 let lastFailedAt: number | null = null;
+let lastBackfillAt: number | null = null;
 const processStartedAt = Date.now();
 
 function processNext() {
+  // Don't start new evals while backfill is running — it needs full memory.
+  // Items stay queued and will be processed after backfill completes.
+  if (backfillRunning) return;
+
   while (active < MAX_CONCURRENT && queue.length > 0) {
     const item = queue.shift()!;
     active++;
@@ -67,17 +70,11 @@ function processNext() {
       console.error(`[eval-queue] Eval failed for ${item.id}:`, err?.message || err);
     }).finally(() => {
       active--;
-      completionsSinceLastBackfill++;
       console.log(`[eval-queue] Finished ${item.id} (active: ${active}, queued: ${queue.length}, completed: ${totalCompleted}, failed: ${totalFailed})`);
 
-      if (completionsSinceLastBackfill >= BACKFILL_INTERVAL_COMPLETIONS) {
-        runBackfillNow();
-      }
-      scheduleDebouncedBackfill();
-
-      // Check if queue fully drained — trigger continuation to schedule more
-      if (active === 0 && queue.length === 0 && queueDrainedFn && !drainHandlerRunning && totalCompleted > 0) {
-        scheduleQueueDrainedHandler();
+      // Check if queue fully drained — run backfill then continuation
+      if (active === 0 && queue.length === 0 && totalCompleted > 0) {
+        scheduleDrainHandler();
       }
 
       // Use setImmediate to avoid deep recursive call stacks when many evals
@@ -88,76 +85,62 @@ function processNext() {
 }
 
 /**
- * Schedule the queue-drained handler after a delay to let backfill complete first.
+ * When the queue drains: run backfill first (to update aggregate summaries),
+ * then trigger continuation (to schedule more evals).
+ *
+ * Backfill MUST run while no evals are active — it scans all 1300+ configs
+ * from S3 and would OOM if running alongside eval pipelines (~600MB each).
  */
-function scheduleQueueDrainedHandler() {
-  // Cancel any pending continuation (in case we're re-entering)
-  if (continuationTimer) {
-    clearTimeout(continuationTimer);
+function scheduleDrainHandler() {
+  if (drainTimer) {
+    clearTimeout(drainTimer);
   }
 
   drainHandlerRunning = true;
-  console.log(`[eval-queue] Queue fully drained (${totalCompleted} completed, ${totalFailed} failed). Scheduling continuation in ${CONTINUATION_DELAY_MS / 1000}s...`);
+  console.log(`[eval-queue] Queue drained (${totalCompleted} completed, ${totalFailed} failed). Backfill + continuation in ${DRAIN_DELAY_MS / 1000}s...`);
 
-  continuationTimer = setTimeout(async () => {
-    continuationTimer = null;
-    try {
-      await queueDrainedFn!();
-    } catch (err: any) {
-      console.error('[eval-queue] Queue drained handler error:', err.message || err);
-    } finally {
-      drainHandlerRunning = false;
+  drainTimer = setTimeout(async () => {
+    drainTimer = null;
+
+    // Step 1: Run backfill (with no evals active, full memory available)
+    if (backfillFn && !backfillRunning) {
+      backfillRunning = true;
+      console.log('[eval-queue] Starting backfill (no active evals, full memory available)...');
+      const backfillStart = Date.now();
+      try {
+        await backfillFn();
+        totalBackfills++;
+        lastBackfillAt = Date.now();
+        const durationSec = Math.round((Date.now() - backfillStart) / 1000);
+        console.log(`[eval-queue] Backfill completed in ${durationSec}s.`);
+      } catch (err: any) {
+        console.error('[eval-queue] Backfill failed:', err?.message || err);
+      } finally {
+        backfillRunning = false;
+      }
     }
-  }, CONTINUATION_DELAY_MS);
+
+    // Process any items that arrived during backfill before continuation
+    if (queue.length > 0) {
+      console.log(`[eval-queue] Processing ${queue.length} items queued during backfill...`);
+      processNext();
+    }
+
+    // Step 2: Trigger continuation (schedule more evals)
+    if (queueDrainedFn) {
+      try {
+        await queueDrainedFn();
+      } catch (err: any) {
+        console.error('[eval-queue] Continuation handler error:', err?.message || err);
+      }
+    }
+
+    drainHandlerRunning = false;
+  }, DRAIN_DELAY_MS);
 }
 
 /**
- * Run backfill immediately (if not already running). Resets the completion counter.
- */
-async function runBackfillNow() {
-  if (!backfillFn || backfillRunning) return;
-
-  backfillRunning = true;
-  completionsSinceLastBackfill = 0;
-
-  // Clear any pending debounce timer since we're running now
-  if (backfillTimer) {
-    clearTimeout(backfillTimer);
-    backfillTimer = null;
-  }
-
-  const queueStatus = getQueueStatus();
-  console.log(`[eval-queue] Running periodic backfill (active: ${queueStatus.active}, queued: ${queueStatus.queued})`);
-
-  try {
-    await backfillFn();
-    console.log(`[eval-queue] Periodic backfill completed successfully.`);
-  } catch (err) {
-    console.error(`[eval-queue] Periodic backfill failed:`, err);
-  } finally {
-    backfillRunning = false;
-  }
-}
-
-/**
- * Schedule a debounced backfill for the tail end — fires 30s after the
- * last eval completes, catching any stragglers below the interval threshold.
- */
-function scheduleDebouncedBackfill() {
-  if (!backfillFn) return;
-
-  if (backfillTimer) {
-    clearTimeout(backfillTimer);
-  }
-
-  backfillTimer = setTimeout(async () => {
-    backfillTimer = null;
-    await runBackfillNow();
-  }, BACKFILL_DEBOUNCE_MS);
-}
-
-/**
- * Register a backfill function to run after evaluations complete.
+ * Register a backfill function to run when the queue drains.
  * Only one can be registered at a time (last one wins).
  */
 export function registerBackfillHandler(fn: () => Promise<void>) {
@@ -165,7 +148,7 @@ export function registerBackfillHandler(fn: () => Promise<void>) {
 }
 
 /**
- * Register a function to call when the queue fully drains (active=0, queued=0).
+ * Register a function to call after backfill, when the queue has drained.
  * Used for auto-continuation: re-triggers the scheduler to process remaining configs.
  * Only one can be registered at a time (last one wins).
  */
@@ -178,10 +161,10 @@ export function registerQueueDrainedHandler(fn: () => Promise<void>) {
  * The evaluation will run when a concurrency slot is available.
  */
 export function enqueueEvaluation(id: string, fn: () => Promise<void>): { position: number; queueLength: number } {
-  // Cancel any pending continuation since new work arrived
-  if (continuationTimer) {
-    clearTimeout(continuationTimer);
-    continuationTimer = null;
+  // Cancel any pending drain handler since new work arrived
+  if (drainTimer) {
+    clearTimeout(drainTimer);
+    drainTimer = null;
     drainHandlerRunning = false;
   }
 
@@ -200,14 +183,16 @@ export function getQueueStatus() {
   return {
     active,
     queued: queue.length,
-    completionsSinceBackfill: completionsSinceLastBackfill,
+    backfillRunning,
     totalEnqueued,
     totalCompleted,
     totalFailed,
+    totalBackfills,
     lastCompletedId,
     lastCompletedAt: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
     lastFailedId,
     lastFailedAt: lastFailedAt ? new Date(lastFailedAt).toISOString() : null,
+    lastBackfillAt: lastBackfillAt ? new Date(lastBackfillAt).toISOString() : null,
     processStartedAt: new Date(processStartedAt).toISOString(),
     uptimeSeconds: Math.round((Date.now() - processStartedAt) / 1000),
   };

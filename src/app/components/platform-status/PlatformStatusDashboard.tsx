@@ -750,17 +750,24 @@ function QueueStatusBanner({ queue }: { queue: QueueStatus }) {
     }
 
     if (!isActive && hasHistory) {
+        const backfillInfo = queue.backfillRunning
+            ? 'Backfill running (updating aggregate summaries)...'
+            : queue.totalBackfills > 0
+                ? `Last backfill: ${queue.lastBackfillAt ? relativeTime(queue.lastBackfillAt) : 'unknown'} (${queue.totalBackfills} total).`
+                : 'Backfill pending (will run when batch completes).';
         return (
             <div className="bg-card border border-border/50 rounded-lg p-4 space-y-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                    Queue idle.
+                    <span className={`inline-block w-2 h-2 rounded-full ${queue.backfillRunning ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
+                    {queue.backfillRunning ? 'Backfill in progress...' : 'Queue idle.'}
                     {' '}{queue.totalCompleted} completed{queue.totalFailed > 0 ? `, ${queue.totalFailed} failed` : ''} since server start ({formatDuration(queue.uptimeSeconds)} ago).
-                    {queue.lastCompletedAt && (
+                    {!queue.backfillRunning && queue.lastCompletedAt && (
                         <> Last completed: <span className="font-mono text-xs">{queue.lastCompletedId}</span> {relativeTime(queue.lastCompletedAt)}.</>
                     )}
                 </div>
-                <p className="text-xs text-muted-foreground/70 pl-4">Auto-continuation enabled: scheduler will re-trigger in ~45s to check for remaining configs.</p>
+                <p className="text-xs text-muted-foreground/70 pl-4">
+                    {backfillInfo} Auto-continuation will re-trigger scheduler after backfill.
+                </p>
             </div>
         );
     }
