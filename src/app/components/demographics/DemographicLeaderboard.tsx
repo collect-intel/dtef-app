@@ -31,15 +31,6 @@ interface ModelResult {
     worstSegment?: { id: string; label: string; score: number };
 }
 
-interface FairnessConcern {
-    modelId: string;
-    category?: string;
-    categoryLabel?: string;
-    bestSegment: string;
-    worstSegment: string;
-    gap: number;
-}
-
 interface ContextResponsivenessModel {
     modelId: string;
     displayName: string;
@@ -51,7 +42,6 @@ interface ContextResponsivenessData {
     contextLevelsFound: number[];
 }
 
-/** Full context data point with optional run link metadata */
 interface FullContextDataPoint {
     contextCount: number;
     score: number;
@@ -89,7 +79,14 @@ interface DemographicsData {
         overallScore: number;
         segmentCount: number;
     }>;
-    fairnessConcerns?: FairnessConcern[];
+    fairnessConcerns?: Array<{
+        modelId: string;
+        category?: string;
+        categoryLabel?: string;
+        bestSegment: string;
+        worstSegment: string;
+        gap: number;
+    }>;
     contextResponsiveness?: ContextResponsivenessData;
     aggregation?: {
         modelResults?: ModelResult[];
@@ -148,7 +145,6 @@ function sortedBy<T>(items: T[], key: string, dir: SortDirection, accessor: (ite
     });
 }
 
-/** Clickable column header with sort indicator and optional tooltip */
 function SortableHeader<K extends string>({
     label, sortKey, current, onSort, align = 'left', className = '', tooltip,
 }: {
@@ -183,7 +179,7 @@ function SortIndicator({ active, direction }: { active: boolean; direction: Sort
     );
 }
 
-// --- Sub-components ---
+// --- Shared UI Components ---
 
 function ScoreBar({ score, maxScore = 1 }: { score: number; maxScore?: number }) {
     const pct = Math.min(100, (score / maxScore) * 100);
@@ -212,22 +208,103 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
+function CategoryBadge({ label }: { label: string }) {
+    const colorMap: Record<string, string> = {
+        Age: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        Gender: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        Country: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        Environment: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+        Religion: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+        'AI Concern': 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
+    };
+    const cls = colorMap[label] || 'bg-muted text-muted-foreground';
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+            {label}
+        </span>
+    );
+}
+
+/** Reusable segment category tab buttons */
+function SegmentCategoryTabs({
+    segmentTypes,
+    activeType,
+    onSelect,
+    allLabel = 'Overall',
+    includeAll = true,
+}: {
+    segmentTypes: string[];
+    activeType: string;
+    onSelect: (type: string) => void;
+    allLabel?: string;
+    includeAll?: boolean;
+}) {
+    const buttonClass = (isActive: boolean) =>
+        `px-3 py-1.5 text-sm rounded-full border transition-colors ${
+            isActive
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+        }`;
+
+    return (
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {includeAll && (
+                <button onClick={() => onSelect('all')} className={buttonClass(activeType === 'all')}>
+                    {allLabel}
+                </button>
+            )}
+            {segmentTypes.map(type => (
+                <button key={type} onClick={() => onSelect(type)} className={buttonClass(activeType === type)}>
+                    {SEGMENT_TYPE_LABELS[type] || type}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/** Reusable show all / show top N toggle */
+function ShowAllToggle({
+    totalCount,
+    isShowingAll,
+    onToggle,
+    threshold = 10,
+}: {
+    totalCount: number;
+    isShowingAll: boolean;
+    onToggle: () => void;
+    threshold?: number;
+}) {
+    if (totalCount <= threshold) return null;
+    return (
+        <div className="text-center mt-3">
+            <button
+                onClick={onToggle}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+                {isShowingAll ? `Show top ${threshold}` : `Show all ${totalCount}`}
+            </button>
+        </div>
+    );
+}
+
+// --- Leaderboard Sub-components ---
+
 /** Expandable segment breakdown for a single model */
-function ModelSegmentBreakdown({ model }: { model: ModelResult }) {
+function ModelSegmentBreakdown({ model, filterCategory }: { model: ModelResult; filterCategory?: string }) {
     const grouped = useMemo(() => {
         const groups = new Map<string, SegmentScore[]>();
         for (const seg of model.segmentScores || []) {
             const prefix = getSegmentPrefix(seg.segmentId);
             if (!SEGMENT_TYPE_LABELS[prefix]) continue;
+            if (filterCategory && prefix !== filterCategory) continue;
             if (!groups.has(prefix)) groups.set(prefix, []);
             groups.get(prefix)!.push(seg);
         }
-        // Sort each group by score descending
         for (const scores of groups.values()) {
             scores.sort((a, b) => b.avgCoverageExtent - a.avgCoverageExtent);
         }
         return groups;
-    }, [model.segmentScores]);
+    }, [model.segmentScores, filterCategory]);
 
     if (grouped.size === 0) {
         return <p className="text-sm text-muted-foreground italic px-4 py-2">No segment data available</p>;
@@ -264,11 +341,9 @@ function ModelSegmentBreakdown({ model }: { model: ModelResult }) {
 
 type SegmentSortKey = 'label' | 'bestModel' | 'bestScore' | 'avgScore';
 
-/** Expandable drill-down: all model scores for a single segment value */
-function SegmentModelDrillDown({ segmentId, modelResults, activeType }: {
+function SegmentModelDrillDown({ segmentId, modelResults }: {
     segmentId: string;
     modelResults: ModelResult[];
-    activeType: string;
 }) {
     const modelScores = useMemo(() => {
         const scores: Array<{ modelId: string; score: number }> = [];
@@ -281,7 +356,7 @@ function SegmentModelDrillDown({ segmentId, modelResults, activeType }: {
             }
         }
         return scores.sort((a, b) => b.score - a.score);
-    }, [segmentId, modelResults, activeType]);
+    }, [segmentId, modelResults]);
 
     if (modelScores.length === 0) return null;
 
@@ -305,7 +380,6 @@ function SegmentModelDrillDown({ segmentId, modelResults, activeType }: {
     );
 }
 
-/** Segment Explorer: tabs for each segment type with per-value leaderboards */
 function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     const segmentTypes = useMemo(() => {
         const types = new Set<string>();
@@ -321,24 +395,19 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
     const [activeType, setActiveType] = useState<string>(segmentTypes[0] || 'O2');
     const [sort, toggleSort] = useSort<SegmentSortKey>('bestScore');
     const [expandedSegment, setExpandedSegment] = useState<string | null>(null);
+    const [showAll, setShowAll] = useState(false);
 
-    // Build a table: rows = segment values, cols = models, cells = scores
     const segmentData = useMemo(() => {
         const valueMap = new Map<string, { label: string; models: Map<string, number> }>();
-
         for (const model of modelResults) {
             for (const seg of model.segmentScores || []) {
                 if (getSegmentPrefix(seg.segmentId) !== activeType) continue;
                 if (!valueMap.has(seg.segmentId)) {
-                    valueMap.set(seg.segmentId, {
-                        label: getSegmentValueLabel(seg.segmentLabel),
-                        models: new Map(),
-                    });
+                    valueMap.set(seg.segmentId, { label: getSegmentValueLabel(seg.segmentLabel), models: new Map() });
                 }
                 valueMap.get(seg.segmentId)!.models.set(model.modelId, seg.avgCoverageExtent);
             }
         }
-
         return Array.from(valueMap.entries()).map(([segId, data]) => {
             let bestModel = '';
             let bestScore = -1;
@@ -347,26 +416,13 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
             for (const [modelId, score] of data.models) {
                 totalScore += score;
                 count++;
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestModel = modelId;
-                }
+                if (score > bestScore) { bestScore = score; bestModel = modelId; }
             }
-            return {
-                segmentId: segId,
-                label: data.label,
-                bestModel,
-                bestScore,
-                avgScore: count > 0 ? totalScore / count : 0,
-                modelCount: count,
-            };
+            return { segmentId: segId, label: data.label, bestModel, bestScore, avgScore: count > 0 ? totalScore / count : 0, modelCount: count };
         });
     }, [modelResults, activeType]);
 
-    // Reset expanded segment when switching tabs
-    useEffect(() => {
-        setExpandedSegment(null);
-    }, [activeType]);
+    useEffect(() => { setExpandedSegment(null); setShowAll(false); }, [activeType]);
 
     const sortedData = useMemo(() => sortedBy(segmentData, sort.key, sort.direction, (item, key) => {
         switch (key as SegmentSortKey) {
@@ -380,6 +436,8 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
 
     if (segmentTypes.length === 0) return null;
 
+    const displayed = showAll ? sortedData : sortedData.slice(0, 10);
+
     return (
         <section>
             <div className="text-center mb-6">
@@ -389,52 +447,33 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                 </p>
             </div>
 
-            {/* Segment type tabs */}
-            <div className="flex flex-wrap justify-center gap-2 mb-6">
-                {segmentTypes.map(type => (
-                    <button
-                        key={type}
-                        onClick={() => setActiveType(type)}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                            activeType === type
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                        }`}
-                    >
-                        {SEGMENT_TYPE_LABELS[type] || type}
-                    </button>
-                ))}
-            </div>
+            <SegmentCategoryTabs
+                segmentTypes={segmentTypes}
+                activeType={activeType}
+                onSelect={setActiveType}
+                includeAll={false}
+            />
 
-            {/* Per-segment-value table */}
             <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border/50 bg-muted/30">
-                            <SortableHeader
-                                label={SEGMENT_TYPE_LABELS[activeType] || activeType}
+                            <SortableHeader label={SEGMENT_TYPE_LABELS[activeType] || activeType}
                                 sortKey="label" current={sort} onSort={toggleSort}
-                                tooltip="Demographic segment value within the selected category"
-                            />
-                            <SortableHeader
-                                label="Best Model"
+                                tooltip="Demographic segment value within the selected category" />
+                            <SortableHeader label="Best Model"
                                 sortKey="bestModel" current={sort} onSort={toggleSort}
-                                tooltip="Model with the highest average score for this segment across all evaluations"
-                            />
-                            <SortableHeader
-                                label="Best Score"
+                                tooltip="Model with the highest average score for this segment" />
+                            <SortableHeader label="Best Score"
                                 sortKey="bestScore" current={sort} onSort={toggleSort} className="w-1/4"
-                                tooltip="Highest average score achieved by any single model for this segment"
-                            />
-                            <SortableHeader
-                                label="Avg Score"
+                                tooltip="Highest average score achieved by any single model" />
+                            <SortableHeader label="Avg Score"
                                 sortKey="avgScore" current={sort} onSort={toggleSort} align="right"
-                                tooltip="Mean score across all models for this segment"
-                            />
+                                tooltip="Mean score across all models for this segment" />
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedData.map((row) => {
+                        {displayed.map((row) => {
                             const isExpanded = expandedSegment === row.segmentId;
                             return (
                                 <Fragment key={row.segmentId}>
@@ -445,17 +484,13 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                                         <td className="px-4 py-3 text-sm font-medium text-foreground">
                                             <span className="inline-flex items-center gap-2">
                                                 {row.label}
-                                                <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                                    ▾
-                                                </span>
+                                                <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-[200px]">
                                             {formatModelName(row.bestModel)}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <ScoreBar score={row.bestScore} />
-                                        </td>
+                                        <td className="px-4 py-3"><ScoreBar score={row.bestScore} /></td>
                                         <td className="px-4 py-3 text-right text-sm text-muted-foreground">
                                             {(row.avgScore * 100).toFixed(1)}%
                                         </td>
@@ -463,11 +498,7 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                                     {isExpanded && (
                                         <tr>
                                             <td colSpan={4} className="p-0 border-b border-border/30 bg-muted/10">
-                                                <SegmentModelDrillDown
-                                                    segmentId={row.segmentId}
-                                                    modelResults={modelResults}
-                                                    activeType={activeType}
-                                                />
+                                                <SegmentModelDrillDown segmentId={row.segmentId} modelResults={modelResults} />
                                             </td>
                                         </tr>
                                     )}
@@ -477,14 +508,12 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                     </tbody>
                 </table>
                 {sortedData.length === 0 && (
-                    <p className="text-center text-muted-foreground py-6 text-sm">
-                        No data available for this segment type.
-                    </p>
+                    <p className="text-center text-muted-foreground py-6 text-sm">No data available for this segment type.</p>
                 )}
             </div>
-
+            <ShowAllToggle totalCount={sortedData.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
             <p className="text-xs text-muted-foreground mt-3 text-center">
-                Each segment&apos;s score is its average coverage extent across all evaluations that include it. Click a row to see all model scores.
+                Click a row to see all model scores for that segment.
             </p>
         </section>
     );
@@ -492,19 +521,15 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
 
 // --- Context Responsiveness ---
 
-/** Gradient bar showing where a model falls on the prior-reliant <-> context-responsive spectrum */
 function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: number }) {
     const range = Math.max(maxSlope, 0.01);
     const normalized = Math.max(2, Math.min(98, 50 + (slope / range) * 45));
-
     return (
         <div className="flex items-center gap-2 w-full">
             <div className="flex-1 relative bg-muted rounded-full h-3 overflow-hidden">
                 <div
                     className="absolute inset-0 rounded-full"
-                    style={{
-                        background: 'linear-gradient(to right, #6366f1, #a5b4fc, #e2e8f0, #fbbf24, #f97316)',
-                    }}
+                    style={{ background: 'linear-gradient(to right, #6366f1, #a5b4fc, #e2e8f0, #fbbf24, #f97316)' }}
                 />
                 <div
                     className="absolute top-0.5 w-2 h-2 rounded-full bg-foreground border border-background shadow-sm"
@@ -518,121 +543,156 @@ function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: numbe
     );
 }
 
-type ContextSortKey = 'model' | 'slope';
-
-/** Expandable drill-down: per-segment context responsiveness for a model */
-function ContextDrillDown({ modelData }: { modelData: FullModelResponsiveness }) {
-    const grouped = useMemo(() => {
-        const groups = new Map<string, FullSegmentResponsiveness[]>();
-        for (const seg of modelData.segmentResponsiveness || []) {
-            const prefix = getSegmentPrefix(seg.segmentId);
-            if (!SEGMENT_TYPE_LABELS[prefix]) continue;
-            if (!groups.has(prefix)) groups.set(prefix, []);
-            groups.get(prefix)!.push(seg);
-        }
-        // Sort each group by slope descending
-        for (const segs of groups.values()) {
-            segs.sort((a, b) => b.slope - a.slope);
-        }
-        return groups;
-    }, [modelData.segmentResponsiveness]);
-
-    if (grouped.size === 0) {
-        return <p className="text-sm text-muted-foreground italic px-4 py-2">No per-segment context data available</p>;
-    }
-
+/** Drill-down showing all models ranked by responsiveness */
+function ContextRankingDrillDown({ models, maxSlope }: {
+    models: Array<{ modelId: string; slope: number }>;
+    maxSlope: number;
+}) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-            {Array.from(grouped.entries()).map(([prefix, segments]) => (
-                <div key={prefix} className="bg-muted/30 rounded-lg p-3">
-                    <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        {SEGMENT_TYPE_LABELS[prefix] || prefix}
-                    </h5>
-                    <ul className="space-y-2">
-                        {segments.map(seg => {
-                            const sortedPoints = [...seg.dataPoints].sort((a, b) => a.contextCount - b.contextCount);
-                            return (
-                                <li key={seg.segmentId}>
-                                    <div className="flex justify-between items-center text-sm mb-0.5">
-                                        <span className="truncate mr-2">{getSegmentValueLabel(seg.segmentId)}</span>
-                                        <span className="font-mono text-xs flex-shrink-0 text-muted-foreground">
-                                            slope: {seg.slope >= 0 ? '+' : ''}{(seg.slope * 100).toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {sortedPoints.map((pt, i) => {
-                                            const colorCls = pt.score >= 0.8 ? 'text-green-600 dark:text-green-400'
-                                                : pt.score >= 0.6 ? 'text-yellow-600 dark:text-yellow-400'
-                                                : 'text-red-600 dark:text-red-400';
-                                            const label = `c${pt.contextCount}: ${(pt.score * 100).toFixed(1)}%`;
-
-                                            if (pt.configId && pt.runLabel && pt.timestamp) {
-                                                const href = `/analysis/${encodeURIComponent(pt.configId)}/${encodeURIComponent(pt.runLabel)}/${encodeURIComponent(pt.timestamp)}`;
-                                                return (
-                                                    <a
-                                                        key={i}
-                                                        href={href}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className={`font-mono text-xs ${colorCls} underline decoration-dotted hover:decoration-solid`}
-                                                    >
-                                                        {label}
-                                                    </a>
-                                                );
-                                            }
-                                            return (
-                                                <span key={i} className={`font-mono text-xs ${colorCls}`}>
-                                                    {label}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            ))}
+        <div className="px-6 py-3">
+            <p className="text-xs text-muted-foreground mb-2">All models ranked by responsiveness:</p>
+            <ul className="space-y-1.5">
+                {models.map((m, i) => (
+                    <li key={m.modelId} className="flex items-center gap-3 text-sm">
+                        <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
+                        <span className="w-36 truncate text-foreground">{formatModelName(m.modelId)}</span>
+                        <div className="flex-1">
+                            <ResponsivenessBar slope={m.slope} maxSlope={maxSlope} />
+                        </div>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
 
-/** Context Responsiveness section: shows how models respond to increasing context */
+type ContextSortKey = 'label' | 'bestModel' | 'slope';
+
+interface ContextRow {
+    key: string;
+    label: string;
+    bestModel: string;
+    bestSlope: number;
+    allModels: Array<{ modelId: string; slope: number }>;
+}
+
 function ContextResponsivenessSection({
     data,
     contextAnalysis,
-    expandedRow,
-    onToggleRow,
 }: {
     data: ContextResponsivenessData;
     contextAnalysis?: FullContextAnalysis;
-    expandedRow: string | null;
-    onToggleRow: (key: string) => void;
 }) {
     const models = data.models;
     if (!models || models.length === 0) return null;
 
+    const [activeCategory, setActiveCategory] = useState('all');
     const [sort, toggleSort] = useSort<ContextSortKey>('slope');
+    const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [showAll, setShowAll] = useState(false);
 
-    const maxAbsSlope = Math.max(...models.map(m => Math.abs(m.slope)), 0.001);
-    const levelsLabel = data.contextLevelsFound
-        .map(l => l === 0 ? '0 (baseline)' : String(l))
-        .join(', ');
+    const hasSegmentData = !!(contextAnalysis?.models?.some(m => m.segmentResponsiveness?.length > 0));
 
-    const sorted = useMemo(() => sortedBy(models, sort.key, sort.direction, (item, key) => {
-        switch (key as ContextSortKey) {
-            case 'model': return formatModelName(item.modelId);
-            case 'slope': return item.slope;
-            default: return 0;
+    const segmentTypes = useMemo(() => {
+        if (!contextAnalysis) return [];
+        const types = new Set<string>();
+        for (const model of contextAnalysis.models) {
+            for (const seg of model.segmentResponsiveness || []) {
+                const prefix = getSegmentPrefix(seg.segmentId);
+                if (SEGMENT_TYPE_LABELS[prefix]) types.add(prefix);
+            }
         }
-    }), [models, sort]);
-
-    // Build lookup from full context analysis for drill-down
-    const fullModelMap = useMemo(() => {
-        if (!contextAnalysis) return new Map<string, FullModelResponsiveness>();
-        return new Map(contextAnalysis.models.map(m => [m.modelId, m]));
+        return Array.from(types).sort();
     }, [contextAnalysis]);
 
-    const hasFullData = fullModelMap.size > 0;
+    const maxAbsSlope = useMemo(() => {
+        let max = 0.001;
+        if (contextAnalysis) {
+            for (const model of contextAnalysis.models) {
+                max = Math.max(max, Math.abs(model.overallSlope));
+                for (const seg of model.segmentResponsiveness || []) {
+                    max = Math.max(max, Math.abs(seg.slope));
+                }
+            }
+        } else {
+            for (const m of models) max = Math.max(max, Math.abs(m.slope));
+        }
+        return max;
+    }, [contextAnalysis, models]);
+
+    // "All" view: rows = categories, showing most responsive model per category
+    const categoryRows = useMemo((): ContextRow[] => {
+        if (!contextAnalysis || activeCategory !== 'all') return [];
+        return segmentTypes.map(type => {
+            const modelSlopes: Array<{ modelId: string; slope: number }> = [];
+            for (const model of contextAnalysis.models) {
+                const catSegs = model.segmentResponsiveness.filter(s => getSegmentPrefix(s.segmentId) === type);
+                if (catSegs.length === 0) continue;
+                const avg = catSegs.reduce((sum, s) => sum + s.slope, 0) / catSegs.length;
+                modelSlopes.push({ modelId: model.modelId, slope: avg });
+            }
+            modelSlopes.sort((a, b) => b.slope - a.slope);
+            const best = modelSlopes[0];
+            return {
+                key: type,
+                label: SEGMENT_TYPE_LABELS[type] || type,
+                bestModel: best?.modelId || '',
+                bestSlope: best?.slope || 0,
+                allModels: modelSlopes,
+            };
+        });
+    }, [contextAnalysis, activeCategory, segmentTypes]);
+
+    // Per-category view: rows = strata within the selected category
+    const strataRows = useMemo((): ContextRow[] => {
+        if (!contextAnalysis || activeCategory === 'all') return [];
+        const segMap = new Map<string, Array<{ modelId: string; slope: number }>>();
+        for (const model of contextAnalysis.models) {
+            for (const seg of model.segmentResponsiveness || []) {
+                if (getSegmentPrefix(seg.segmentId) !== activeCategory) continue;
+                if (!segMap.has(seg.segmentId)) segMap.set(seg.segmentId, []);
+                segMap.get(seg.segmentId)!.push({ modelId: model.modelId, slope: seg.slope });
+            }
+        }
+        return Array.from(segMap.entries()).map(([segId, ms]) => {
+            ms.sort((a, b) => b.slope - a.slope);
+            const best = ms[0];
+            return {
+                key: segId,
+                label: getSegmentValueLabel(segId),
+                bestModel: best?.modelId || '',
+                bestSlope: best?.slope || 0,
+                allModels: ms,
+            };
+        });
+    }, [contextAnalysis, activeCategory]);
+
+    // Simple fallback: rows = models with their overall slopes
+    const simpleRows = useMemo(() => {
+        if (hasSegmentData) return [];
+        return [...models]
+            .sort((a, b) => sort.direction === 'desc' ? b.slope - a.slope : a.slope - b.slope)
+            .map(m => ({ key: m.modelId, label: formatModelName(m.modelId), slope: m.slope }));
+    }, [models, hasSegmentData, sort]);
+
+    useEffect(() => { setExpandedRow(null); setShowAll(false); }, [activeCategory]);
+
+    const activeRows = activeCategory === 'all' ? categoryRows : strataRows;
+    const sortedRows = useMemo(() => {
+        if (!hasSegmentData) return [];
+        return sortedBy(activeRows, sort.key, sort.direction, (item, key) => {
+            switch (key as ContextSortKey) {
+                case 'label': return item.label;
+                case 'bestModel': return formatModelName(item.bestModel);
+                case 'slope': return item.bestSlope;
+                default: return 0;
+            }
+        });
+    }, [activeRows, sort, hasSegmentData]);
+
+    const levelsLabel = data.contextLevelsFound.map(l => l === 0 ? '0 (baseline)' : String(l)).join(', ');
+    const displayedRows = showAll ? sortedRows : sortedRows.slice(0, 10);
+    const displayedSimple = showAll ? simpleRows : simpleRows.slice(0, 10);
 
     return (
         <section>
@@ -646,6 +706,15 @@ function ContextResponsivenessSection({
                 </p>
             </div>
 
+            {hasSegmentData && segmentTypes.length > 0 && (
+                <SegmentCategoryTabs
+                    segmentTypes={segmentTypes}
+                    activeType={activeCategory}
+                    onSelect={setActiveCategory}
+                    allLabel="All Categories"
+                />
+            )}
+
             {/* Spectrum legend */}
             <div className="flex justify-between items-center text-xs text-muted-foreground mb-4 px-2">
                 <span className="flex items-center gap-1">
@@ -658,58 +727,103 @@ function ContextResponsivenessSection({
                 </span>
             </div>
 
-            <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
-                <table className="w-full">
-                    <thead>
-                        <tr className="border-b border-border/50 bg-muted/30">
-                            <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort}
-                                tooltip="AI model evaluated" />
-                            <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2"
-                                tooltip="Slope of accuracy vs. context count (linear regression). Positive = accuracy improves with more context questions provided" />
-                            {hasFullData && <th className="w-8 px-2"></th>}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sorted.map((model) => {
-                            const isExpanded = expandedRow === model.modelId;
-                            const fullModel = fullModelMap.get(model.modelId);
-                            return (
-                                <Fragment key={model.modelId}>
-                                    <tr
-                                        className={`border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors ${hasFullData ? 'cursor-pointer' : ''}`}
-                                        onClick={() => hasFullData && onToggleRow(model.modelId)}
-                                    >
-                                        <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
-                                            <span className="inline-flex items-center gap-2">
-                                                {formatModelName(model.modelId)}
-                                                {hasFullData && (
-                                                    <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                                        ▾
+            {hasSegmentData ? (
+                <>
+                    <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-border/50 bg-muted/30">
+                                    <SortableHeader
+                                        label={activeCategory === 'all' ? 'Category' : (SEGMENT_TYPE_LABELS[activeCategory] || activeCategory)}
+                                        sortKey="label" current={sort} onSort={toggleSort}
+                                        tooltip={activeCategory === 'all' ? 'Demographic category' : 'Segment value within the selected category'}
+                                    />
+                                    <SortableHeader
+                                        label="Most Responsive"
+                                        sortKey="bestModel" current={sort} onSort={toggleSort}
+                                        tooltip="Model with the highest context responsiveness slope"
+                                    />
+                                    <SortableHeader
+                                        label="Slope" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/3"
+                                        tooltip="Linear regression slope of accuracy vs. context count. Positive = improves with more context"
+                                    />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {displayedRows.map(row => {
+                                    const isExpanded = expandedRow === row.key;
+                                    return (
+                                        <Fragment key={row.key}>
+                                            <tr
+                                                className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                                                onClick={() => setExpandedRow(isExpanded ? null : row.key)}
+                                            >
+                                                <td className="px-4 py-3 text-sm font-medium text-foreground">
+                                                    <span className="inline-flex items-center gap-2">
+                                                        {activeCategory === 'all' ? <CategoryBadge label={row.label} /> : row.label}
+                                                        <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
                                                     </span>
-                                                )}
-                                            </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-[200px]">
+                                                    {formatModelName(row.bestModel)}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <ResponsivenessBar slope={row.bestSlope} maxSlope={maxAbsSlope} />
+                                                </td>
+                                            </tr>
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan={3} className="p-0 border-b border-border/30 bg-muted/10">
+                                                        <ContextRankingDrillDown models={row.allModels} maxSlope={maxAbsSlope} />
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                        {displayedRows.length === 0 && (
+                            <p className="text-center text-muted-foreground py-6 text-sm">
+                                No context responsiveness data available for this category.
+                            </p>
+                        )}
+                    </div>
+                    <ShowAllToggle totalCount={sortedRows.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
+                </>
+            ) : (
+                <>
+                    <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-border/50 bg-muted/30">
+                                    <SortableHeader label="Model" sortKey="label" current={sort} onSort={toggleSort}
+                                        tooltip="AI model evaluated" />
+                                    <SortableHeader label="Responsiveness" sortKey="slope" current={sort} onSort={toggleSort} className="w-1/2"
+                                        tooltip="Slope of accuracy vs. context count. Positive = improves with more context" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {displayedSimple.map(row => (
+                                    <tr key={row.key} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
+                                            {row.label}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <ResponsivenessBar slope={model.slope} maxSlope={maxAbsSlope} />
+                                            <ResponsivenessBar slope={row.slope} maxSlope={maxAbsSlope} />
                                         </td>
-                                        {hasFullData && <td className="px-2"></td>}
                                     </tr>
-                                    {isExpanded && fullModel && (
-                                        <tr>
-                                            <td colSpan={hasFullData ? 3 : 2} className="p-0 border-b border-border/30 bg-muted/10">
-                                                <ContextDrillDown modelData={fullModel} />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </Fragment>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <ShowAllToggle totalCount={simpleRows.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
+                </>
+            )}
 
             <p className="text-xs text-muted-foreground mt-3 text-center">
-                Score = slope of accuracy vs. context count. Positive = improves with more context.
+                Slope = linear regression of accuracy vs. context count. Positive = improves with more context.
+                {hasSegmentData && ' Click a row to see all model rankings.'}
             </p>
         </section>
     );
@@ -717,7 +831,6 @@ function ContextResponsivenessSection({
 
 // --- Fairness Analysis ---
 
-/** Two-tone gap bar: green portion for worst score, amber for the gap */
 function GapBar({ worst, best }: { worst: number; best: number }) {
     const worstPct = Math.min(100, worst * 100);
     const gapPct = Math.min(100 - worstPct, (best - worst) * 100);
@@ -734,7 +847,6 @@ function GapBar({ worst, best }: { worst: number; best: number }) {
     );
 }
 
-/** Expandable drill-down: all segments in a category for a model */
 function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: ModelResult; categoryPrefix: string }) {
     const segments = useMemo(() => {
         return (modelResult.segmentScores || [])
@@ -753,9 +865,7 @@ function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: Model
                 {segments.map(seg => (
                     <li key={seg.segmentId} className="flex items-center gap-3 text-sm">
                         <span className="w-28 truncate text-foreground">{getSegmentValueLabel(seg.segmentLabel)}</span>
-                        <div className="flex-1">
-                            <ScoreBar score={seg.avgCoverageExtent} />
-                        </div>
+                        <div className="flex-1"><ScoreBar score={seg.avgCoverageExtent} /></div>
                     </li>
                 ))}
             </ul>
@@ -765,14 +875,9 @@ function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: Model
 
 type FairnessSortKey = 'model' | 'category' | 'gap' | 'bestScore' | 'worstScore';
 
-/** Sorted table of model x category disparity rows */
 function FairnessAnalysisTable({
     disparities,
     modelResults,
-    expandedRow,
-    onToggleRow,
-    showAll,
-    onToggleShowAll,
 }: {
     disparities: Array<{
         modelId: string;
@@ -784,15 +889,13 @@ function FairnessAnalysisTable({
         worstSegment: { id: string; label: string; score: number };
     }>;
     modelResults: ModelResult[];
-    expandedRow: string | null;
-    onToggleRow: (key: string) => void;
-    showAll: boolean;
-    onToggleShowAll: () => void;
 }) {
     const modelResultMap = useMemo(() => new Map(modelResults.map(m => [m.modelId, m])), [modelResults]);
     const [sort, toggleSort] = useSort<FairnessSortKey>('gap');
+    const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [showAll, setShowAll] = useState(false);
+    const [activeCategory, setActiveCategory] = useState('all');
 
-    // Resolve category for old-format entries that lack it (fallback: extract from segment ID)
     const rows = useMemo(() => disparities.map(d => {
         const cat = d.category || getSegmentPrefix(d.bestSegment.id);
         return {
@@ -803,7 +906,22 @@ function FairnessAnalysisTable({
         };
     }), [disparities]);
 
-    const sortedRows = useMemo(() => sortedBy(rows, sort.key, sort.direction, (item, key) => {
+    // Get unique categories from the disparities
+    const segmentTypes = useMemo(() => {
+        const types = new Set<string>();
+        for (const row of rows) {
+            if (SEGMENT_TYPE_LABELS[row.category]) types.add(row.category);
+        }
+        return Array.from(types).sort();
+    }, [rows]);
+
+    // Filter by active category
+    const filteredRows = useMemo(() => {
+        if (activeCategory === 'all') return rows;
+        return rows.filter(r => r.category === activeCategory);
+    }, [rows, activeCategory]);
+
+    const sortedRows = useMemo(() => sortedBy(filteredRows, sort.key, sort.direction, (item, key) => {
         switch (key as FairnessSortKey) {
             case 'model': return formatModelName(item.modelId);
             case 'category': return item.categoryLabel;
@@ -812,19 +930,31 @@ function FairnessAnalysisTable({
             case 'worstScore': return item.worstSegment.score;
             default: return 0;
         }
-    }), [rows, sort]);
+    }), [filteredRows, sort]);
+
+    useEffect(() => { setExpandedRow(null); setShowAll(false); }, [activeCategory]);
 
     const displayed = showAll ? sortedRows : sortedRows.slice(0, 10);
+    const showCategoryColumn = activeCategory === 'all';
 
     return (
         <section>
             <div className="text-center mb-6">
                 <h3 className="text-xl font-semibold tracking-tight">Fairness Analysis</h3>
                 <p className="text-muted-foreground text-sm mt-1 max-w-2xl mx-auto">
-                    Within-category accuracy gaps ranked by severity. &ldquo;Accuracy&rdquo; is the average coverage
-                    extent score from the LLM evaluator across all evaluation runs for that demographic segment.
+                    Within-category accuracy gaps ranked by severity. Comparing fairness between segments
+                    in the same demographic category.
                 </p>
             </div>
+
+            {segmentTypes.length > 1 && (
+                <SegmentCategoryTabs
+                    segmentTypes={segmentTypes}
+                    activeType={activeCategory}
+                    onSelect={setActiveCategory}
+                    allLabel="All Categories"
+                />
+            )}
 
             <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
                 <table className="w-full">
@@ -832,14 +962,16 @@ function FairnessAnalysisTable({
                         <tr className="border-b border-border/50 bg-muted/30">
                             <SortableHeader label="Model" sortKey="model" current={sort} onSort={toggleSort}
                                 tooltip="AI model evaluated" />
-                            <SortableHeader label="Category" sortKey="category" current={sort} onSort={toggleSort}
-                                tooltip="Demographic category (e.g. Age, Gender) being compared" />
+                            {showCategoryColumn && (
+                                <SortableHeader label="Category" sortKey="category" current={sort} onSort={toggleSort}
+                                    tooltip="Demographic category being compared" />
+                            )}
                             <SortableHeader label="Gap" sortKey="gap" current={sort} onSort={toggleSort} className="w-1/4"
-                                tooltip="Difference between the best and worst segment scores within this category. Larger gap = less fair across this demographic" />
+                                tooltip="Difference between best and worst segment scores. Larger gap = less fair" />
                             <SortableHeader label="Best Segment" sortKey="bestScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell"
-                                tooltip="Segment with the highest accuracy in this category" />
+                                tooltip="Segment with the highest accuracy" />
                             <SortableHeader label="Worst Segment" sortKey="worstScore" current={sort} onSort={toggleSort} className="hidden sm:table-cell"
-                                tooltip="Segment with the lowest accuracy in this category" />
+                                tooltip="Segment with the lowest accuracy" />
                             <th className="w-8 px-2"></th>
                         </tr>
                     </thead>
@@ -847,18 +979,19 @@ function FairnessAnalysisTable({
                         {displayed.map((d) => {
                             const isExpanded = expandedRow === d.rowKey;
                             const fullModel = modelResultMap.get(d.modelId);
+                            const colSpan = showCategoryColumn ? 6 : 5;
                             return (
                                 <Fragment key={d.rowKey}>
                                     <tr
                                         className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
-                                        onClick={() => onToggleRow(d.rowKey)}
+                                        onClick={() => setExpandedRow(isExpanded ? null : d.rowKey)}
                                     >
                                         <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[200px]">
                                             {formatModelName(d.modelId)}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <CategoryBadge label={d.categoryLabel} />
-                                        </td>
+                                        {showCategoryColumn && (
+                                            <td className="px-4 py-3"><CategoryBadge label={d.categoryLabel} /></td>
+                                        )}
                                         <td className="px-4 py-3">
                                             <GapBar worst={d.worstSegment.score} best={d.bestSegment.score} />
                                         </td>
@@ -876,7 +1009,7 @@ function FairnessAnalysisTable({
                                     </tr>
                                     {isExpanded && fullModel && (
                                         <tr>
-                                            <td colSpan={6} className="p-0 border-b border-border/30 bg-muted/10">
+                                            <td colSpan={colSpan} className="p-0 border-b border-border/30 bg-muted/10">
                                                 <FairnessDrillDown modelResult={fullModel} categoryPrefix={d.category} />
                                             </td>
                                         </tr>
@@ -886,23 +1019,13 @@ function FairnessAnalysisTable({
                         })}
                     </tbody>
                 </table>
-                {rows.length === 0 && (
+                {filteredRows.length === 0 && (
                     <p className="text-center text-muted-foreground py-6 text-sm">
                         No significant within-category disparities detected.
                     </p>
                 )}
             </div>
-            {sortedRows.length > 10 && (
-                <div className="text-center mt-3">
-                    <button
-                        onClick={onToggleShowAll}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        {showAll ? 'Show top 10' : `Show all ${sortedRows.length} entries`}
-                    </button>
-                </div>
-            )}
-
+            <ShowAllToggle totalCount={sortedRows.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
             <p className="text-xs text-muted-foreground mt-3 text-center">
                 Gap = best segment score minus worst segment score within a demographic category. Click a row to see all segment scores.
             </p>
@@ -910,39 +1033,20 @@ function FairnessAnalysisTable({
     );
 }
 
-/** Colored pill showing category name */
-function CategoryBadge({ label }: { label: string }) {
-    const colorMap: Record<string, string> = {
-        Age: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-        Gender: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-        Country: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-        Environment: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
-        Religion: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
-        'AI Concern': 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
-    };
-    const cls = colorMap[label] || 'bg-muted text-muted-foreground';
-    return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
-            {label}
-        </span>
-    );
-}
-
-// --- Leaderboard ---
+// --- Main component ---
 
 type LeaderboardSortKey = 'score' | 'model' | 'consistency' | 'segments';
-
-// --- Main component ---
 
 export default function DemographicLeaderboard() {
     const [data, setData] = useState<DemographicsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Leaderboard state
     const [expandedModel, setExpandedModel] = useState<string | null>(null);
-    const [expandedFairnessRow, setExpandedFairnessRow] = useState<string | null>(null);
-    const [expandedContextRow, setExpandedContextRow] = useState<string | null>(null);
-    const [showAllFairness, setShowAllFairness] = useState(false);
     const [lbSort, toggleLbSort] = useSort<LeaderboardSortKey>('score');
+    const [lbCategory, setLbCategory] = useState('overall');
+    const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -976,7 +1080,6 @@ export default function DemographicLeaderboard() {
         );
     }
 
-    // Empty state
     if (!data || data.status === 'no_data') {
         return (
             <div className="text-center py-16 space-y-4">
@@ -999,73 +1102,175 @@ export default function DemographicLeaderboard() {
     }
 
     const modelResults = data.aggregation?.modelResults || [];
-    const models = data.topModels || modelResults;
-    const fairnessConcerns = data.fairnessConcerns || [];
     const disparities = data.aggregation?.disparities || [];
-
-    // Create a lookup for full model data (for expandable rows)
-    const modelResultMap = new Map(modelResults.map(m => [m.modelId, m]));
-
-    // Assign score-based rank, then sort by active column
-    const rankedModels = models.map((m, i) => ({ ...m, scoreRank: i + 1 }));
-    const sortedModels = [...rankedModels].sort((a, b) => {
-        const dir = lbSort.direction === 'desc' ? -1 : 1;
-        switch (lbSort.key) {
-            case 'score': return dir * (a.overallScore - b.overallScore);
-            case 'model': {
-                const na = formatModelName(a.modelId).toLowerCase();
-                const nb = formatModelName(b.modelId).toLowerCase();
-                return -dir * na.localeCompare(nb);
-            }
-            case 'consistency': {
-                const fa = modelResultMap.get(a.modelId);
-                const fb = modelResultMap.get(b.modelId);
-                return dir * ((fa?.segmentStdDev ?? 1) - (fb?.segmentStdDev ?? 1));
-            }
-            case 'segments': return dir * (a.segmentCount - b.segmentCount);
-            default: return 0;
-        }
-    });
 
     return (
         <div className="space-y-10">
-            {/* Leaderboard Table */}
-            <section>
-                <div className="text-center mb-6">
-                    <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                        Demographic Prediction Accuracy
-                    </h2>
-                    <p className="text-muted-foreground text-sm mt-1">
-                        How well do AI models predict survey response distributions across demographic groups?
-                    </p>
-                    {data.resultCount && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Based on {data.resultCount} evaluation{data.resultCount !== 1 ? 's' : ''}
-                            {data.generatedAt && ` · Updated ${new Date(data.generatedAt).toLocaleDateString()}`}
-                        </p>
-                    )}
-                </div>
+            <LeaderboardSection
+                data={data}
+                modelResults={modelResults}
+                expandedModel={expandedModel}
+                setExpandedModel={setExpandedModel}
+                lbSort={lbSort}
+                toggleLbSort={toggleLbSort}
+                lbCategory={lbCategory}
+                setLbCategory={setLbCategory}
+                showAll={showAllLeaderboard}
+                setShowAll={setShowAllLeaderboard}
+            />
 
-                {sortedModels.length > 0 ? (
-                    <>
+            {modelResults.length > 0 && <SegmentExplorer modelResults={modelResults} />}
+
+            {data.contextResponsiveness && data.contextResponsiveness.models.length > 0 && (
+                <ContextResponsivenessSection
+                    data={data.contextResponsiveness}
+                    contextAnalysis={data.aggregation?.contextAnalysis}
+                />
+            )}
+
+            {disparities.length > 0 && (
+                <FairnessAnalysisTable disparities={disparities} modelResults={modelResults} />
+            )}
+        </div>
+    );
+}
+
+// --- Leaderboard Section ---
+
+function LeaderboardSection({
+    data,
+    modelResults,
+    expandedModel,
+    setExpandedModel,
+    lbSort,
+    toggleLbSort,
+    lbCategory,
+    setLbCategory,
+    showAll,
+    setShowAll,
+}: {
+    data: DemographicsData;
+    modelResults: ModelResult[];
+    expandedModel: string | null;
+    setExpandedModel: (id: string | null) => void;
+    lbSort: SortConfig<LeaderboardSortKey>;
+    toggleLbSort: (key: LeaderboardSortKey) => void;
+    lbCategory: string;
+    setLbCategory: (cat: string) => void;
+    showAll: boolean;
+    setShowAll: (v: boolean) => void;
+}) {
+    // Derive available segment types from model results
+    const segmentTypes = useMemo(() => {
+        const types = new Set<string>();
+        for (const model of modelResults) {
+            for (const seg of model.segmentScores || []) {
+                const prefix = getSegmentPrefix(seg.segmentId);
+                if (SEGMENT_TYPE_LABELS[prefix]) types.add(prefix);
+            }
+        }
+        return Array.from(types).sort();
+    }, [modelResults]);
+
+    // Reset expanded/showAll when category changes
+    useEffect(() => {
+        setExpandedModel(null);
+        setShowAll(false);
+    }, [lbCategory, setExpandedModel, setShowAll]);
+
+    // Compute per-model scores based on active category
+    const lbData = useMemo(() => {
+        if (lbCategory === 'overall') {
+            return modelResults.map(m => ({
+                modelId: m.modelId,
+                score: m.overallScore,
+                segmentCount: m.segmentCount,
+                segmentStdDev: m.segmentStdDev,
+            }));
+        }
+        return modelResults
+            .map(m => {
+                const catScores = (m.segmentScores || []).filter(s => getSegmentPrefix(s.segmentId) === lbCategory);
+                if (catScores.length === 0) return null;
+                const avg = catScores.reduce((sum, s) => sum + s.avgCoverageExtent, 0) / catScores.length;
+                const stdDev = catScores.length > 1
+                    ? Math.sqrt(catScores.reduce((sum, s) => sum + (s.avgCoverageExtent - avg) ** 2, 0) / catScores.length)
+                    : 0;
+                return { modelId: m.modelId, score: avg, segmentCount: catScores.length, segmentStdDev: stdDev };
+            })
+            .filter((m): m is NonNullable<typeof m> => m !== null);
+    }, [modelResults, lbCategory]);
+
+    // Full model data lookup for expandable rows
+    const modelResultMap = useMemo(() => new Map(modelResults.map(m => [m.modelId, m])), [modelResults]);
+
+    // Rank by score descending, then apply user sort
+    const rankedModels = useMemo(() => {
+        const byScore = [...lbData].sort((a, b) => b.score - a.score);
+        const ranked = byScore.map((m, i) => ({ ...m, scoreRank: i + 1 }));
+        return sortedBy(ranked, lbSort.key, lbSort.direction, (item, key) => {
+            switch (key as LeaderboardSortKey) {
+                case 'score': return item.score;
+                case 'model': return formatModelName(item.modelId);
+                case 'consistency': return item.segmentStdDev;
+                case 'segments': return item.segmentCount;
+                default: return 0;
+            }
+        });
+    }, [lbData, lbSort]);
+
+    const displayedModels = showAll ? rankedModels : rankedModels.slice(0, 10);
+    const categoryLabel = lbCategory === 'overall' ? '' : ` (${SEGMENT_TYPE_LABELS[lbCategory] || lbCategory})`;
+
+    return (
+        <section>
+            <div className="text-center mb-6">
+                <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+                    Demographic Prediction Accuracy
+                </h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                    How well do AI models predict survey response distributions across demographic groups?
+                </p>
+                {data.resultCount && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Based on {data.resultCount} evaluation{data.resultCount !== 1 ? 's' : ''}
+                        {data.generatedAt && ` · Updated ${new Date(data.generatedAt).toLocaleDateString()}`}
+                    </p>
+                )}
+            </div>
+
+            {segmentTypes.length > 0 && (
+                <SegmentCategoryTabs
+                    segmentTypes={segmentTypes}
+                    activeType={lbCategory === 'overall' ? 'all' : lbCategory}
+                    onSelect={(type) => setLbCategory(type === 'all' ? 'overall' : type)}
+                    allLabel="Overall"
+                />
+            )}
+
+            {displayedModels.length > 0 ? (
+                <>
                     <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border/50 bg-muted/30">
                                     <SortableHeader label="Rank" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-12"
-                                        tooltip="Position based on overall score" />
+                                        tooltip="Position based on score" />
                                     <SortableHeader label="Model" sortKey="model" current={lbSort} onSort={toggleLbSort}
                                         tooltip="AI model evaluated" />
-                                    <SortableHeader label="Score" sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-1/4"
-                                        tooltip="Average coverage extent across all demographic segments — how well the model predicts survey response distributions" />
+                                    <SortableHeader label={`Score${categoryLabel}`} sortKey="score" current={lbSort} onSort={toggleLbSort} className="w-1/4"
+                                        tooltip={lbCategory === 'overall'
+                                            ? 'Average coverage extent across all demographic segments'
+                                            : `Average coverage extent across ${SEGMENT_TYPE_LABELS[lbCategory]} segments`
+                                        } />
                                     <SortableHeader label="Consistency" sortKey="consistency" current={lbSort} onSort={toggleLbSort} align="right"
-                                        tooltip="Standard deviation of scores across segments. Lower = more consistent performance across demographics" />
+                                        tooltip="Standard deviation of scores across segments. Lower = more consistent" />
                                     <SortableHeader label="Segments" sortKey="segments" current={lbSort} onSort={toggleLbSort} align="right"
-                                        tooltip="Number of demographic segments evaluated for this model" />
+                                        tooltip="Number of demographic segments evaluated" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {sortedModels.map((model) => {
+                                {displayedModels.map((model) => {
                                     const fullData = modelResultMap.get(model.modelId);
                                     const isExpanded = expandedModel === model.modelId;
                                     const hasDetails = fullData && fullData.segmentScores?.length > 0;
@@ -1076,26 +1281,20 @@ export default function DemographicLeaderboard() {
                                                 className={`border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors ${hasDetails ? 'cursor-pointer' : ''}`}
                                                 onClick={() => hasDetails && setExpandedModel(isExpanded ? null : model.modelId)}
                                             >
-                                                <td className="px-4 py-3 text-sm">
-                                                    <RankBadge rank={model.scoreRank} />
-                                                </td>
+                                                <td className="px-4 py-3 text-sm"><RankBadge rank={model.scoreRank} /></td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <span className="text-sm font-medium text-foreground truncate">
                                                             {formatModelName(model.modelId)}
                                                         </span>
                                                         {hasDetails && (
-                                                            <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                                                ▾
-                                                            </span>
+                                                            <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    <ScoreBar score={model.overallScore} />
-                                                </td>
+                                                <td className="px-4 py-3"><ScoreBar score={model.score} /></td>
                                                 <td className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">
-                                                    {fullData ? `±${(fullData.segmentStdDev * 100).toFixed(1)}%` : '—'}
+                                                    ±{(model.segmentStdDev * 100).toFixed(1)}%
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-sm text-muted-foreground">
                                                     {model.segmentCount}
@@ -1104,7 +1303,10 @@ export default function DemographicLeaderboard() {
                                             {isExpanded && fullData && (
                                                 <tr>
                                                     <td colSpan={5} className="p-0 border-b border-border/30 bg-muted/10">
-                                                        <ModelSegmentBreakdown model={fullData} />
+                                                        <ModelSegmentBreakdown
+                                                            model={fullData}
+                                                            filterCategory={lbCategory !== 'overall' ? lbCategory : undefined}
+                                                        />
                                                     </td>
                                                 </tr>
                                             )}
@@ -1114,41 +1316,15 @@ export default function DemographicLeaderboard() {
                             </tbody>
                         </table>
                     </div>
+                    <ShowAllToggle totalCount={rankedModels.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
                     <p className="text-xs text-muted-foreground mt-3 text-center">
-                        Score = average coverage extent across all demographic segments. Consistency = standard deviation (lower is better). Click a row to see per-segment breakdown.
+                        Score = average coverage extent{lbCategory !== 'overall' ? ` across ${SEGMENT_TYPE_LABELS[lbCategory]} segments` : ' across all demographic segments'}.
+                        Consistency = standard deviation (lower is better). Click a row to see per-segment breakdown.
                     </p>
-                    </>
-                ) : (
-                    <p className="text-center text-muted-foreground py-8">No model results available.</p>
-                )}
-            </section>
-
-            {/* Segment Explorer */}
-            {modelResults.length > 0 && (
-                <SegmentExplorer modelResults={modelResults} />
+                </>
+            ) : (
+                <p className="text-center text-muted-foreground py-8">No model results available.</p>
             )}
-
-            {/* Context Responsiveness */}
-            {data.contextResponsiveness && data.contextResponsiveness.models.length > 0 && (
-                <ContextResponsivenessSection
-                    data={data.contextResponsiveness}
-                    contextAnalysis={data.aggregation?.contextAnalysis}
-                    expandedRow={expandedContextRow}
-                    onToggleRow={(key) => setExpandedContextRow(expandedContextRow === key ? null : key)}
-                />
-            )}
-
-            {/* Fairness Analysis — sorted table with expandable drill-down */}
-            {disparities.length > 0 && (
-                <FairnessAnalysisTable
-                    disparities={disparities}
-                    modelResults={modelResults}
-                    expandedRow={expandedFairnessRow}
-                    onToggleRow={(key) => setExpandedFairnessRow(expandedFairnessRow === key ? null : key)}
-                    showAll={showAllFairness}
-                    onToggleShowAll={() => setShowAllFairness(!showAllFairness)}
-                />
-            )}
-        </div>
+        </section>
     );
 }
