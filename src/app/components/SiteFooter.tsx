@@ -1,4 +1,6 @@
-import Link from 'next/link';
+'use client';
+
+import { usePathname } from 'next/navigation';
 import CIPLogo from '@/components/icons/CIPLogo';
 import { APP_REPO_URL, BLUEPRINT_CONFIG_REPO_URL } from '@/lib/configConstants';
 import { cn } from '@/lib/utils';
@@ -7,7 +9,31 @@ interface SiteFooterProps {
   contentMaxWidth?: string;
 }
 
+function useBugReportUrl() {
+  const pathname = usePathname();
+
+  const params = new URLSearchParams({
+    template: 'bug_report.yml',
+  });
+
+  if (typeof window !== 'undefined') {
+    params.set('page-url', window.location.href);
+  } else if (pathname) {
+    params.set('page-url', pathname);
+  }
+
+  // Extract blueprint ID from /analysis/[configId]/... paths
+  const match = pathname?.match(/^\/analysis\/([^/]+)/);
+  if (match) {
+    params.set('blueprint-id', decodeURIComponent(match[1]));
+  }
+
+  return `${APP_REPO_URL}/issues/new?${params.toString()}`;
+}
+
 export function SiteFooter({ contentMaxWidth = 'max-w-7xl' }: SiteFooterProps) {
+  const bugReportUrl = useBugReportUrl();
+
   return (
     <div className="w-full bg-header py-6 border-t border-border/50">
       <div className={cn("mx-auto px-4 sm:px-6 lg:px-8", contentMaxWidth)}>
@@ -43,7 +69,7 @@ export function SiteFooter({ contentMaxWidth = 'max-w-7xl' }: SiteFooterProps) {
             </a>
             <span className="text-muted-foreground/60">|</span>
             <a
-              href={`${APP_REPO_URL}/issues/new/choose`}
+              href={bugReportUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary dark:hover:text-sky-400 transition-colors"
@@ -55,4 +81,4 @@ export function SiteFooter({ contentMaxWidth = 'max-w-7xl' }: SiteFooterProps) {
       </div>
     </div>
   );
-} 
+}

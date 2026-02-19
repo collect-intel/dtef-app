@@ -29,10 +29,9 @@ body:
     id: blueprint-id
     attributes:
       label: Blueprint ID
-      description: Find this in your dashboard URL or settings page. Required for reproduction.
       placeholder: e.g. my-blueprint-name
     validations:
-      required: true
+      required: false
 
   - type: input
     id: page-url
