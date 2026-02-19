@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from './configConstants';
 import { ComparisonConfig } from '@/cli/types/cli_types'
+import { fetchModelCollectionCached } from './github-raw-content';
 
 // Define a simple logger interface for compatibility
 export interface SimpleLogger {
@@ -232,6 +233,7 @@ export async function fetchModelCollection(
 
 export async function resolveModelsInConfig(
   config: ComparisonConfig,
+  commitSha?: string | null,
   githubToken?: string,
   logger: SimpleLogger = defaultLogger
 ): Promise<ComparisonConfig> {
@@ -242,20 +244,18 @@ export async function resolveModelsInConfig(
 
   if (!Array.isArray(resolvedConfig.models)) {
     logger.warn(`[blueprint-service] Config '${resolvedConfig.configId}' has an invalid 'models' field (not an array). Proceeding without model resolution for this field.`);
-    return resolvedConfig; // Return original config if models field is not an array
+    return resolvedConfig;
   }
 
   for (const modelEntry of originalModels) {
     if (typeof modelEntry === 'string' && !modelEntry.includes(':') && modelEntry.toUpperCase() === modelEntry) {
       logger.info(`[blueprint-service] Found model collection placeholder: '${modelEntry}' in config '${resolvedConfig.configId}'`);
-      const collectionModels = await fetchModelCollection(modelEntry, githubToken, logger);
+      const collectionModels = await fetchModelCollectionCached(modelEntry, commitSha ?? null, githubToken);
       if (collectionModels) {
         newModelsList.push(...collectionModels);
       } else {
         logger.error(`[blueprint-service] Could not resolve model collection '${modelEntry}' for config '${resolvedConfig.configId}'. This collection will be skipped.`);
-        // Optionally, decide if this should be a critical error that stops processing
-        // For now, we'll allow the config to proceed without this specific collection
-        collectionProcessingError = true; 
+        collectionProcessingError = true;
       }
     } else if (typeof modelEntry === 'string') {
       newModelsList.push(modelEntry);
@@ -266,10 +266,10 @@ export async function resolveModelsInConfig(
 
   resolvedConfig.models = [...new Set(newModelsList)]; // Deduplicate
   logger.info(`[blueprint-service] Final models for config '${resolvedConfig.configId}' after resolution: [${resolvedConfig.models.join(', ')}] (Count: ${resolvedConfig.models.length})`);
-  
+
   if (originalModels.length > 0 && resolvedConfig.models.length === 0 && !collectionProcessingError) {
      logger.warn(`[blueprint-service] Config '${resolvedConfig.configId}' resulted in an empty list of models after attempting to resolve collections (original was: [${originalModels.join(',')}]). Check collection definitions or model entries.`);
   }
-  
+
   return resolvedConfig;
 } 

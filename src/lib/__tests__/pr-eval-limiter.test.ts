@@ -13,10 +13,12 @@ import {
 } from '../pr-eval-limiter';
 import { ComparisonConfig } from '@/cli/types/cli_types';
 
-// Mock axios for model collection fetching
-jest.mock('axios');
-import axios from 'axios';
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Mock the cached model collection fetcher
+jest.mock('../github-raw-content', () => ({
+  fetchModelCollectionCached: jest.fn(),
+}));
+import { fetchModelCollectionCached } from '../github-raw-content';
+const mockedFetchCollection = fetchModelCollectionCached as jest.MockedFunction<typeof fetchModelCollectionCached>;
 
 describe('PR_EVAL_LIMITS constants', () => {
   it('should have reasonable hardcoded limits', () => {
@@ -34,9 +36,9 @@ describe('checkPREvalLimits', () => {
     jest.clearAllMocks();
 
     // Mock CORE collection to return 5 models
-    mockedAxios.get.mockResolvedValue({
-      data: ['openai:gpt-4', 'anthropic:claude-3-opus', 'openai:gpt-3.5-turbo', 'anthropic:claude-3-sonnet', 'google:gemini-pro']
-    });
+    mockedFetchCollection.mockResolvedValue(
+      ['openai:gpt-4', 'anthropic:claude-3-opus', 'openai:gpt-3.5-turbo', 'anthropic:claude-3-sonnet', 'google:gemini-pro']
+    );
   });
 
   describe('prompts limit', () => {
@@ -192,10 +194,7 @@ describe('checkPREvalLimits', () => {
       const result = await checkPREvalLimits(config);
 
       expect(result.allowed).toBe(true);
-      expect(mockedAxios.get).toHaveBeenCalledWith(
-        expect.stringContaining('CORE.json'),
-        expect.any(Object)
-      );
+      expect(mockedFetchCollection).toHaveBeenCalledWith('CORE', null, undefined);
     });
 
     it('should detect disallowed model collections', async () => {
@@ -233,7 +232,7 @@ describe('checkPREvalLimits', () => {
 
       expect(result.allowed).toBe(true);
       // Should not try to fetch collections for direct model IDs
-      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(mockedFetchCollection).not.toHaveBeenCalled();
     });
 
     it('should allow custom model definitions', async () => {
@@ -256,9 +255,9 @@ describe('checkPREvalLimits', () => {
 
     it('should detect too many models after collection resolution', async () => {
       // Mock CORE to return more than maxModels
-      mockedAxios.get.mockResolvedValueOnce({
-        data: Array(10).fill(null).map((_, i) => `model-${i}`),
-      });
+      mockedFetchCollection.mockResolvedValueOnce(
+        Array(10).fill(null).map((_, i) => `model-${i}`)
+      );
 
       const config: ComparisonConfig = {
         id: 'test',
@@ -297,9 +296,9 @@ describe('checkPREvalLimits', () => {
     });
 
     it('should detect total responses exceeding limit', async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        data: Array(5).fill(null).map((_, i) => `model-${i}`),
-      });
+      mockedFetchCollection.mockResolvedValueOnce(
+        Array(5).fill(null).map((_, i) => `model-${i}`)
+      );
 
       const config: ComparisonConfig = {
         id: 'test',
@@ -342,9 +341,9 @@ describe('checkPREvalLimits', () => {
 
   describe('multiple violations', () => {
     it('should report all violations', async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        data: Array(10).fill(null).map((_, i) => `model-${i}`),
-      });
+      mockedFetchCollection.mockResolvedValueOnce(
+        Array(10).fill(null).map((_, i) => `model-${i}`)
+      );
 
       const config: ComparisonConfig = {
         id: 'test',
@@ -375,9 +374,9 @@ describe('applyPREvalLimits', () => {
     jest.clearAllMocks();
 
     // Mock CORE collection
-    mockedAxios.get.mockResolvedValue({
-      data: ['openai:gpt-4', 'anthropic:claude-3-opus', 'openai:gpt-3.5-turbo', 'anthropic:claude-3-sonnet', 'google:gemini-pro']
-    });
+    mockedFetchCollection.mockResolvedValue(
+      ['openai:gpt-4', 'anthropic:claude-3-opus', 'openai:gpt-3.5-turbo', 'anthropic:claude-3-sonnet', 'google:gemini-pro']
+    );
   });
 
   it('should trim prompts to maxPrompts', async () => {
@@ -436,14 +435,11 @@ describe('applyPREvalLimits', () => {
   });
 
   it('should filter to allowed collections and limit count', async () => {
-    mockedAxios.get.mockImplementation((url: string) => {
-      if (url.includes('CORE.json')) {
-        return Promise.resolve({
-          data: Array(10).fill(null).map((_, i) => `core-model-${i}`)
-        });
+    mockedFetchCollection.mockImplementation(async (name: string) => {
+      if (name === 'CORE') {
+        return Array(10).fill(null).map((_, i) => `core-model-${i}`);
       }
-      // PREMIUM not fetched (not allowed)
-      return Promise.reject(new Error('Not found'));
+      return null;
     });
 
     const config: ComparisonConfig = {
@@ -501,9 +497,9 @@ describe('applyPREvalLimits', () => {
   });
 
   it('should apply all limits together', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: Array(10).fill(null).map((_, i) => `model-${i}`)
-    });
+    mockedFetchCollection.mockResolvedValueOnce(
+      Array(10).fill(null).map((_, i) => `model-${i}`)
+    );
 
     const config: ComparisonConfig = {
       id: 'test',

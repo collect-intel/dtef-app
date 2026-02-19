@@ -63,7 +63,7 @@ async function runPipeline(requestPayload: any) {
 
   // Resolve model group placeholders (e.g. QUICK → individual model IDs)
   const githubToken = process.env.GITHUB_TOKEN;
-  const resolvedConfig = await resolveModelsInConfig(config, githubToken, logger as any);
+  const resolvedConfig = await resolveModelsInConfig(config, null, githubToken, logger as any);
   Object.assign(config, resolvedConfig);
 
   // Custom Model Registration

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import pLimit from 'p-limit';
 import { checkBackgroundAuth } from '@/lib/background-function-auth';
 import { ComparisonConfig } from '@/cli/types/cli_types';
 import { listRunsForConfig } from '@/lib/storageService';
@@ -12,10 +13,14 @@ import { captureError, setContext } from '@/utils/sentry';
 import { callBackgroundFunction } from '@/lib/background-function-client';
 import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
+import { fetchRawContent, preWarmModelCollections } from '@/lib/github-raw-content';
 
 const GITHUB_API_BASE = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}`;
 const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
 const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Concurrency limit for CDN fetches (conservative; CDN handles much more)
+const cdnLimit = pLimit(20);
 
 export async function POST(req: NextRequest) {
   const authError = checkBackgroundAuth(req);
@@ -54,20 +59,16 @@ export async function POST(req: NextRequest) {
   const githubHeaders: Record<string, string> = {
     'Accept': 'application/vnd.github.v3+json',
   };
-  const rawContentHeaders: Record<string, string> = {
-    'Accept': 'application/vnd.github.v3.raw',
-  };
 
   if (githubToken) {
     logger.info('Using GITHUB_TOKEN for API calls.');
     githubHeaders['Authorization'] = `token ${githubToken}`;
-    rawContentHeaders['Authorization'] = `token ${githubToken}`;
   } else {
     logger.warn('GITHUB_TOKEN not set. Making anonymous calls to GitHub API.');
   }
 
   try {
-    // Fetch the latest commit SHA
+    // Fetch the latest commit SHA (1 API call)
     let latestCommitSha: string | null = null;
     try {
       const commitResponse = await axios.get(REPO_COMMITS_API_URL, { headers: githubHeaders });
@@ -80,21 +81,96 @@ export async function POST(req: NextRequest) {
       captureError(commitError, { context: 'fetch-commit-sha' });
     }
 
+    // Fetch file tree (1 API call)
     const treeApiUrl = `${GITHUB_API_BASE}/git/trees/main?recursive=1`;
     logger.info(`Fetching file tree from: ${treeApiUrl}`);
     const treeResponse = await axios.get(treeApiUrl, { headers: githubHeaders });
+
+    if (!treeResponse.data?.tree || !Array.isArray(treeResponse.data.tree)) {
+      const truncated = treeResponse.data?.truncated;
+      logger.error(`GitHub tree API returned invalid data. truncated=${truncated}, has tree=${!!treeResponse.data?.tree}`);
+      return NextResponse.json({
+        error: 'GitHub tree API returned no tree data.',
+        truncated,
+        status: treeResponse.status,
+      }, { status: 502 });
+    }
+
+    if (treeResponse.data.truncated) {
+      logger.warn('GitHub tree response is truncated — some blueprint files may be missing.');
+    }
 
     const filesInBlueprintDir = treeResponse.data.tree.filter(
       (node: any) => node.type === 'blob' && node.path.startsWith('blueprints/') && (node.path.endsWith('.yml') || node.path.endsWith('.yaml') || node.path.endsWith('.json'))
     );
 
-    if (!Array.isArray(filesInBlueprintDir)) {
-      logger.error('Failed to fetch or filter file list from GitHub repo tree.');
-      captureError(new Error('Failed to process file list from GitHub repo'), { treeData: treeResponse.data });
-      return NextResponse.json({ error: 'Failed to process file list from GitHub repo.' }, { status: 500 });
+    if (!Array.isArray(filesInBlueprintDir) || filesInBlueprintDir.length === 0) {
+      logger.error('No blueprint files found in the GitHub repo tree.');
+      return NextResponse.json({ error: 'No blueprint files found in repo tree.' }, { status: 500 });
     }
 
     logger.info(`Found ${filesInBlueprintDir.length} blueprint files in the repo tree.`);
+
+    // Pre-warm model collection cache using CDN (0 API calls)
+    // Discover collection names from the tree response
+    const modelCollectionFiles = treeResponse.data.tree.filter(
+      (node: any) => node.type === 'blob' && node.path.startsWith('models/') && node.path.endsWith('.json')
+    );
+    const collectionNames = modelCollectionFiles.map(
+      (node: any) => node.path.replace('models/', '').replace('.json', '')
+    );
+    logger.info(`Pre-warming ${collectionNames.length} model collections via CDN...`);
+    await preWarmModelCollections(collectionNames, latestCommitSha, githubToken);
+
+    // Pre-fetch all blueprint file contents via CDN with concurrency control
+    // This replaces 1300+ blob API calls with 1300+ CDN requests (no rate limit)
+    const ref = latestCommitSha || 'main';
+    logger.info(`Fetching ${filesInBlueprintDir.length} blueprint files via CDN (ref: ${ref}, concurrency: 20)...`);
+
+    const blueprintFetchResults = await Promise.allSettled(
+      filesInBlueprintDir.map((file: any) =>
+        cdnLimit(async () => {
+          try {
+            const content = await fetchRawContent(BLUEPRINT_CONFIG_REPO_SLUG, ref, file.path);
+            return { file, content, error: null };
+          } catch (cdnError: any) {
+            // Fallback to blob API URL if CDN fails
+            try {
+              const rawContentHeaders: Record<string, string> = {
+                'Accept': 'application/vnd.github.v3.raw',
+              };
+              if (githubToken) {
+                rawContentHeaders['Authorization'] = `token ${githubToken}`;
+              }
+              const fallbackResponse = await axios.get(file.url, { headers: rawContentHeaders });
+              const content = typeof fallbackResponse.data === 'string'
+                ? fallbackResponse.data
+                : JSON.stringify(fallbackResponse.data);
+              return { file, content, error: null };
+            } catch (fallbackError: any) {
+              return { file, content: null, error: fallbackError.message };
+            }
+          }
+        })
+      )
+    );
+
+    // Build a map of file path → content for processing
+    const contentMap = new Map<string, string>();
+    let cdnSucceeded = 0;
+    let cdnFailed = 0;
+    for (const result of blueprintFetchResults) {
+      if (result.status === 'fulfilled' && result.value.content !== null) {
+        contentMap.set(result.value.file.path, result.value.content);
+        cdnSucceeded++;
+      } else {
+        cdnFailed++;
+        const failedFile = result.status === 'fulfilled' ? result.value.file.path : 'unknown';
+        const errorMsg = result.status === 'fulfilled' ? result.value.error : result.reason?.message;
+        logger.error(`Failed to fetch blueprint ${failedFile}: ${errorMsg}`);
+      }
+    }
+    logger.info(`Blueprint fetch complete: ${cdnSucceeded} succeeded, ${cdnFailed} failed`);
 
     let scheduled = 0;
     let skippedFresh = 0;
@@ -114,10 +190,13 @@ export async function POST(req: NextRequest) {
         : file.path;
 
       try {
-        const configFileResponse = await axios.get(file.url, { headers: rawContentHeaders });
+        const configContent = contentMap.get(file.path);
+        if (!configContent) {
+          skippedOther++;
+          continue;
+        }
 
         const fileType = (file.path.endsWith('.yaml') || file.path.endsWith('.yml')) ? 'yaml' : 'json';
-        const configContent = typeof configFileResponse.data === 'string' ? configFileResponse.data : JSON.stringify(configFileResponse.data);
 
         let config: ComparisonConfig = parseAndNormalizeBlueprint(configContent, fileType);
 
@@ -164,7 +243,8 @@ export async function POST(req: NextRequest) {
 
         const currentId = config.id!;
 
-        config = await resolveModelsInConfig(config, githubToken, logger as any);
+        // resolveModelsInConfig now uses cached model collections (0 API calls)
+        config = await resolveModelsInConfig(config, latestCommitSha, githubToken, logger as any);
 
         if (config.models.length === 0) {
           logger.warn(`Blueprint ${file.path} (id: ${currentId}) has no models after resolution. Skipping.`);
@@ -250,6 +330,9 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     logger.error('Error in handler', error);
     captureError(error, { handler: 'fetch-and-schedule-evals' });
-    return NextResponse.json({ error: 'Error processing scheduled eval check.' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Error processing scheduled eval check.',
+      message: error?.message || String(error),
+    }, { status: 500 });
   }
 }

@@ -190,7 +190,7 @@ async function runPRPipeline(body: any) {
     }
 
     logger.info(`Resolving model collections for PR #${prNumber}...`);
-    config = await resolveModelsInConfig(config, process.env.GITHUB_TOKEN, logger as SimpleLogger);
+    config = await resolveModelsInConfig(config, null, process.env.GITHUB_TOKEN, logger as SimpleLogger);
     logger.info(`Models after resolution: ${config.models?.length || 0} models`);
 
     if (!config.models || config.models.length === 0) {

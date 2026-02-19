@@ -358,7 +358,7 @@ export async function loadAndValidateConfig(options: {
         const customModels = configJson.models.filter(m => typeof m === 'object') as CustomModelDefinition[];
         // Temporarily create a config with only string models for the resolver
         const tempConfigForResolution: ComparisonConfig = { ...configJson, models: stringModels };
-        const resolvedConfig = await resolveModelsInConfig(tempConfigForResolution, githubToken, logger as SimpleLogger);
+        const resolvedConfig = await resolveModelsInConfig(tempConfigForResolution, null, githubToken, logger as SimpleLogger);
         // Re-combine the resolved string models with the custom models
         configJson.models = [...resolvedConfig.models, ...customModels];
     } else {

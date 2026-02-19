@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
     
     logger.info(`Attempting to resolve model collections for ${config.id}`);
-    config = await resolveModelsInConfig(config, githubToken, logger);
+    config = await resolveModelsInConfig(config, null, githubToken, logger);
     logger.info(`Config for ${config.id} after model resolution: Models: [${config.models?.join(', ')}] (Count: ${config.models?.length})`);
 
     // Check if models array is empty after resolution

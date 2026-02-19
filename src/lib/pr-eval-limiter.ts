@@ -7,8 +7,7 @@
 
 import { ComparisonConfig } from '@/cli/types/cli_types';
 import { CustomModelDefinition } from '@/lib/llm-clients/types';
-import axios from 'axios';
-import { BLUEPRINT_CONFIG_REPO_SLUG } from '@/lib/configConstants';
+import { fetchModelCollectionCached } from '@/lib/github-raw-content';
 
 /**
  * Limits for PR evaluations
@@ -65,34 +64,8 @@ export interface LimitCheckResult {
 }
 
 /**
- * Fetch model collection from GitHub
- */
-async function fetchModelCollection(
-  collectionName: string,
-  githubToken?: string
-): Promise<string[]> {
-  const apiHeaders: Record<string, string> = {
-    'Accept': 'application/vnd.github.v3.raw'
-  };
-
-  if (githubToken) {
-    apiHeaders['Authorization'] = `token ${githubToken}`;
-  }
-
-  const url = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}/contents/models/${collectionName}.json`;
-
-  try {
-    const response = await axios.get(url, { headers: apiHeaders });
-    const models = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-    return Array.isArray(models) ? models : [];
-  } catch (error: any) {
-    console.error(`Failed to fetch model collection ${collectionName}:`, error.message);
-    return [];
-  }
-}
-
-/**
- * Resolve models in blueprint, respecting PR eval limits
+ * Resolve models in blueprint, respecting PR eval limits.
+ * Uses cached model collection fetching (CDN-backed, no API rate limit).
  */
 async function resolveModels(
   configModels: any[],
@@ -121,9 +94,9 @@ async function resolveModels(
           continue;
         }
 
-        // Fetch and expand collection
-        const collectionModels = await fetchModelCollection(modelEntry, githubToken);
-        resolvedModelIds.push(...collectionModels);
+        // Fetch and expand collection (cached, CDN-backed)
+        const collectionModels = await fetchModelCollectionCached(modelEntry, null, githubToken);
+        resolvedModelIds.push(...(collectionModels || []));
       } else {
         // Direct model ID - allow it
         resolvedModelIds.push(modelEntry);

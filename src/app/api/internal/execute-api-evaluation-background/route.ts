@@ -82,7 +82,7 @@ async function runAPIPipeline(requestPayload: { runId: string; config: Compariso
     logger.info(`Executing pipeline for runId: ${runId} with derived configId: ${configIdForStorage} and runLabel: ${runLabel}`);
 
     // Resolve model group placeholders (e.g. QUICK → individual model IDs)
-    const resolvedConfig = await resolveModelsInConfig(config, process.env.GITHUB_TOKEN, logger as any);
+    const resolvedConfig = await resolveModelsInConfig(config, null, process.env.GITHUB_TOKEN, logger as any);
     Object.assign(config, resolvedConfig);
 
     // Custom Model Registration
