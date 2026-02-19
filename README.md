@@ -347,6 +347,10 @@ Contributions are welcome. The framework is open-source under the MIT license.
 
 ---
 
+## Bug Reports & Feedback
+
+Found a bug? Please [open an issue](https://github.com/collect-intel/dtef-app/issues/new/choose) using our bug report template. See [CONTRIBUTING.md](CONTRIBUTING.md) for details on what to include.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
