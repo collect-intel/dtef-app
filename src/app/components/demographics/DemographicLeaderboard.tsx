@@ -11,6 +11,15 @@ import {
 
 // --- Types ---
 
+interface RunScore {
+    score: number;
+    promptCount: number;
+    contextCount: number;
+    configId?: string;
+    runLabel?: string;
+    timestamp?: string;
+}
+
 interface SegmentScore {
     segmentId: string;
     segmentLabel: string;
@@ -18,6 +27,7 @@ interface SegmentScore {
     modelId: string;
     avgCoverageExtent: number;
     promptCount: number;
+    runs?: RunScore[];
 }
 
 interface ModelResult {
@@ -287,6 +297,137 @@ function ShowAllToggle({
     );
 }
 
+// --- Shared Drill-Down Components ---
+
+/** Simple linear regression slope for scatter plot trend line */
+function lrSlope(points: Array<{ x: number; y: number }>): { slope: number; intercept: number } {
+    if (points.length < 2) return { slope: 0, intercept: points[0]?.y ?? 0 };
+    const n = points.length;
+    let sx = 0, sy = 0, sxy = 0, sxx = 0;
+    for (const p of points) { sx += p.x; sy += p.y; sxy += p.x * p.y; sxx += p.x * p.x; }
+    const denom = n * sxx - sx * sx;
+    if (denom === 0) return { slope: 0, intercept: sy / n };
+    const slope = (n * sxy - sx * sy) / denom;
+    const intercept = (sy - slope * sx) / n;
+    return { slope, intercept };
+}
+
+/** Inline SVG scatter plot: score vs. context count with clickable dots and trend line */
+function MiniScatterPlot({ dataPoints }: { dataPoints: FullContextDataPoint[] }) {
+    const sorted = useMemo(() => [...dataPoints].sort((a, b) => a.contextCount - b.contextCount), [dataPoints]);
+    if (sorted.length === 0) return null;
+
+    const W = 280, H = 90;
+    const pad = { top: 10, right: 12, bottom: 22, left: 36 };
+    const pW = W - pad.left - pad.right;
+    const pH = H - pad.top - pad.bottom;
+
+    const ctxValues = sorted.map(p => p.contextCount);
+    const scoreValues = sorted.map(p => p.score);
+    const minCtx = Math.min(...ctxValues);
+    const maxCtx = Math.max(...ctxValues);
+    const minScore = Math.max(0, Math.min(...scoreValues) - 0.05);
+    const maxScore = Math.min(1, Math.max(...scoreValues) + 0.05);
+
+    const xScale = (v: number) => pad.left + (maxCtx === minCtx ? pW / 2 : ((v - minCtx) / (maxCtx - minCtx)) * pW);
+    const yScale = (v: number) => pad.top + pH - (maxScore === minScore ? pH / 2 : ((v - minScore) / (maxScore - minScore)) * pH);
+
+    // Trend line
+    const lr = lrSlope(sorted.map(p => ({ x: p.contextCount, y: p.score })));
+    const trendY = (x: number) => lr.intercept + lr.slope * x;
+
+    // Deduplicate context labels for X axis
+    const uniqueCtx = Array.from(new Set(ctxValues));
+
+    return (
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block">
+            {/* Axes */}
+            <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + pH} stroke="currentColor" opacity={0.15} />
+            <line x1={pad.left} y1={pad.top + pH} x2={pad.left + pW} y2={pad.top + pH} stroke="currentColor" opacity={0.15} />
+            {/* Trend line */}
+            <line
+                x1={xScale(minCtx)} y1={yScale(trendY(minCtx))}
+                x2={xScale(maxCtx)} y2={yScale(trendY(maxCtx))}
+                stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2"
+            />
+            {/* Data points */}
+            {sorted.map((pt, i) => {
+                const cx = xScale(pt.contextCount);
+                const cy = yScale(pt.score);
+                const fill = pt.score >= 0.8 ? '#22c55e' : pt.score >= 0.6 ? '#eab308' : '#ef4444';
+                const href = pt.configId && pt.runLabel && pt.timestamp
+                    ? `/analysis/${encodeURIComponent(pt.configId)}/${encodeURIComponent(pt.runLabel)}/${encodeURIComponent(pt.timestamp)}`
+                    : undefined;
+                return (
+                    <g key={i}>
+                        {href ? (
+                            <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                                <circle cx={cx} cy={cy} r={5} fill={fill} stroke="white" strokeWidth={1.5} style={{ cursor: 'pointer' }} />
+                            </a>
+                        ) : (
+                            <circle cx={cx} cy={cy} r={5} fill={fill} stroke="white" strokeWidth={1.5} />
+                        )}
+                        <text x={cx} y={cy - 8} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                            {(pt.score * 100).toFixed(0)}%
+                        </text>
+                    </g>
+                );
+            })}
+            {/* X axis labels */}
+            {uniqueCtx.map(c => (
+                <text key={c} x={xScale(c)} y={pad.top + pH + 14} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                    c{c}
+                </text>
+            ))}
+            {/* Y axis labels */}
+            <text x={pad.left - 4} y={pad.top + 4} textAnchor="end" fontSize={9} fill="#94a3b8">
+                {(maxScore * 100).toFixed(0)}%
+            </text>
+            <text x={pad.left - 4} y={pad.top + pH + 4} textAnchor="end" fontSize={9} fill="#94a3b8">
+                {(minScore * 100).toFixed(0)}%
+            </text>
+        </svg>
+    );
+}
+
+/** Sorted list of individual run scores with clickable links */
+function RunScoreDrillDown({ runs }: { runs?: RunScore[] }) {
+    if (!runs || runs.length === 0) {
+        return <p className="text-xs text-muted-foreground italic py-1">No individual run data available</p>;
+    }
+    const sorted = useMemo(() => [...runs].sort((a, b) => b.score - a.score), [runs]);
+
+    return (
+        <div className="pt-1.5 pb-1">
+            <p className="text-xs text-muted-foreground mb-1">
+                {sorted.length} run{sorted.length !== 1 ? 's' : ''}:
+            </p>
+            <ul className="space-y-1">
+                {sorted.map((run, i) => {
+                    const href = run.configId && run.runLabel && run.timestamp
+                        ? `/analysis/${encodeURIComponent(run.configId)}/${encodeURIComponent(run.runLabel)}/${encodeURIComponent(run.timestamp)}`
+                        : undefined;
+                    return (
+                        <li key={i} className="flex items-center gap-2 text-sm">
+                            <span className="w-8 text-xs text-muted-foreground text-right flex-shrink-0 font-mono">
+                                c{run.contextCount}
+                            </span>
+                            {href ? (
+                                <a href={href} target="_blank" rel="noopener noreferrer"
+                                    className="flex-1 hover:opacity-80" onClick={e => e.stopPropagation()}>
+                                    <ScoreBar score={run.score} />
+                                </a>
+                            ) : (
+                                <div className="flex-1"><ScoreBar score={run.score} /></div>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
+
 // --- Leaderboard Sub-components ---
 
 /** Expandable segment breakdown for a single model */
@@ -345,12 +486,14 @@ function SegmentModelDrillDown({ segmentId, modelResults }: {
     segmentId: string;
     modelResults: ModelResult[];
 }) {
+    const [expandedModel, setExpandedModel] = useState<string | null>(null);
+
     const modelScores = useMemo(() => {
-        const scores: Array<{ modelId: string; score: number }> = [];
+        const scores: Array<{ modelId: string; score: number; runs?: RunScore[] }> = [];
         for (const model of modelResults) {
             for (const seg of model.segmentScores || []) {
                 if (seg.segmentId === segmentId) {
-                    scores.push({ modelId: model.modelId, score: seg.avgCoverageExtent });
+                    scores.push({ modelId: model.modelId, score: seg.avgCoverageExtent, runs: seg.runs });
                     break;
                 }
             }
@@ -365,16 +508,33 @@ function SegmentModelDrillDown({ segmentId, modelResults }: {
             <p className="text-xs text-muted-foreground mb-2">
                 All model scores for this segment (sorted by score):
             </p>
-            <ul className="space-y-1.5">
-                {modelScores.map((ms, i) => (
-                    <li key={ms.modelId} className="flex items-center gap-3 text-sm">
-                        <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
-                        <span className="w-36 truncate text-foreground">{formatModelName(ms.modelId)}</span>
-                        <div className="flex-1">
-                            <ScoreBar score={ms.score} />
-                        </div>
-                    </li>
-                ))}
+            <ul className="space-y-1">
+                {modelScores.map((ms, i) => {
+                    const isExpanded = expandedModel === ms.modelId;
+                    const hasRuns = ms.runs && ms.runs.length > 1;
+                    return (
+                        <li key={ms.modelId}>
+                            <div
+                                className={`flex items-center gap-3 text-sm py-0.5 ${hasRuns ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                onClick={() => hasRuns && setExpandedModel(isExpanded ? null : ms.modelId)}
+                            >
+                                <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
+                                <span className="w-36 truncate text-foreground">
+                                    {formatModelName(ms.modelId)}
+                                    {hasRuns && (
+                                        <span className={`text-muted-foreground text-xs ml-1 inline-block transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                                    )}
+                                </span>
+                                <div className="flex-1"><ScoreBar score={ms.score} /></div>
+                            </div>
+                            {isExpanded && (
+                                <div className="ml-10 pl-4 border-l-2 border-border/30 mb-1">
+                                    <RunScoreDrillDown runs={ms.runs} />
+                                </div>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
@@ -543,24 +703,94 @@ function ResponsivenessBar({ slope, maxSlope }: { slope: number; maxSlope: numbe
     );
 }
 
-/** Drill-down showing all models ranked by responsiveness */
-function ContextRankingDrillDown({ models, maxSlope }: {
+/** Drill-down showing all models ranked by responsiveness, with expandable third-level */
+function ContextRankingDrillDown({ models, maxSlope, contextAnalysis, activeCategory, rowKey }: {
     models: Array<{ modelId: string; slope: number }>;
     maxSlope: number;
+    contextAnalysis?: FullContextAnalysis;
+    /** 'all' or a specific category prefix */
+    activeCategory: string;
+    /** The category prefix (when activeCategory='all') or segmentId (when per-category) */
+    rowKey: string;
 }) {
+    const [expandedModel, setExpandedModel] = useState<string | null>(null);
+
+    // Build a lookup: modelId → relevant segment data for the third level
+    const modelDataMap = useMemo(() => {
+        if (!contextAnalysis) return new Map<string, FullSegmentResponsiveness[]>();
+        const map = new Map<string, FullSegmentResponsiveness[]>();
+        for (const model of contextAnalysis.models) {
+            if (activeCategory === 'all') {
+                // rowKey is a category prefix — show strata in this category for this model
+                const segs = model.segmentResponsiveness.filter(s => getSegmentPrefix(s.segmentId) === rowKey);
+                if (segs.length > 0) map.set(model.modelId, segs);
+            } else {
+                // rowKey is a segmentId — show just this segment's data for this model
+                const seg = model.segmentResponsiveness.find(s => s.segmentId === rowKey);
+                if (seg) map.set(model.modelId, [seg]);
+            }
+        }
+        return map;
+    }, [contextAnalysis, activeCategory, rowKey]);
+
     return (
         <div className="px-6 py-3">
             <p className="text-xs text-muted-foreground mb-2">All models ranked by responsiveness:</p>
-            <ul className="space-y-1.5">
-                {models.map((m, i) => (
-                    <li key={m.modelId} className="flex items-center gap-3 text-sm">
-                        <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
-                        <span className="w-36 truncate text-foreground">{formatModelName(m.modelId)}</span>
-                        <div className="flex-1">
-                            <ResponsivenessBar slope={m.slope} maxSlope={maxSlope} />
-                        </div>
-                    </li>
-                ))}
+            <ul className="space-y-1">
+                {models.map((m, i) => {
+                    const isExpanded = expandedModel === m.modelId;
+                    const segData = modelDataMap.get(m.modelId);
+                    const hasDetail = segData && segData.length > 0;
+                    return (
+                        <li key={m.modelId}>
+                            <div
+                                className={`flex items-center gap-3 text-sm py-0.5 ${hasDetail ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                onClick={() => hasDetail && setExpandedModel(isExpanded ? null : m.modelId)}
+                            >
+                                <span className="w-6 text-xs text-muted-foreground text-right flex-shrink-0">{i + 1}.</span>
+                                <span className="w-36 truncate text-foreground">
+                                    {formatModelName(m.modelId)}
+                                    {hasDetail && (
+                                        <span className={`text-muted-foreground text-xs ml-1 inline-block transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                                    )}
+                                </span>
+                                <div className="flex-1">
+                                    <ResponsivenessBar slope={m.slope} maxSlope={maxSlope} />
+                                </div>
+                            </div>
+                            {isExpanded && segData && (
+                                <div className="ml-10 pl-4 border-l-2 border-border/30 mb-2">
+                                    {segData.length === 1 ? (
+                                        // Single segment: show scatter plot directly
+                                        <div className="py-1">
+                                            <p className="text-xs text-muted-foreground mb-1">
+                                                Score vs. context level ({segData[0].dataPoints.length} data point{segData[0].dataPoints.length !== 1 ? 's' : ''}):
+                                            </p>
+                                            <MiniScatterPlot dataPoints={segData[0].dataPoints} />
+                                        </div>
+                                    ) : (
+                                        // Multiple segments: show per-stratum scatter plots
+                                        <div className="py-1 space-y-3">
+                                            {segData
+                                                .sort((a, b) => b.slope - a.slope)
+                                                .map(seg => (
+                                                    <div key={seg.segmentId}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-xs font-medium text-foreground">{getSegmentValueLabel(seg.segmentId)}</span>
+                                                            <span className="text-xs text-muted-foreground font-mono">
+                                                                slope: {seg.slope >= 0 ? '+' : ''}{(seg.slope * 100).toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        <MiniScatterPlot dataPoints={seg.dataPoints} />
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
@@ -774,7 +1004,13 @@ function ContextResponsivenessSection({
                                             {isExpanded && (
                                                 <tr>
                                                     <td colSpan={3} className="p-0 border-b border-border/30 bg-muted/10">
-                                                        <ContextRankingDrillDown models={row.allModels} maxSlope={maxAbsSlope} />
+                                                        <ContextRankingDrillDown
+                                                            models={row.allModels}
+                                                            maxSlope={maxAbsSlope}
+                                                            contextAnalysis={contextAnalysis}
+                                                            activeCategory={activeCategory}
+                                                            rowKey={row.key}
+                                                        />
                                                     </td>
                                                 </tr>
                                             )}
@@ -848,6 +1084,8 @@ function GapBar({ worst, best }: { worst: number; best: number }) {
 }
 
 function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: ModelResult; categoryPrefix: string }) {
+    const [expandedSegment, setExpandedSegment] = useState<string | null>(null);
+
     const segments = useMemo(() => {
         return (modelResult.segmentScores || [])
             .filter(s => getSegmentPrefix(s.segmentId) === categoryPrefix)
@@ -861,13 +1099,32 @@ function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: Model
             <p className="text-xs text-muted-foreground mb-2">
                 All {getCategoryLabel(categoryPrefix)} segments for {formatModelName(modelResult.modelId)}:
             </p>
-            <ul className="space-y-1.5">
-                {segments.map(seg => (
-                    <li key={seg.segmentId} className="flex items-center gap-3 text-sm">
-                        <span className="w-28 truncate text-foreground">{getSegmentValueLabel(seg.segmentLabel)}</span>
-                        <div className="flex-1"><ScoreBar score={seg.avgCoverageExtent} /></div>
-                    </li>
-                ))}
+            <ul className="space-y-1">
+                {segments.map(seg => {
+                    const isExpanded = expandedSegment === seg.segmentId;
+                    const hasRuns = seg.runs && seg.runs.length > 1;
+                    return (
+                        <li key={seg.segmentId}>
+                            <div
+                                className={`flex items-center gap-3 text-sm py-0.5 ${hasRuns ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                onClick={() => hasRuns && setExpandedSegment(isExpanded ? null : seg.segmentId)}
+                            >
+                                <span className="w-28 truncate text-foreground">
+                                    {getSegmentValueLabel(seg.segmentLabel)}
+                                    {hasRuns && (
+                                        <span className={`text-muted-foreground text-xs ml-1 inline-block transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                                    )}
+                                </span>
+                                <div className="flex-1"><ScoreBar score={seg.avgCoverageExtent} /></div>
+                            </div>
+                            {isExpanded && (
+                                <div className="ml-6 pl-4 border-l-2 border-border/30 mb-1">
+                                    <RunScoreDrillDown runs={seg.runs} />
+                                </div>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );

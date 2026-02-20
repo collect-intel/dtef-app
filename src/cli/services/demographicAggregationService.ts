@@ -15,6 +15,18 @@ import { DTEFLeaderboardEntry } from '@/types/dtef';
 import { getSegmentPrefix, getCategoryLabel, SEGMENT_TYPE_LABELS } from '@/lib/segmentUtils';
 
 /**
+ * Individual evaluation run score for a (model, segment) pair.
+ */
+export interface RunScore {
+    score: number;
+    promptCount: number;
+    contextCount: number;
+    configId?: string;
+    runLabel?: string;
+    timestamp?: string;
+}
+
+/**
  * Per-segment score for a model.
  */
 export interface SegmentModelScore {
@@ -26,6 +38,8 @@ export interface SegmentModelScore {
     avgCoverageExtent: number;
     /** Number of prompts evaluated */
     promptCount: number;
+    /** Individual evaluation runs for this (model, segment) pair */
+    runs?: RunScore[];
 }
 
 /**
@@ -413,7 +427,9 @@ export class DemographicAggregationService {
         // When the same (model, segment) pair has results at multiple context levels,
         // use only the highest-context result for the main leaderboard/disparity analysis.
         // This prevents multi-level evaluations from inflating segment counts.
+        // Also collect ALL runs per (model, segment) for per-run drill-downs.
         const scoreMap = new Map<string, { score: SegmentModelScore; contextCount: number }>();
+        const allRunsMap = new Map<string, RunScore[]>();
 
         for (const result of dtefResults) {
             const ctx = this.extractDTEFContext(result);
@@ -424,6 +440,18 @@ export class DemographicAggregationService {
 
             for (const [modelId, data] of Object.entries(modelScores)) {
                 const key = `${modelId}::${ctx.segmentId}`;
+
+                // Collect ALL runs for drill-down
+                if (!allRunsMap.has(key)) allRunsMap.set(key, []);
+                allRunsMap.get(key)!.push({
+                    score: data.avgScore,
+                    promptCount: data.promptCount,
+                    contextCount,
+                    configId: result.configId,
+                    runLabel: result.runLabel,
+                    timestamp: result.timestamp,
+                });
+
                 const existing = scoreMap.get(key);
 
                 const score: SegmentModelScore = {
@@ -442,7 +470,11 @@ export class DemographicAggregationService {
             }
         }
 
-        const allSegmentScores: SegmentModelScore[] = Array.from(scoreMap.values()).map(e => e.score);
+        // Attach per-run data to each segment score
+        const allSegmentScores: SegmentModelScore[] = Array.from(scoreMap.entries()).map(([key, e]) => ({
+            ...e.score,
+            runs: (allRunsMap.get(key) || []).sort((a, b) => b.score - a.score),
+        }));
 
         // Group by model
         const modelGroups = new Map<string, SegmentModelScore[]>();
