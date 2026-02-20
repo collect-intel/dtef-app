@@ -482,9 +482,10 @@ function ModelSegmentBreakdown({ model, filterCategory }: { model: ModelResult; 
 
 type SegmentSortKey = 'label' | 'bestModel' | 'bestScore' | 'avgScore';
 
-function SegmentModelDrillDown({ segmentId, modelResults }: {
+function SegmentModelDrillDown({ segmentId, modelResults, runsLookup }: {
     segmentId: string;
     modelResults: ModelResult[];
+    runsLookup: Map<string, RunScore[]>;
 }) {
     const [expandedModel, setExpandedModel] = useState<string | null>(null);
 
@@ -493,13 +494,14 @@ function SegmentModelDrillDown({ segmentId, modelResults }: {
         for (const model of modelResults) {
             for (const seg of model.segmentScores || []) {
                 if (seg.segmentId === segmentId) {
-                    scores.push({ modelId: model.modelId, score: seg.avgCoverageExtent, runs: seg.runs });
+                    const runs = seg.runs || runsLookup.get(`${model.modelId}::${segmentId}`);
+                    scores.push({ modelId: model.modelId, score: seg.avgCoverageExtent, runs });
                     break;
                 }
             }
         }
         return scores.sort((a, b) => b.score - a.score);
-    }, [segmentId, modelResults]);
+    }, [segmentId, modelResults, runsLookup]);
 
     if (modelScores.length === 0) return null;
 
@@ -540,7 +542,7 @@ function SegmentModelDrillDown({ segmentId, modelResults }: {
     );
 }
 
-function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
+function SegmentExplorer({ modelResults, runsLookup }: { modelResults: ModelResult[]; runsLookup: Map<string, RunScore[]> }) {
     const segmentTypes = useMemo(() => {
         const types = new Set<string>();
         for (const model of modelResults) {
@@ -658,7 +660,7 @@ function SegmentExplorer({ modelResults }: { modelResults: ModelResult[] }) {
                                     {isExpanded && (
                                         <tr>
                                             <td colSpan={4} className="p-0 border-b border-border/30 bg-muted/10">
-                                                <SegmentModelDrillDown segmentId={row.segmentId} modelResults={modelResults} />
+                                                <SegmentModelDrillDown segmentId={row.segmentId} modelResults={modelResults} runsLookup={runsLookup} />
                                             </td>
                                         </tr>
                                     )}
@@ -1083,14 +1085,20 @@ function GapBar({ worst, best }: { worst: number; best: number }) {
     );
 }
 
-function FairnessDrillDown({ modelResult, categoryPrefix }: { modelResult: ModelResult; categoryPrefix: string }) {
+function FairnessDrillDown({ modelResult, categoryPrefix, runsLookup }: {
+    modelResult: ModelResult; categoryPrefix: string; runsLookup: Map<string, RunScore[]>;
+}) {
     const [expandedSegment, setExpandedSegment] = useState<string | null>(null);
 
     const segments = useMemo(() => {
         return (modelResult.segmentScores || [])
             .filter(s => getSegmentPrefix(s.segmentId) === categoryPrefix)
+            .map(s => ({
+                ...s,
+                runs: s.runs || runsLookup.get(`${modelResult.modelId}::${s.segmentId}`),
+            }))
             .sort((a, b) => b.avgCoverageExtent - a.avgCoverageExtent);
-    }, [modelResult, categoryPrefix]);
+    }, [modelResult, categoryPrefix, runsLookup]);
 
     if (segments.length === 0) return null;
 
@@ -1135,6 +1143,7 @@ type FairnessSortKey = 'model' | 'category' | 'gap' | 'bestScore' | 'worstScore'
 function FairnessAnalysisTable({
     disparities,
     modelResults,
+    runsLookup,
 }: {
     disparities: Array<{
         modelId: string;
@@ -1146,6 +1155,7 @@ function FairnessAnalysisTable({
         worstSegment: { id: string; label: string; score: number };
     }>;
     modelResults: ModelResult[];
+    runsLookup: Map<string, RunScore[]>;
 }) {
     const modelResultMap = useMemo(() => new Map(modelResults.map(m => [m.modelId, m])), [modelResults]);
     const [sort, toggleSort] = useSort<FairnessSortKey>('gap');
@@ -1267,7 +1277,7 @@ function FairnessAnalysisTable({
                                     {isExpanded && fullModel && (
                                         <tr>
                                             <td colSpan={colSpan} className="p-0 border-b border-border/30 bg-muted/10">
-                                                <FairnessDrillDown modelResult={fullModel} categoryPrefix={d.category} />
+                                                <FairnessDrillDown modelResult={fullModel} categoryPrefix={d.category} runsLookup={runsLookup} />
                                             </td>
                                         </tr>
                                     )}
@@ -1361,6 +1371,36 @@ export default function DemographicLeaderboard() {
     const modelResults = data.aggregation?.modelResults || [];
     const disparities = data.aggregation?.disparities || [];
 
+    // Build a runs lookup from contextAnalysis (fallback for data generated before pipeline update)
+    const runsLookup = useMemo(() => {
+        const map = new Map<string, RunScore[]>();
+        const ca = data.aggregation?.contextAnalysis;
+        if (ca) {
+            for (const model of ca.models) {
+                for (const seg of model.segmentResponsiveness || []) {
+                    const key = `${model.modelId}::${seg.segmentId}`;
+                    map.set(key, seg.dataPoints.map(dp => ({
+                        score: dp.score,
+                        promptCount: 0,
+                        contextCount: dp.contextCount,
+                        configId: dp.configId,
+                        runLabel: dp.runLabel,
+                        timestamp: dp.timestamp,
+                    })));
+                }
+            }
+        }
+        // Pipeline-generated runs take priority when available
+        for (const model of modelResults) {
+            for (const seg of model.segmentScores || []) {
+                if (seg.runs && seg.runs.length > 0) {
+                    map.set(`${seg.modelId}::${seg.segmentId}`, seg.runs);
+                }
+            }
+        }
+        return map;
+    }, [data.aggregation?.contextAnalysis, modelResults]);
+
     return (
         <div className="space-y-10">
             <LeaderboardSection
@@ -1376,7 +1416,7 @@ export default function DemographicLeaderboard() {
                 setShowAll={setShowAllLeaderboard}
             />
 
-            {modelResults.length > 0 && <SegmentExplorer modelResults={modelResults} />}
+            {modelResults.length > 0 && <SegmentExplorer modelResults={modelResults} runsLookup={runsLookup} />}
 
             {data.contextResponsiveness && data.contextResponsiveness.models.length > 0 && (
                 <ContextResponsivenessSection
@@ -1386,7 +1426,7 @@ export default function DemographicLeaderboard() {
             )}
 
             {disparities.length > 0 && (
-                <FairnessAnalysisTable disparities={disparities} modelResults={modelResults} />
+                <FairnessAnalysisTable disparities={disparities} modelResults={modelResults} runsLookup={runsLookup} />
             )}
         </div>
     );
