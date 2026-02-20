@@ -479,19 +479,24 @@ interface ContextResponsivenessResult {
     dataPoints: number;
 }
 
-interface CategoryContextBreakdown {
+interface CategoryContextResult {
+    modelId: string;
     category: string;
-    modelSlopes: { modelId: string; slope: number; dataPoints: number }[];
+    observedSlope: number;
+    pValue: number;
+    adjustedPValue: number;
+    significant: boolean;
+    dataPoints: number;
 }
 
 function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
     perModel: ContextResponsivenessResult[];
-    categoryBreakdown: CategoryContextBreakdown[];
+    categoryResults: CategoryContextResult[];
 } {
     // Check if we have variation in context counts
     const contextCounts = new Set(modelScores.map(s => s.contextCount));
     if (contextCounts.size < 2) {
-        return { perModel: [], categoryBreakdown: [] };
+        return { perModel: [], categoryResults: [] };
     }
 
     // Group by model
@@ -593,13 +598,13 @@ function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
         perModel[i].significant = adjusted < SIGNIFICANCE_ALPHA;
     }
 
-    // Category breakdown
+    // Category-level significance tests (model × category permutation tests)
     const SEGMENT_CATEGORIES: Record<string, string> = {
         age: 'Age', gender: 'Gender', country: 'Country',
         environment: 'Environment', ai_concern: 'AI Concern', religion: 'Religion',
     };
 
-    const categoryBreakdown: CategoryContextBreakdown[] = [];
+    const categoryResults: CategoryContextResult[] = [];
 
     for (const [catPrefix, catLabel] of Object.entries(SEGMENT_CATEGORIES)) {
         const catScores = modelScores.filter(s => s.segmentId.startsWith(catPrefix + ':'));
@@ -610,8 +615,6 @@ function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
             if (!catByModel.has(s.modelId)) catByModel.set(s.modelId, []);
             catByModel.get(s.modelId)!.push(s);
         }
-
-        const modelSlopes: { modelId: string; slope: number; dataPoints: number }[] = [];
 
         for (const [modelId, scores] of catByModel) {
             const grouped = new Map<string, { sum: number; count: number }>();
@@ -633,29 +636,68 @@ function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
             }
 
             const slopes: number[] = [];
-            let dp = 0;
+            const allCatPoints: ContextDataPoint[] = [];
             for (const [, points] of sqPoints) {
                 if (points.length < 2) continue;
                 slopes.push(DemographicAggregationService.linearRegressionSlope(points));
-                dp += points.length;
+                allCatPoints.push(...points);
             }
 
-            if (slopes.length > 0) {
-                modelSlopes.push({
-                    modelId,
-                    slope: slopes.reduce((a, b) => a + b, 0) / slopes.length,
-                    dataPoints: dp,
-                });
-            }
-        }
+            if (slopes.length === 0) continue;
 
-        if (modelSlopes.length > 0) {
-            modelSlopes.sort((a, b) => b.slope - a.slope);
-            categoryBreakdown.push({ category: catLabel, modelSlopes });
+            const observedSlope = slopes.reduce((a, b) => a + b, 0) / slopes.length;
+
+            // Permutation test within this model × category
+            let exceedCount = 0;
+            const contextLabels = allCatPoints.map(p => p.contextCount);
+
+            for (let iter = 0; iter < PERMUTATION_ITERATIONS; iter++) {
+                const shuffled = [...contextLabels];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+
+                let pointIdx = 0;
+                const permSlopes: number[] = [];
+                for (const [, points] of sqPoints) {
+                    if (points.length < 2) continue;
+                    const permPoints: ContextDataPoint[] = points.map((p, pi) => ({
+                        contextCount: shuffled[pointIdx + pi],
+                        score: p.score,
+                    }));
+                    pointIdx += points.length;
+                    permSlopes.push(DemographicAggregationService.linearRegressionSlope(permPoints));
+                }
+
+                const permMeanSlope = permSlopes.reduce((a, b) => a + b, 0) / permSlopes.length;
+                if (permMeanSlope >= observedSlope) {
+                    exceedCount++;
+                }
+            }
+
+            categoryResults.push({
+                modelId,
+                category: catLabel,
+                observedSlope,
+                pValue: exceedCount / PERMUTATION_ITERATIONS,
+                adjustedPValue: 0,
+                significant: false,
+                dataPoints: allCatPoints.length,
+            });
         }
     }
 
-    return { perModel, categoryBreakdown };
+    // Joint Holm-Bonferroni across ALL model × category pairs
+    categoryResults.sort((a, b) => a.pValue - b.pValue);
+    const mc = categoryResults.length;
+    for (let i = 0; i < mc; i++) {
+        const adjusted = Math.min(1, categoryResults[i].pValue * (mc - i));
+        categoryResults[i].adjustedPValue = adjusted;
+        categoryResults[i].significant = adjusted < SIGNIFICANCE_ALPHA;
+    }
+
+    return { perModel, categoryResults };
 }
 
 // ── Report Generation ──────────────────────────────────────────────────────
@@ -864,20 +906,43 @@ function generateReport(
         }
         ln();
 
-        if (contextResults.categoryBreakdown.length > 0) {
-            ln('### Breakdown by Segment Category');
+        if (contextResults.categoryResults.length > 0) {
+            ln('### Significance by Model × Category');
             ln();
-            ln('Average slope per model within each demographic category (positive = more context helps):');
+            ln(`> **Multiple comparisons correction:** Each model × category combination is tested independently, then Holm-Bonferroni is applied jointly across all ${contextResults.categoryResults.length} tests. This controls for the fact that with enough model-category pairs, some would show positive slopes by pure chance. Only combinations that survive this joint correction are marked significant.`);
             ln();
 
-            for (const cat of contextResults.categoryBreakdown) {
-                ln(`**${cat.category}:**`);
+            // Group by category for display
+            const categories = [...new Set(contextResults.categoryResults.map(r => r.category))];
+            const sigCatResults = contextResults.categoryResults.filter(r => r.significant);
+            const totalCatTests = contextResults.categoryResults.length;
+            ln(`**Summary:** ${sigCatResults.length} of ${totalCatTests} model×category pairs significant after joint correction.`);
+            ln();
+
+            if (sigCatResults.length > 0) {
+                ln('#### Significant Model × Category Pairs');
                 ln();
-                ln('| Model | Avg Slope | Data Points |');
-                ln('|-------|----------|-------------|');
-                for (const ms of cat.modelSlopes) {
-                    const shortName = ms.modelId.replace(/^openrouter:/, '');
-                    ln(`| ${shortName} | ${ms.slope >= 0 ? '+' : ''}${ms.slope.toFixed(6)} | ${ms.dataPoints} |`);
+                ln('| Category | Model | Slope | Raw p | Adjusted p | Data Points |');
+                ln('|----------|-------|-------|-------|------------|-------------|');
+                for (const r of sigCatResults.sort((a, b) => a.adjustedPValue - b.adjustedPValue)) {
+                    const shortName = r.modelId.replace(/^openrouter:/, '');
+                    ln(`| ${r.category} | ${shortName} | ${r.observedSlope >= 0 ? '+' : ''}${r.observedSlope.toFixed(6)} | ${r.pValue.toFixed(4)} | ${r.adjustedPValue.toFixed(4)} | ${r.dataPoints} |`);
+                }
+                ln();
+            }
+
+            for (const cat of categories) {
+                const catResults = contextResults.categoryResults
+                    .filter(r => r.category === cat)
+                    .sort((a, b) => b.observedSlope - a.observedSlope);
+                ln(`**${cat}:**`);
+                ln();
+                ln('| Model | Slope | Raw p | Adjusted p | Data Points | Sig? |');
+                ln('|-------|-------|-------|------------|-------------|------|');
+                for (const r of catResults) {
+                    const shortName = r.modelId.replace(/^openrouter:/, '');
+                    const sig = r.significant ? '**Yes**' : 'No';
+                    ln(`| ${shortName} | ${r.observedSlope >= 0 ? '+' : ''}${r.observedSlope.toFixed(6)} | ${r.pValue.toFixed(4)} | ${r.adjustedPValue.toFixed(4)} | ${r.dataPoints} | ${sig} |`);
                 }
                 ln();
             }
@@ -912,7 +977,8 @@ function generateReport(
     ln(`- **Permutation test:** ${PERMUTATION_ITERATIONS.toLocaleString()} iterations flipping sign of paired differences (Analysis 3) or shuffling context count labels (Analysis 4).`);
     ln('- **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni. Applied separately within each analysis.');
     ln('- **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories. Higher values indicate better data quality.');
-    ln('- **Context responsiveness:** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution.');
+    ln('- **Context responsiveness (overall):** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution. Holm-Bonferroni applied across all models.');
+    ln('- **Context responsiveness (by category):** Same test run independently for each model × category pair, with Holm-Bonferroni applied jointly across *all* model×category combinations. This controls for the multiple comparisons problem: with enough pairs, some would show positive slopes by chance alone.');
     ln();
 
     return lines.join('\n');
@@ -995,7 +1061,9 @@ async function main() {
         console.log('  Insufficient context count variation (all evals used same context count)');
     } else {
         const sigCtx = contextResults.perModel.filter(r => r.significant).length;
-        console.log(`  ${sigCtx}/${contextResults.perModel.length} models show significant context responsiveness`);
+        console.log(`  ${sigCtx}/${contextResults.perModel.length} models show significant context responsiveness (overall)`);
+        const sigCat = contextResults.categoryResults.filter(r => r.significant).length;
+        console.log(`  ${sigCat}/${contextResults.categoryResults.length} model×category pairs significant (joint Holm-Bonferroni)`);
     }
 
     // Generate report

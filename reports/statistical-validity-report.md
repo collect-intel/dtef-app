@@ -1,6 +1,6 @@
 # DTEF Statistical Validity Report
 
-*Generated: 2026-02-20T14:50:06.375Z*
+*Generated: 2026-02-20T21:15:55.085Z*
 
 **Data:** 6 surveys, 1000 evaluation results
 
@@ -16,7 +16,7 @@ This report evaluates how well AI models predict demographic opinion distributio
 - **Models vs. Population Marginal:** Effect size = **-0.102** (models do not yet exceed just knowing the overall population distribution)
 - **Models vs. Shuffled Null:** Shuffled mean = 0.761 [0.760, 0.762], best model = 0.768
 - **Data quality:** 54.5% of segment-question pairs have high enough sample sizes for reliable evaluation (noise floor > 0.7)
-- **Pairwise significance:** 238/273 model pairs significantly different (α = 0.05, Holm-Bonferroni corrected)
+- **Pairwise significance:** 239/273 model pairs significantly different (α = 0.05, Holm-Bonferroni corrected)
 - **Context responsiveness:** 3/24 models show significant improvement with more demographic context
 
 ## Analysis 1: Null Model Baselines
@@ -121,7 +121,7 @@ Minimum respondents needed per segment to achieve a given noise floor:
 
 Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.05.
 
-**Summary:** 238 of 273 model pairs (87.2%) show statistically significant differences.
+**Summary:** 239 of 273 model pairs (87.5%) show statistically significant differences.
 
 ### Pairwise Comparison Table
 
@@ -220,6 +220,7 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | google/gemini-2.5-flash[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0343 | 0.0000 | 0.0000 | 9221 | **Yes** |
 | google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.0099 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0239 | 0.0000 | 0.0000 | 5533 | **Yes** |
+| google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0039 | 0.0000 | 0.0000 | 14053 | **Yes** |
 | google/gemini-2.5-flash[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | +0.0075 | 0.0000 | 0.0000 | 9180 | **Yes** |
 | google/gemma-3-12b-it[temp:0.3] | meta-llama/llama-4-maverick[temp:0.3] | -0.0428 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | google/gemma-3-12b-it[temp:0.3] | mistralai/mistral-large-2411[temp:0.3] | -0.0368 | 0.0000 | 0.0000 | 9130 | **Yes** |
@@ -240,7 +241,6 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1[temp:0.3] | -0.0121 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4o-mini[temp:0.3] | +0.0191 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4o[temp:0.3] | -0.0084 | 0.0000 | 0.0000 | 9223 | **Yes** |
-| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0039 | 0.0000 | 0.0000 | 7016 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0217 | 0.0000 | 0.0000 | 9220 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0090 | 0.0000 | 0.0000 | 5675 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-oss-120b[temp:0.3] | +0.0292 | 0.0000 | 0.0000 | 9223 | **Yes** |
@@ -349,6 +349,7 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | openai/gpt-5[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | +0.0280 | 0.0000 | 0.0000 | 5632 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0165 | 0.0000 | 0.0000 | 9221 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | -0.0059 | 0.0000 | 0.0000 | 9223 | **Yes** |
+| openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0058 | 0.0000 | 0.0000 | 5533 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0195 | 0.0000 | 0.0000 | 8941 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0105 | 0.0000 | 0.0000 | 9180 | **Yes** |
 | openai/gpt-oss-20b[temp:0.3] | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | -0.0224 | 0.0000 | 0.0000 | 9221 | **Yes** |
@@ -361,45 +362,44 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | qwen/qwen3-32b[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0261 | 0.0000 | 0.0000 | 5251 | **Yes** |
 | qwen/qwen3-32b[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0173 | 0.0000 | 0.0000 | 5490 | **Yes** |
 | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | +0.0088 | 0.0000 | 0.0000 | 8941 | **Yes** |
-| google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0039 | 0.0001 | 0.0039 | 14053 | **Yes** |
-| openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0058 | 0.0002 | 0.0072 | 5533 | **Yes** |
-| openai/gpt-4o[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0044 | 0.0002 | 0.0074 | 5675 | **Yes** |
-| anthropic/claude-sonnet-4[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0026 | 0.0002 | 0.0076 | 9220 | **Yes** |
-| mistralai/mistral-large-2411[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0021 | 0.0026 | 0.0910 | 9130 | No |
-| mistralai/mistral-large-2411[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0034 | 0.0029 | 0.0986 | 6925 | No |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | anthropic/claude-sonnet-4.5[temp:0.3] | +0.0018 | 0.0031 | 0.1023 | 9222 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0016 | 0.0058 | 0.1856 | 14335 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-large-2411[temp:0.3] | +0.0018 | 0.0107 | 0.3317 | 9130 | No |
-| anthropic/claude-sonnet-4.5[temp:0.3] | openai/gpt-5.1[temp:0.3] | +0.0016 | 0.0142 | 0.4260 | 9220 | No |
-| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0001 | 0.9002 | 0.9002 | 9180 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0026 | 0.0378 | 1.0000 | 5675 | No |
-| anthropic/claude-sonnet-4[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0401 | 0.0542 | 1.0000 | 43 | No |
-| google/gemma-3-12b-it[temp:0.3] | qwen/qwen3-32b[temp:0.3] | -0.0031 | 0.0645 | 1.0000 | 5533 | No |
-| anthropic/claude-sonnet-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0377 | 0.0743 | 1.0000 | 43 | No |
-| google/gemini-2.5-flash[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0388 | 0.0846 | 1.0000 | 43 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0008 | 0.0850 | 1.0000 | 14335 | No |
-| openai/gpt-4.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0316 | 0.1184 | 1.0000 | 43 | No |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0337 | 0.1191 | 1.0000 | 43 | No |
-| openai/gpt-oss-20b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0326 | 0.1283 | 1.0000 | 43 | No |
-| openai/gpt-4.1-nano[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0363 | 0.1605 | 1.0000 | 43 | No |
-| openai/gpt-5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.1903 | 1.0000 | 43 | No |
-| mistralai/mistral-medium-3[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0008 | 0.1932 | 1.0000 | 14335 | No |
-| openai/gpt-5.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.2055 | 1.0000 | 43 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0247 | 0.2067 | 1.0000 | 43 | No |
-| google/gemma-3-12b-it[temp:0.3] | openai/gpt-4.1-nano[temp:0.3] | +0.0011 | 0.2150 | 1.0000 | 14335 | No |
-| openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0223 | 0.2442 | 1.0000 | 43 | No |
-| openai/gpt-4.1[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0010 | 0.3497 | 1.0000 | 5675 | No |
-| google/gemma-3-12b-it[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0259 | 0.3542 | 1.0000 | 43 | No |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0172 | 0.4701 | 1.0000 | 43 | No |
-| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0190 | 0.4954 | 1.0000 | 43 | No |
-| openai/gpt-4.1-nano[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0007 | 0.5117 | 1.0000 | 9221 | No |
-| qwen/qwen3-32b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0133 | 0.5496 | 1.0000 | 43 | No |
-| mistralai/mistral-medium-3[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0108 | 0.6250 | 1.0000 | 43 | No |
-| openai/gpt-4o[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0119 | 0.6254 | 1.0000 | 43 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0083 | 0.7079 | 1.0000 | 43 | No |
-| openai/gpt-4.1-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0072 | 0.7605 | 1.0000 | 43 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-4.1[temp:0.3] | +0.0001 | 0.8332 | 1.0000 | 14335 | No |
-| mistralai/mistral-large-2411[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0037 | 0.8713 | 1.0000 | 43 | No |
+| openai/gpt-4o[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0044 | 0.0001 | 0.0038 | 5675 | **Yes** |
+| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0039 | 0.0003 | 0.0108 | 7016 | **Yes** |
+| anthropic/claude-sonnet-4[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0026 | 0.0003 | 0.0111 | 9220 | **Yes** |
+| mistralai/mistral-large-2411[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0034 | 0.0012 | 0.0420 | 6925 | **Yes** |
+| mistralai/mistral-large-2411[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0021 | 0.0020 | 0.0680 | 9130 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | anthropic/claude-sonnet-4.5[temp:0.3] | +0.0018 | 0.0042 | 0.1386 | 9222 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0016 | 0.0059 | 0.1888 | 14335 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-large-2411[temp:0.3] | +0.0018 | 0.0102 | 0.3162 | 9130 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | openai/gpt-5.1[temp:0.3] | +0.0016 | 0.0150 | 0.4500 | 9220 | No |
+| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0001 | 0.9073 | 0.9073 | 9180 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0026 | 0.0389 | 1.0000 | 5675 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0401 | 0.0523 | 1.0000 | 43 | No |
+| google/gemma-3-12b-it[temp:0.3] | qwen/qwen3-32b[temp:0.3] | -0.0031 | 0.0675 | 1.0000 | 5533 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0377 | 0.0756 | 1.0000 | 43 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0008 | 0.0800 | 1.0000 | 14335 | No |
+| google/gemini-2.5-flash[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0388 | 0.0880 | 1.0000 | 43 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0337 | 0.1125 | 1.0000 | 43 | No |
+| openai/gpt-4.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0316 | 0.1168 | 1.0000 | 43 | No |
+| openai/gpt-oss-20b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0326 | 0.1268 | 1.0000 | 43 | No |
+| openai/gpt-4.1-nano[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0363 | 0.1663 | 1.0000 | 43 | No |
+| mistralai/mistral-medium-3[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0008 | 0.1835 | 1.0000 | 14335 | No |
+| openai/gpt-5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.1893 | 1.0000 | 43 | No |
+| openai/gpt-5.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.2020 | 1.0000 | 43 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0247 | 0.2059 | 1.0000 | 43 | No |
+| google/gemma-3-12b-it[temp:0.3] | openai/gpt-4.1-nano[temp:0.3] | +0.0011 | 0.2153 | 1.0000 | 14335 | No |
+| openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0223 | 0.2424 | 1.0000 | 43 | No |
+| google/gemma-3-12b-it[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0259 | 0.3427 | 1.0000 | 43 | No |
+| openai/gpt-4.1[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0010 | 0.3523 | 1.0000 | 5675 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0172 | 0.4811 | 1.0000 | 43 | No |
+| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0190 | 0.5031 | 1.0000 | 43 | No |
+| openai/gpt-4.1-nano[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0007 | 0.5143 | 1.0000 | 9221 | No |
+| qwen/qwen3-32b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0133 | 0.5433 | 1.0000 | 43 | No |
+| mistralai/mistral-medium-3[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0108 | 0.6203 | 1.0000 | 43 | No |
+| openai/gpt-4o[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0119 | 0.6302 | 1.0000 | 43 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0083 | 0.7110 | 1.0000 | 43 | No |
+| openai/gpt-4.1-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0072 | 0.7564 | 1.0000 | 43 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-4.1[temp:0.3] | +0.0001 | 0.8365 | 1.0000 | 14335 | No |
+| mistralai/mistral-large-2411[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0037 | 0.8752 | 1.0000 | 43 | No |
 
 ## Analysis 4: Context Responsiveness
 
@@ -412,19 +412,19 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | openai/gpt-5[temp:0.3] | +0.003866 | 0.0000 | 0.0000 | 5 | 6188 | **Yes** |
 | qwen/qwen3-32b[temp:0.3] | +0.003180 | 0.0000 | 0.0000 | 5 | 6026 | **Yes** |
 | anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001516 | 0.0000 | 0.0000 | 5 | 21336 | **Yes** |
-| openai/gpt-5.1[temp:0.3] | +0.000332 | 0.0036 | 0.0756 | 5 | 23244 | No |
-| mistralai/mistral-large-2411[temp:0.3] | +0.000325 | 0.0069 | 0.1380 | 5 | 23245 | No |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000237 | 0.0131 | 0.2489 | 5 | 42628 | No |
-| openai/gpt-4o[temp:0.3] | +0.000192 | 0.0601 | 1.0000 | 5 | 23243 | No |
-| google/gemma-3-12b-it[temp:0.3] | -0.000039 | 0.6326 | 1.0000 | 5 | 42623 | No |
-| openai/gpt-4.1-mini[temp:0.3] | -0.000240 | 0.9933 | 1.0000 | 5 | 42630 | No |
+| openai/gpt-5.1[temp:0.3] | +0.000332 | 0.0048 | 0.1008 | 5 | 23244 | No |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000325 | 0.0068 | 0.1360 | 5 | 23245 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000237 | 0.0127 | 0.2413 | 5 | 42628 | No |
+| openai/gpt-4o[temp:0.3] | +0.000192 | 0.0580 | 1.0000 | 5 | 23243 | No |
+| google/gemma-3-12b-it[temp:0.3] | -0.000039 | 0.6305 | 1.0000 | 5 | 42623 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000240 | 0.9920 | 1.0000 | 5 | 42630 | No |
 | anthropic/claude-haiku-4.5[temp:0.3] | -0.000449 | 1.0000 | 1.0000 | 5 | 42628 | No |
-| openai/gpt-4.1-nano[temp:0.3] | -0.000477 | 0.9994 | 1.0000 | 5 | 42631 | No |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000477 | 0.9997 | 1.0000 | 5 | 42631 | No |
 | openai/gpt-4.1[temp:0.3] | -0.000520 | 1.0000 | 1.0000 | 5 | 42626 | No |
 | openai/gpt-4o-mini[temp:0.3] | -0.000705 | 1.0000 | 1.0000 | 5 | 42633 | No |
 | meta-llama/llama-4-maverick[temp:0.3] | -0.000795 | 1.0000 | 1.0000 | 5 | 42631 | No |
 | anthropic/claude-sonnet-4[temp:0.3] | -0.000821 | 1.0000 | 1.0000 | 5 | 42626 | No |
-| x-ai/grok-4[temp:0.3] | -0.000872 | 0.7231 | 1.0000 | 5 | 78 | No |
+| x-ai/grok-4[temp:0.3] | -0.000872 | 0.7246 | 1.0000 | 5 | 78 | No |
 | anthropic/claude-sonnet-4.5[temp:0.3] | -0.000933 | 1.0000 | 1.0000 | 5 | 42621 | No |
 | mistralai/mistral-medium-3[temp:0.3] | -0.000971 | 1.0000 | 1.0000 | 5 | 42630 | No |
 | openai/gpt-oss-120b[temp:0.3] | -0.001259 | 1.0000 | 1.0000 | 5 | 23238 | No |
@@ -436,122 +436,137 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 
 > **Interpretation:** 3 model(s) show statistically significant improvement with more demographic context. This suggests these models can meaningfully use additional demographic information to make better predictions about group-specific opinion distributions.
 
-### Breakdown by Segment Category
+### Significance by Model × Category
 
-Average slope per model within each demographic category (positive = more context helps):
+> **Multiple comparisons correction:** Each model × category combination is tested independently, then Holm-Bonferroni is applied jointly across all 93 tests. This controls for the fact that with enough model-category pairs, some would show positive slopes by pure chance. Only combinations that survive this joint correction are marked significant.
+
+**Summary:** 8 of 93 model×category pairs significant after joint correction.
+
+#### Significant Model × Category Pairs
+
+| Category | Model | Slope | Raw p | Adjusted p | Data Points |
+|----------|-------|-------|-------|------------|-------------|
+| Gender | anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002674 | 0.0000 | 0.0000 | 966 |
+| Country | anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001312 | 0.0000 | 0.0000 | 13004 |
+| Country | openai/gpt-5[temp:0.3] | +0.002635 | 0.0000 | 0.0000 | 3623 |
+| Country | qwen/qwen3-32b[temp:0.3] | +0.002992 | 0.0000 | 0.0000 | 3536 |
+| Environment | anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002372 | 0.0000 | 0.0000 | 1354 |
+| Religion | anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001813 | 0.0000 | 0.0000 | 3245 |
+| Religion | openai/gpt-5[temp:0.3] | +0.009213 | 0.0000 | 0.0000 | 944 |
+| Environment | openai/gpt-5[temp:0.3] | +0.004210 | 0.0005 | 0.0430 | 405 |
 
 **Gender:**
 
-| Model | Avg Slope | Data Points |
-|-------|----------|-------------|
-| qwen/qwen3-32b[temp:0.3] | +0.003190 | 261 |
-| openai/gpt-5[temp:0.3] | +0.003125 | 270 |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002674 | 966 |
-| openai/gpt-5.1[temp:0.3] | +0.001481 | 966 |
-| openai/gpt-4o[temp:0.3] | +0.000610 | 965 |
-| mistralai/mistral-large-2411[temp:0.3] | +0.000208 | 966 |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000035 | 1812 |
-| openai/gpt-4.1-mini[temp:0.3] | -0.000127 | 1812 |
-| openai/gpt-4.1[temp:0.3] | -0.000505 | 1810 |
-| google/gemma-3-12b-it[temp:0.3] | -0.000522 | 1812 |
-| anthropic/claude-haiku-4.5[temp:0.3] | -0.000563 | 1812 |
-| openai/gpt-4.1-nano[temp:0.3] | -0.000663 | 1812 |
-| openai/gpt-4o-mini[temp:0.3] | -0.000951 | 1812 |
-| mistralai/mistral-medium-3[temp:0.3] | -0.001265 | 1812 |
-| meta-llama/llama-4-maverick[temp:0.3] | -0.001639 | 1812 |
-| x-ai/grok-4.1-fast[temp:0.3] | -0.001698 | 966 |
-| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001699 | 1812 |
-| openai/gpt-5-mini[temp:0.3] | -0.001713 | 696 |
-| anthropic/claude-sonnet-4[temp:0.3] | -0.001861 | 1812 |
-| openai/gpt-oss-120b[temp:0.3] | -0.002051 | 966 |
-| google/gemini-2.5-flash[temp:0.3] | -0.002095 | 1811 |
-| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.002818 | 1533 |
-| openai/gpt-oss-20b[temp:0.3] | -0.002856 | 966 |
+| Model | Slope | Raw p | Adjusted p | Data Points | Sig? |
+|-------|-------|-------|------------|-------------|------|
+| qwen/qwen3-32b[temp:0.3] | +0.003190 | 0.0554 | 1.0000 | 261 | No |
+| openai/gpt-5[temp:0.3] | +0.003125 | 0.0190 | 1.0000 | 270 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002674 | 0.0000 | 0.0000 | 966 | **Yes** |
+| openai/gpt-5.1[temp:0.3] | +0.001481 | 0.0043 | 0.3612 | 966 | No |
+| openai/gpt-4o[temp:0.3] | +0.000610 | 0.1128 | 1.0000 | 965 | No |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000208 | 0.3648 | 1.0000 | 966 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000035 | 0.4789 | 1.0000 | 1812 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000127 | 0.6223 | 1.0000 | 1812 | No |
+| openai/gpt-4.1[temp:0.3] | -0.000505 | 0.8837 | 1.0000 | 1810 | No |
+| google/gemma-3-12b-it[temp:0.3] | -0.000522 | 0.8356 | 1.0000 | 1812 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000563 | 0.8464 | 1.0000 | 1812 | No |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000663 | 0.8617 | 1.0000 | 1812 | No |
+| openai/gpt-4o-mini[temp:0.3] | -0.000951 | 0.9897 | 1.0000 | 1812 | No |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001265 | 0.9971 | 1.0000 | 1812 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.001639 | 1.0000 | 1.0000 | 1812 | No |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001698 | 0.9769 | 1.0000 | 966 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001699 | 0.9981 | 1.0000 | 1812 | No |
+| openai/gpt-5-mini[temp:0.3] | -0.001713 | 0.9782 | 1.0000 | 696 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.001861 | 0.9991 | 1.0000 | 1812 | No |
+| openai/gpt-oss-120b[temp:0.3] | -0.002051 | 0.9955 | 1.0000 | 966 | No |
+| google/gemini-2.5-flash[temp:0.3] | -0.002095 | 0.9999 | 1.0000 | 1811 | No |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.002818 | 1.0000 | 1.0000 | 1533 | No |
+| openai/gpt-oss-20b[temp:0.3] | -0.002856 | 0.9990 | 1.0000 | 966 | No |
 
 **Country:**
 
-| Model | Avg Slope | Data Points |
-|-------|----------|-------------|
-| qwen/qwen3-32b[temp:0.3] | +0.002992 | 3536 |
-| openai/gpt-5[temp:0.3] | +0.002635 | 3623 |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001312 | 13004 |
-| mistralai/mistral-large-2411[temp:0.3] | +0.000196 | 13720 |
-| openai/gpt-4o[temp:0.3] | +0.000187 | 13720 |
-| google/gemma-3-12b-it[temp:0.3] | +0.000161 | 25264 |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000139 | 25261 |
-| openai/gpt-5.1[temp:0.3] | +0.000110 | 13720 |
-| openai/gpt-4.1-nano[temp:0.3] | +0.000021 | 25266 |
-| openai/gpt-4.1-mini[temp:0.3] | -0.000278 | 25264 |
-| openai/gpt-4o-mini[temp:0.3] | -0.000351 | 25266 |
-| anthropic/claude-haiku-4.5[temp:0.3] | -0.000613 | 25262 |
-| anthropic/claude-sonnet-4[temp:0.3] | -0.000650 | 25262 |
-| meta-llama/llama-4-maverick[temp:0.3] | -0.000670 | 25266 |
-| openai/gpt-4.1[temp:0.3] | -0.000708 | 25265 |
-| x-ai/grok-4[temp:0.3] | -0.000872 | 78 |
-| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000930 | 25262 |
-| mistralai/mistral-medium-3[temp:0.3] | -0.001066 | 25265 |
-| openai/gpt-oss-120b[temp:0.3] | -0.001185 | 13718 |
-| x-ai/grok-4.1-fast[temp:0.3] | -0.001502 | 13632 |
-| openai/gpt-oss-20b[temp:0.3] | -0.001695 | 13649 |
-| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.003138 | 18904 |
-| google/gemini-2.5-flash[temp:0.3] | -0.004479 | 25265 |
-| openai/gpt-5-mini[temp:0.3] | -0.005034 | 7536 |
+| Model | Slope | Raw p | Adjusted p | Data Points | Sig? |
+|-------|-------|-------|------------|-------------|------|
+| qwen/qwen3-32b[temp:0.3] | +0.002992 | 0.0000 | 0.0000 | 3536 | **Yes** |
+| openai/gpt-5[temp:0.3] | +0.002635 | 0.0000 | 0.0000 | 3623 | **Yes** |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001312 | 0.0000 | 0.0000 | 13004 | **Yes** |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000196 | 0.1300 | 1.0000 | 13720 | No |
+| openai/gpt-4o[temp:0.3] | +0.000187 | 0.1328 | 1.0000 | 13720 | No |
+| google/gemma-3-12b-it[temp:0.3] | +0.000161 | 0.1521 | 1.0000 | 25264 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000139 | 0.1550 | 1.0000 | 25261 | No |
+| openai/gpt-5.1[temp:0.3] | +0.000110 | 0.2637 | 1.0000 | 13720 | No |
+| openai/gpt-4.1-nano[temp:0.3] | +0.000021 | 0.4506 | 1.0000 | 25266 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000278 | 0.9800 | 1.0000 | 25264 | No |
+| openai/gpt-4o-mini[temp:0.3] | -0.000351 | 0.9956 | 1.0000 | 25266 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000613 | 1.0000 | 1.0000 | 25262 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.000650 | 1.0000 | 1.0000 | 25262 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.000670 | 1.0000 | 1.0000 | 25266 | No |
+| openai/gpt-4.1[temp:0.3] | -0.000708 | 1.0000 | 1.0000 | 25265 | No |
+| x-ai/grok-4[temp:0.3] | -0.000872 | 0.7231 | 1.0000 | 78 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000930 | 1.0000 | 1.0000 | 25262 | No |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001066 | 1.0000 | 1.0000 | 25265 | No |
+| openai/gpt-oss-120b[temp:0.3] | -0.001185 | 1.0000 | 1.0000 | 13718 | No |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001502 | 1.0000 | 1.0000 | 13632 | No |
+| openai/gpt-oss-20b[temp:0.3] | -0.001695 | 1.0000 | 1.0000 | 13649 | No |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.003138 | 1.0000 | 1.0000 | 18904 | No |
+| google/gemini-2.5-flash[temp:0.3] | -0.004479 | 1.0000 | 1.0000 | 25265 | No |
+| openai/gpt-5-mini[temp:0.3] | -0.005034 | 1.0000 | 1.0000 | 7536 | No |
 
 **Environment:**
 
-| Model | Avg Slope | Data Points |
-|-------|----------|-------------|
-| qwen/qwen3-32b[temp:0.3] | +0.005536 | 396 |
-| openai/gpt-5[temp:0.3] | +0.004210 | 405 |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002372 | 1354 |
-| openai/gpt-5.1[temp:0.3] | +0.001244 | 1449 |
-| openai/gpt-4o[temp:0.3] | +0.001009 | 1449 |
-| mistralai/mistral-large-2411[temp:0.3] | +0.000936 | 1449 |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000388 | 2706 |
-| x-ai/grok-4.1-fast[temp:0.3] | +0.000137 | 1449 |
-| anthropic/claude-haiku-4.5[temp:0.3] | -0.000009 | 2706 |
-| openai/gpt-4.1-mini[temp:0.3] | -0.000081 | 2706 |
-| openai/gpt-4.1[temp:0.3] | -0.000089 | 2705 |
-| openai/gpt-4.1-nano[temp:0.3] | -0.000226 | 2705 |
-| google/gemma-3-12b-it[temp:0.3] | -0.000432 | 2705 |
-| openai/gpt-oss-120b[temp:0.3] | -0.000506 | 1449 |
-| openai/gpt-5-mini[temp:0.3] | -0.000649 | 1044 |
-| mistralai/mistral-medium-3[temp:0.3] | -0.000996 | 2706 |
-| openai/gpt-4o-mini[temp:0.3] | -0.001295 | 2706 |
-| openai/gpt-oss-20b[temp:0.3] | -0.001514 | 1440 |
-| meta-llama/llama-4-maverick[temp:0.3] | -0.001606 | 2706 |
-| anthropic/claude-sonnet-4[temp:0.3] | -0.001697 | 2706 |
-| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001869 | 2700 |
-| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001986 | 2279 |
-| google/gemini-2.5-flash[temp:0.3] | -0.002145 | 2706 |
+| Model | Slope | Raw p | Adjusted p | Data Points | Sig? |
+|-------|-------|-------|------------|-------------|------|
+| qwen/qwen3-32b[temp:0.3] | +0.005536 | 0.0011 | 0.0935 | 396 | No |
+| openai/gpt-5[temp:0.3] | +0.004210 | 0.0005 | 0.0430 | 405 | **Yes** |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002372 | 0.0000 | 0.0000 | 1354 | **Yes** |
+| openai/gpt-5.1[temp:0.3] | +0.001244 | 0.0063 | 0.5229 | 1449 | No |
+| openai/gpt-4o[temp:0.3] | +0.001009 | 0.0103 | 0.8343 | 1449 | No |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000936 | 0.0367 | 1.0000 | 1449 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000388 | 0.1313 | 1.0000 | 2706 | No |
+| x-ai/grok-4.1-fast[temp:0.3] | +0.000137 | 0.4181 | 1.0000 | 1449 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000009 | 0.5106 | 1.0000 | 2706 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000081 | 0.5945 | 1.0000 | 2706 | No |
+| openai/gpt-4.1[temp:0.3] | -0.000089 | 0.5969 | 1.0000 | 2705 | No |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000226 | 0.6936 | 1.0000 | 2705 | No |
+| google/gemma-3-12b-it[temp:0.3] | -0.000432 | 0.8368 | 1.0000 | 2705 | No |
+| openai/gpt-oss-120b[temp:0.3] | -0.000506 | 0.7698 | 1.0000 | 1449 | No |
+| openai/gpt-5-mini[temp:0.3] | -0.000649 | 0.8169 | 1.0000 | 1044 | No |
+| mistralai/mistral-medium-3[temp:0.3] | -0.000996 | 0.9985 | 1.0000 | 2706 | No |
+| openai/gpt-4o-mini[temp:0.3] | -0.001295 | 0.9999 | 1.0000 | 2706 | No |
+| openai/gpt-oss-20b[temp:0.3] | -0.001514 | 0.9758 | 1.0000 | 1440 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.001606 | 1.0000 | 1.0000 | 2706 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.001697 | 1.0000 | 1.0000 | 2706 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001869 | 0.9999 | 1.0000 | 2700 | No |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001986 | 1.0000 | 1.0000 | 2279 | No |
+| google/gemini-2.5-flash[temp:0.3] | -0.002145 | 1.0000 | 1.0000 | 2706 | No |
 
 **Religion:**
 
-| Model | Avg Slope | Data Points |
-|-------|----------|-------------|
-| openai/gpt-5[temp:0.3] | +0.009213 | 944 |
-| qwen/qwen3-32b[temp:0.3] | +0.002942 | 923 |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001813 | 3245 |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000577 | 6314 |
-| openai/gpt-5.1[temp:0.3] | +0.000470 | 3380 |
-| openai/gpt-4o[temp:0.3] | +0.000309 | 3381 |
-| openai/gpt-4.1-nano[temp:0.3] | +0.000213 | 6313 |
-| mistralai/mistral-large-2411[temp:0.3] | +0.000194 | 3380 |
-| google/gemma-3-12b-it[temp:0.3] | -0.000158 | 6308 |
-| anthropic/claude-haiku-4.5[temp:0.3] | -0.000341 | 6313 |
-| openai/gpt-4.1[temp:0.3] | -0.000522 | 6313 |
-| openai/gpt-4.1-mini[temp:0.3] | -0.000547 | 6313 |
-| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000771 | 6314 |
-| meta-llama/llama-4-maverick[temp:0.3] | -0.000775 | 6314 |
-| anthropic/claude-sonnet-4[temp:0.3] | -0.000784 | 6312 |
-| openai/gpt-4o-mini[temp:0.3] | -0.000815 | 6314 |
-| mistralai/mistral-medium-3[temp:0.3] | -0.001043 | 6312 |
-| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001411 | 5299 |
-| openai/gpt-oss-120b[temp:0.3] | -0.001460 | 3377 |
-| openai/gpt-5-mini[temp:0.3] | -0.001767 | 2435 |
-| x-ai/grok-4.1-fast[temp:0.3] | -0.001991 | 3380 |
-| openai/gpt-oss-20b[temp:0.3] | -0.002012 | 3373 |
-| google/gemini-2.5-flash[temp:0.3] | -0.003313 | 6314 |
+| Model | Slope | Raw p | Adjusted p | Data Points | Sig? |
+|-------|-------|-------|------------|-------------|------|
+| openai/gpt-5[temp:0.3] | +0.009213 | 0.0000 | 0.0000 | 944 | **Yes** |
+| qwen/qwen3-32b[temp:0.3] | +0.002942 | 0.0068 | 0.5576 | 923 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001813 | 0.0000 | 0.0000 | 3245 | **Yes** |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000577 | 0.0140 | 1.0000 | 6314 | No |
+| openai/gpt-5.1[temp:0.3] | +0.000470 | 0.0786 | 1.0000 | 3380 | No |
+| openai/gpt-4o[temp:0.3] | +0.000309 | 0.1639 | 1.0000 | 3381 | No |
+| openai/gpt-4.1-nano[temp:0.3] | +0.000213 | 0.2757 | 1.0000 | 6313 | No |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000194 | 0.2944 | 1.0000 | 3380 | No |
+| google/gemma-3-12b-it[temp:0.3] | -0.000158 | 0.6915 | 1.0000 | 6308 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000341 | 0.9064 | 1.0000 | 6313 | No |
+| openai/gpt-4.1[temp:0.3] | -0.000522 | 0.9798 | 1.0000 | 6313 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000547 | 0.9863 | 1.0000 | 6313 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000771 | 0.9975 | 1.0000 | 6314 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.000775 | 0.9993 | 1.0000 | 6314 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.000784 | 0.9986 | 1.0000 | 6312 | No |
+| openai/gpt-4o-mini[temp:0.3] | -0.000815 | 0.9994 | 1.0000 | 6314 | No |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001043 | 1.0000 | 1.0000 | 6312 | No |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001411 | 1.0000 | 1.0000 | 5299 | No |
+| openai/gpt-oss-120b[temp:0.3] | -0.001460 | 0.9997 | 1.0000 | 3377 | No |
+| openai/gpt-5-mini[temp:0.3] | -0.001767 | 0.9995 | 1.0000 | 2435 | No |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001991 | 1.0000 | 1.0000 | 3380 | No |
+| openai/gpt-oss-20b[temp:0.3] | -0.002012 | 0.9999 | 1.0000 | 3373 | No |
+| google/gemini-2.5-flash[temp:0.3] | -0.003313 | 1.0000 | 1.0000 | 6314 | No |
 
 ---
 
@@ -578,4 +593,5 @@ With data spanning GD1 through GD7, future analysis could examine temporal consi
 - **Permutation test:** 10,000 iterations flipping sign of paired differences (Analysis 3) or shuffling context count labels (Analysis 4).
 - **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni. Applied separately within each analysis.
 - **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories. Higher values indicate better data quality.
-- **Context responsiveness:** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution.
+- **Context responsiveness (overall):** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution. Holm-Bonferroni applied across all models.
+- **Context responsiveness (by category):** Same test run independently for each model × category pair, with Holm-Bonferroni applied jointly across *all* model×category combinations. This controls for the multiple comparisons problem: with enough pairs, some would show positive slopes by chance alone.
