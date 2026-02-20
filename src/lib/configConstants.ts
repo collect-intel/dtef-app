@@ -17,6 +17,4 @@ export const EXPECTED_FORK_REPO_NAME = configRepo;
 export const APP_REPO_SLUG = process.env.NEXT_PUBLIC_APP_REPO_SLUG || 'collect-intel/dtef-app';
 export const APP_REPO_URL = `https://github.com/${APP_REPO_SLUG}`;
 
-export const BUG_REPORT_FORM_URL = process.env.NEXT_PUBLIC_BUG_REPORT_FORM_URL || '';
-export const BUG_REPORT_FORM_PAGE_URL_ENTRY = process.env.NEXT_PUBLIC_BUG_REPORT_FORM_PAGE_URL_ENTRY || '';
-export const BUG_REPORT_FORM_BLUEPRINT_ENTRY = process.env.NEXT_PUBLIC_BUG_REPORT_FORM_BLUEPRINT_ENTRY || ''; 
+ 
