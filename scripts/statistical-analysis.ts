@@ -1,10 +1,11 @@
 /**
  * DTEF Statistical Validity Analysis
  *
- * Runs three analyses on existing evaluation data (no API calls):
+ * Runs four analyses on existing evaluation data (no API calls):
  *   1. Null Model Baselines — uniform, population-marginal, shuffled
  *   2. Analytical Noise Floor — sample-size-based JSD noise estimates
  *   3. Pairwise Model Significance — permutation tests with Holm-Bonferroni
+ *   4. Context Responsiveness — does more demographic context improve accuracy?
  *
  * Usage: pnpm analyze:stats
  */
@@ -19,6 +20,7 @@ import {
     getResultByFileName,
 } from '../src/lib/storageService';
 import { DemographicAggregationService } from '../src/cli/services/demographicAggregationService';
+import type { ContextDataPoint } from '../src/cli/services/demographicAggregationService';
 import type { DTEFSurveyData } from '../src/types/dtef';
 import type { CoverageResult } from '../src/types/shared';
 
@@ -45,6 +47,7 @@ interface ModelQuestionScore {
     segmentId: string;
     questionId: string;
     score: number;
+    contextCount: number;
 }
 
 // ── Data Loading ───────────────────────────────────────────────────────────
@@ -88,6 +91,8 @@ async function loadModelScoresFromS3(): Promise<{ scores: ModelQuestionScore[]; 
             const ctx = DemographicAggregationService.extractDTEFContext(result);
             if (!ctx) continue;
 
+            const contextCount = DemographicAggregationService.extractContextCount(result) ?? 0;
+
             const coverageScores = result.evaluationResults?.llmCoverageScores;
             if (!coverageScores) continue;
 
@@ -117,6 +122,7 @@ async function loadModelScoresFromS3(): Promise<{ scores: ModelQuestionScore[]; 
                         segmentId: ctx.segmentId,
                         questionId,
                         score: coverage.avgCoverageExtent,
+                        contextCount,
                     });
                 }
             }
@@ -381,7 +387,6 @@ interface PairwiseResult {
 
 function computePairwiseSignificance(modelScores: ModelQuestionScore[]): {
     pairwise: PairwiseResult[];
-    tiers: string[][];
 } {
     // Group scores by model → (segmentId::questionId) → score
     const modelMap = new Map<string, Map<string, number[]>>();
@@ -459,50 +464,198 @@ function computePairwiseSignificance(modelScores: ModelQuestionScore[]): {
         pairwise[i].significant = adjusted < SIGNIFICANCE_ALPHA;
     }
 
-    // Build tiers: group models that are NOT significantly different
-    const tiers = buildTiers(modelIds, pairwise);
-
-    return { pairwise, tiers };
+    return { pairwise };
 }
 
-/**
- * Group models into tiers of statistically indistinguishable performance.
- * Two models are in the same tier if they are not significantly different.
- * Uses union-find to group connected components.
- */
-function buildTiers(modelIds: string[], pairwise: PairwiseResult[]): string[][] {
-    const parent = new Map<string, string>();
-    for (const id of modelIds) parent.set(id, id);
+// ── Analysis 4: Context Responsiveness ──────────────────────────────────────
 
-    function find(x: string): string {
-        while (parent.get(x) !== x) {
-            parent.set(x, parent.get(parent.get(x)!)!);
-            x = parent.get(x)!;
+interface ContextResponsivenessResult {
+    modelId: string;
+    observedSlope: number;
+    pValue: number;
+    adjustedPValue: number;
+    significant: boolean;
+    contextLevels: number;
+    dataPoints: number;
+}
+
+interface CategoryContextBreakdown {
+    category: string;
+    modelSlopes: { modelId: string; slope: number; dataPoints: number }[];
+}
+
+function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
+    perModel: ContextResponsivenessResult[];
+    categoryBreakdown: CategoryContextBreakdown[];
+} {
+    // Check if we have variation in context counts
+    const contextCounts = new Set(modelScores.map(s => s.contextCount));
+    if (contextCounts.size < 2) {
+        return { perModel: [], categoryBreakdown: [] };
+    }
+
+    // Group by model
+    const byModel = new Map<string, ModelQuestionScore[]>();
+    for (const ms of modelScores) {
+        if (!byModel.has(ms.modelId)) byModel.set(ms.modelId, []);
+        byModel.get(ms.modelId)!.push(ms);
+    }
+
+    const perModel: ContextResponsivenessResult[] = [];
+
+    for (const [modelId, scores] of byModel) {
+        // Group by (segmentId, questionId, contextCount) → average score
+        const grouped = new Map<string, { sum: number; count: number }>();
+        for (const s of scores) {
+            const key = `${s.segmentId}::${s.questionId}::${s.contextCount}`;
+            if (!grouped.has(key)) grouped.set(key, { sum: 0, count: 0 });
+            const entry = grouped.get(key)!;
+            entry.sum += s.score;
+            entry.count++;
         }
-        return x;
+
+        // For each (segmentId, questionId), collect (contextCount, avgScore) points
+        const segmentQuestionPoints = new Map<string, ContextDataPoint[]>();
+        for (const [key, entry] of grouped) {
+            const parts = key.split('::');
+            const sqKey = `${parts[0]}::${parts[1]}`;
+            const contextCount = parseInt(parts[2], 10);
+            if (!segmentQuestionPoints.has(sqKey)) segmentQuestionPoints.set(sqKey, []);
+            segmentQuestionPoints.get(sqKey)!.push({
+                contextCount,
+                score: entry.sum / entry.count,
+            });
+        }
+
+        // For each segment-question pair with 2+ context levels, compute regression slope
+        const slopes: number[] = [];
+        const allPoints: ContextDataPoint[] = [];
+        for (const [, points] of segmentQuestionPoints) {
+            if (points.length < 2) continue;
+            const slope = DemographicAggregationService.linearRegressionSlope(points);
+            slopes.push(slope);
+            allPoints.push(...points);
+        }
+
+        if (slopes.length === 0) continue;
+
+        const observedSlope = slopes.reduce((a, b) => a + b, 0) / slopes.length;
+
+        // Permutation test: shuffle contextCount labels across all points, recompute slopes
+        let exceedCount = 0;
+        const contextLabels = allPoints.map(p => p.contextCount);
+
+        for (let iter = 0; iter < PERMUTATION_ITERATIONS; iter++) {
+            // Shuffle context labels
+            const shuffled = [...contextLabels];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Reassign and recompute per-segment slopes
+            let pointIdx = 0;
+            const permSlopes: number[] = [];
+            for (const [, points] of segmentQuestionPoints) {
+                if (points.length < 2) continue;
+                const permPoints: ContextDataPoint[] = points.map((p, pi) => ({
+                    contextCount: shuffled[pointIdx + pi],
+                    score: p.score,
+                }));
+                pointIdx += points.length;
+                permSlopes.push(DemographicAggregationService.linearRegressionSlope(permPoints));
+            }
+
+            const permMeanSlope = permSlopes.reduce((a, b) => a + b, 0) / permSlopes.length;
+            if (permMeanSlope >= observedSlope) {
+                exceedCount++;
+            }
+        }
+
+        const pValue = exceedCount / PERMUTATION_ITERATIONS;
+        perModel.push({
+            modelId,
+            observedSlope,
+            pValue,
+            adjustedPValue: pValue,
+            significant: false,
+            contextLevels: contextCounts.size,
+            dataPoints: allPoints.length,
+        });
     }
 
-    function union(a: string, b: string) {
-        const ra = find(a);
-        const rb = find(b);
-        if (ra !== rb) parent.set(ra, rb);
+    // Holm-Bonferroni correction
+    perModel.sort((a, b) => a.pValue - b.pValue);
+    const m = perModel.length;
+    for (let i = 0; i < m; i++) {
+        const adjusted = Math.min(1, perModel[i].pValue * (m - i));
+        perModel[i].adjustedPValue = adjusted;
+        perModel[i].significant = adjusted < SIGNIFICANCE_ALPHA;
     }
 
-    // Merge models that are NOT significantly different
-    for (const p of pairwise) {
-        if (!p.significant) {
-            union(p.modelA, p.modelB);
+    // Category breakdown
+    const SEGMENT_CATEGORIES: Record<string, string> = {
+        age: 'Age', gender: 'Gender', country: 'Country',
+        environment: 'Environment', ai_concern: 'AI Concern', religion: 'Religion',
+    };
+
+    const categoryBreakdown: CategoryContextBreakdown[] = [];
+
+    for (const [catPrefix, catLabel] of Object.entries(SEGMENT_CATEGORIES)) {
+        const catScores = modelScores.filter(s => s.segmentId.startsWith(catPrefix + ':'));
+        if (catScores.length === 0) continue;
+
+        const catByModel = new Map<string, ModelQuestionScore[]>();
+        for (const s of catScores) {
+            if (!catByModel.has(s.modelId)) catByModel.set(s.modelId, []);
+            catByModel.get(s.modelId)!.push(s);
+        }
+
+        const modelSlopes: { modelId: string; slope: number; dataPoints: number }[] = [];
+
+        for (const [modelId, scores] of catByModel) {
+            const grouped = new Map<string, { sum: number; count: number }>();
+            for (const s of scores) {
+                const key = `${s.segmentId}::${s.questionId}::${s.contextCount}`;
+                if (!grouped.has(key)) grouped.set(key, { sum: 0, count: 0 });
+                const entry = grouped.get(key)!;
+                entry.sum += s.score;
+                entry.count++;
+            }
+
+            const sqPoints = new Map<string, ContextDataPoint[]>();
+            for (const [key, entry] of grouped) {
+                const parts = key.split('::');
+                const sqKey = `${parts[0]}::${parts[1]}`;
+                const contextCount = parseInt(parts[2], 10);
+                if (!sqPoints.has(sqKey)) sqPoints.set(sqKey, []);
+                sqPoints.get(sqKey)!.push({ contextCount, score: entry.sum / entry.count });
+            }
+
+            const slopes: number[] = [];
+            let dp = 0;
+            for (const [, points] of sqPoints) {
+                if (points.length < 2) continue;
+                slopes.push(DemographicAggregationService.linearRegressionSlope(points));
+                dp += points.length;
+            }
+
+            if (slopes.length > 0) {
+                modelSlopes.push({
+                    modelId,
+                    slope: slopes.reduce((a, b) => a + b, 0) / slopes.length,
+                    dataPoints: dp,
+                });
+            }
+        }
+
+        if (modelSlopes.length > 0) {
+            modelSlopes.sort((a, b) => b.slope - a.slope);
+            categoryBreakdown.push({ category: catLabel, modelSlopes });
         }
     }
 
-    const groups = new Map<string, string[]>();
-    for (const id of modelIds) {
-        const root = find(id);
-        if (!groups.has(root)) groups.set(root, []);
-        groups.get(root)!.push(id);
-    }
-
-    return Array.from(groups.values());
+    return { perModel, categoryBreakdown };
 }
 
 // ── Report Generation ──────────────────────────────────────────────────────
@@ -512,6 +665,7 @@ function generateReport(
     modelOverallScores: Map<string, number>,
     noiseFloor: ReturnType<typeof computeNoiseFloor>,
     pairwiseResults: ReturnType<typeof computePairwiseSignificance>,
+    contextResults: ReturnType<typeof computeContextResponsiveness>,
     surveyCount: number,
     resultCount: number,
 ): string {
@@ -527,6 +681,10 @@ function generateReport(
 
     // ── Executive Summary ──
     ln('## Executive Summary');
+    ln();
+    ln('### What This Report Tells You');
+    ln();
+    ln('This report evaluates how well AI models predict demographic opinion distributions — that is, given a demographic group (e.g., "18-25 year olds in Brazil"), can the model predict how that group would respond to survey questions? We compare model predictions against real survey data from Global Dialogues rounds, testing whether models do better than simple baselines, whether our data quality is sufficient for reliable evaluation, whether any models are statistically distinguishable from each other, and whether giving models more demographic context actually improves their predictions.');
     ln();
 
     const uniformBaseline = baselines.find(b => b.name === 'Uniform')!;
@@ -548,15 +706,18 @@ function generateReport(
     const marginalDiff = avgModelScore - marginalBaseline.meanScore;
     ln(`- **Models vs. Population Marginal:** Effect size = **${marginalDiff >= 0 ? '+' : ''}${marginalDiff.toFixed(3)}** (${marginalDiff >= 0 ? 'models add value beyond' : 'models do not yet exceed'} just knowing the overall population distribution)`);
     ln(`- **Models vs. Shuffled Null:** Shuffled mean = ${shuffledBaseline.meanScore.toFixed(3)} [${shuffledBaseline.ci95Low?.toFixed(3)}, ${shuffledBaseline.ci95High?.toFixed(3)}], best model = ${bestModelScore.toFixed(3)}`);
-    ln(`- **Noise floor:** ${((noiseFloor.thresholdAnalysis.find(t => t.threshold === NOISE_THRESHOLD)?.fractionAbove ?? 0) * 100).toFixed(1)}% of segment-question pairs have noise floor > ${NOISE_THRESHOLD}`);
+    ln(`- **Data quality:** ${((noiseFloor.thresholdAnalysis.find(t => t.threshold === NOISE_THRESHOLD)?.fractionAbove ?? 0) * 100).toFixed(1)}% of segment-question pairs have high enough sample sizes for reliable evaluation (noise floor > ${NOISE_THRESHOLD})`);
     ln(`- **Pairwise significance:** ${sigPairs}/${totalPairs} model pairs significantly different (α = ${SIGNIFICANCE_ALPHA}, Holm-Bonferroni corrected)`);
-    ln(`- **Model tiers:** ${pairwiseResults.tiers.length} statistically distinguishable tier(s)`);
+    if (contextResults.perModel.length > 0) {
+        const sigContext = contextResults.perModel.filter(r => r.significant).length;
+        ln(`- **Context responsiveness:** ${sigContext}/${contextResults.perModel.length} models show significant improvement with more demographic context`);
+    }
     ln();
 
     // ── Analysis 1: Baselines ──
     ln('## Analysis 1: Null Model Baselines');
     ln();
-    ln('Comparison of actual model scores against naive predictors that use no model intelligence.');
+    ln('> **What this measures:** We compare model predictions against three "dumb" baselines that require no AI. If models can\'t beat these baselines, they aren\'t adding real value. The **Uniform** baseline guesses equal probability for every option. The **Population Marginal** baseline uses the overall population\'s answer distribution (ignoring demographics entirely). The **Shuffled** baseline assigns random demographic segments to each question, measuring how much demographic identity actually matters for each question.');
     ln();
     ln('| Baseline | Mean Score | 95% CI | (Segment, Question) Pairs |');
     ln('|----------|-----------|--------|---------------------------|');
@@ -565,6 +726,11 @@ function generateReport(
         ln(`| ${b.name} | ${b.meanScore.toFixed(3)} | ${ci} | ${b.pairCount.toLocaleString()} |`);
     }
     ln();
+
+    if (marginalDiff < 0) {
+        ln('> **Interpretation:** The population marginal baseline currently outperforms the models. This means models aren\'t yet adding demographic-specific knowledge beyond what you\'d get from just knowing the overall population distribution. The models know *what people in general think* but haven\'t learned *how specific demographics differ* from the population average.');
+        ln();
+    }
 
     ln('### Model Scores vs. Baselines');
     ln();
@@ -580,25 +746,30 @@ function generateReport(
     ln();
 
     // ── Analysis 2: Noise Floor ──
-    ln('## Analysis 2: Analytical Noise Floor');
+    ln('## Analysis 2: Analytical Noise Floor (Data Quality)');
     ln();
-    ln(`Expected JSD similarity from sampling noise alone: \`1 - sqrt((k-1) / (2n × ln2))\``);
+    ln('> **What this measures:** The noise floor tells us how similar two samples drawn from the *same* distribution would look, given the sample size. A **higher noise floor is better** — it means the data has enough samples that random sampling variation is small, and we can reliably distinguish real differences from noise. Pairs *below* the threshold have too few samples for confident evaluation.');
     ln();
-    ln(`Threshold for flagging: ${NOISE_THRESHOLD}`);
+    ln(`Formula: \`1 - sqrt((k-1) / (2n × ln2))\` where k = number of options, n = sample size.`);
+    ln();
+    ln(`Quality threshold: ${NOISE_THRESHOLD} (pairs above this have sufficient data quality for reliable evaluation)`);
     ln();
     ln('### By Segment Category');
     ln();
-    ln('| Category | Pairs | Avg Sample Size | Avg Noise Floor | % Above Threshold |');
-    ln('|----------|-------|----------------|----------------|-------------------|');
+    ln('| Category | Pairs | Avg Sample Size | Avg Noise Floor | % Reliable (Above Threshold) |');
+    ln('|----------|-------|----------------|----------------|------------------------------|');
     for (const cat of noiseFloor.categorySummaries) {
         ln(`| ${cat.category} | ${cat.totalPairs} | ${cat.avgSampleSize.toFixed(0)} | ${cat.avgNoiseFloor.toFixed(3)} | ${cat.percentAbove.toFixed(1)}% |`);
     }
     ln();
 
+    ln('> **Reading this table:** Categories with high "% Reliable" have large sample sizes and clean data — evaluation results for these segments are trustworthy. Categories with low reliability (typically country-level segments with n~33) should be interpreted cautiously, as sampling noise alone could account for apparent model differences.');
+    ln();
+
     ln('### Threshold Sweep');
     ln();
-    ln('| Noise Floor Threshold | % of Pairs Above |');
-    ln('|----------------------|------------------|');
+    ln('| Quality Threshold | % of Pairs Meeting Threshold |');
+    ln('|-------------------|------------------------------|');
     for (const t of noiseFloor.thresholdAnalysis) {
         ln(`| ${t.threshold.toFixed(2)} | ${(t.fractionAbove * 100).toFixed(1)}% |`);
     }
@@ -622,10 +793,10 @@ function generateReport(
 
     ln('### Minimum Sample Size Recommendations');
     ln();
-    ln('For noise floor below 0.90 (where model differentiation is feasible):');
+    ln('Minimum respondents needed per segment to achieve a given noise floor:');
     ln();
-    ln('| Options (k) | Min n for noise < 0.90 | Min n for noise < 0.80 | Min n for noise < 0.70 |');
-    ln('|-------------|----------------------|----------------------|----------------------|');
+    ln('| Options (k) | n for 0.90 floor | n for 0.80 floor | n for 0.70 floor |');
+    ln('|-------------|-----------------|-----------------|-----------------|');
     for (const k of [3, 4, 5, 6, 7]) {
         const nFor90 = Math.ceil((k - 1) / (2 * Math.pow(1 - 0.90, 2) * Math.LN2));
         const nFor80 = Math.ceil((k - 1) / (2 * Math.pow(1 - 0.80, 2) * Math.LN2));
@@ -637,13 +808,18 @@ function generateReport(
     // ── Analysis 3: Pairwise ──
     ln('## Analysis 3: Pairwise Model Significance');
     ln();
+    ln('> **What this measures:** For each pair of models, we test whether the difference in their scores is statistically significant or could be explained by chance. A permutation test shuffles which model\'s score is which and checks whether the observed difference is unusually large. Statistical significance does *not* imply practical importance — a highly significant difference might still be too small to matter.');
+    ln();
     ln(`Permutation test (${PERMUTATION_ITERATIONS.toLocaleString()} iterations) with Holm-Bonferroni correction at α = ${SIGNIFICANCE_ALPHA}.`);
     ln();
 
     if (pairwiseResults.pairwise.length === 0) {
         ln('*No model pairs with sufficient shared questions for testing.*');
     } else {
-        ln('### Significant Differences');
+        const sigSummary = pairwiseResults.pairwise.filter(p => p.significant).length;
+        ln(`**Summary:** ${sigSummary} of ${pairwiseResults.pairwise.length} model pairs (${(sigSummary / pairwiseResults.pairwise.length * 100).toFixed(1)}%) show statistically significant differences.`);
+        ln();
+        ln('### Pairwise Comparison Table');
         ln();
         ln('| Model A | Model B | Mean Diff | Raw p | Adjusted p | Shared Qs | Sig? |');
         ln('|---------|---------|-----------|-------|------------|-----------|------|');
@@ -658,24 +834,73 @@ function generateReport(
         ln();
     }
 
-    ln('### Model Tiers');
+    // ── Analysis 4: Context Responsiveness ──
+    ln('## Analysis 4: Context Responsiveness');
     ln();
-    ln('Models within the same tier are not statistically distinguishable at the given significance level.');
+    ln('> **What this measures:** When we give a model more demographic context questions in its prompt (e.g., telling it not just the country but also the age group, gender, and religion of the respondents), does its prediction accuracy improve? A positive slope means more context = better predictions. We test significance via permutation: if randomly reassigning context counts produces slopes as large as the observed one, the relationship is not meaningful.');
     ln();
-    for (let i = 0; i < pairwiseResults.tiers.length; i++) {
-        const tier = pairwiseResults.tiers[i];
-        // Sort tier by overall score
-        const sorted = tier
-            .map(id => ({ id, score: modelOverallScores.get(id) ?? 0 }))
-            .sort((a, b) => b.score - a.score);
-        const avgTierScore = sorted.reduce((a, m) => a + m.score, 0) / sorted.length;
-        ln(`**Tier ${i + 1}** (avg: ${avgTierScore.toFixed(3)}):`);
-        for (const m of sorted) {
-            const shortName = m.id.replace(/^openrouter:/, '');
-            ln(`  - ${shortName} (${m.score.toFixed(3)})`);
+
+    if (contextResults.perModel.length === 0) {
+        ln('*Insufficient context count variation to test. All evaluations used the same number of context questions, or no evaluation data is available.*');
+        ln();
+    } else {
+        ln('### Per-Model Context Responsiveness');
+        ln();
+        ln('| Model | Observed Slope | p-value | Adjusted p | Context Levels | Data Points | Significant? |');
+        ln('|-------|---------------|---------|------------|----------------|-------------|-------------|');
+        const sortedCtx = [...contextResults.perModel].sort((a, b) => b.observedSlope - a.observedSlope);
+        for (const r of sortedCtx) {
+            const shortName = r.modelId.replace(/^openrouter:/, '');
+            const sig = r.significant ? '**Yes**' : 'No';
+            ln(`| ${shortName} | ${r.observedSlope >= 0 ? '+' : ''}${r.observedSlope.toFixed(6)} | ${r.pValue.toFixed(4)} | ${r.adjustedPValue.toFixed(4)} | ${r.contextLevels} | ${r.dataPoints} | ${sig} |`);
         }
         ln();
+
+        const sigModels = contextResults.perModel.filter(r => r.significant);
+        if (sigModels.length > 0) {
+            ln(`> **Interpretation:** ${sigModels.length} model(s) show statistically significant improvement with more demographic context. This suggests these models can meaningfully use additional demographic information to make better predictions about group-specific opinion distributions.`);
+        } else {
+            ln('> **Interpretation:** No models show statistically significant improvement with more demographic context. This could mean models aren\'t effectively using the additional context, or that the current range of context counts is too narrow to detect an effect.');
+        }
+        ln();
+
+        if (contextResults.categoryBreakdown.length > 0) {
+            ln('### Breakdown by Segment Category');
+            ln();
+            ln('Average slope per model within each demographic category (positive = more context helps):');
+            ln();
+
+            for (const cat of contextResults.categoryBreakdown) {
+                ln(`**${cat.category}:**`);
+                ln();
+                ln('| Model | Avg Slope | Data Points |');
+                ln('|-------|----------|-------------|');
+                for (const ms of cat.modelSlopes) {
+                    const shortName = ms.modelId.replace(/^openrouter:/, '');
+                    ln(`| ${shortName} | ${ms.slope >= 0 ? '+' : ''}${ms.slope.toFixed(6)} | ${ms.dataPoints} |`);
+                }
+                ln();
+            }
+        }
     }
+
+    // ── Future Work ──
+    ln('---');
+    ln();
+    ln('## Future Work & Limitations');
+    ln();
+    ln('### Population Baseline Blueprint Variant');
+    ln();
+    ln('Currently we cannot directly test whether knowing demographics helps or hurts accuracy, because all evaluation blueprints include demographic context in the prompt. A "no-demographic" blueprint variant would allow a direct comparison: the same model predicting the same segment\'s distribution, with and without knowing which demographic group it\'s predicting for. The population marginal baseline approximates this (it measures how well you can do with zero demographic knowledge), but it isn\'t the same as testing the model\'s own ability to predict without demographics — the model might perform differently than the marginal average.');
+    ln();
+    ln('### Demographic Combinations');
+    ln();
+    ln('The current analysis tests single demographic dimensions (age, gender, country, etc.) independently. Real people belong to intersecting groups — a "18-25 year old male in an urban area" may have very different opinions from what you\'d predict by averaging the age, gender, and environment effects separately. Future work should test combinations to understand whether models improve accuracy with intersectional demographic context, and whether certain combinations are particularly well or poorly predicted.');
+    ln();
+    ln('### Cross-Round Temporal Analysis');
+    ln();
+    ln('With data spanning GD1 through GD7, future analysis could examine temporal consistency. Do models perform differently on newer vs. older survey rounds? Are opinion shifts over time captured by the models, or do they reflect a static snapshot of the training data? This would help assess whether models are learning genuine cultural patterns or memorizing specific survey results.');
+    ln();
 
     // ── Methodology ──
     ln('---');
@@ -684,10 +909,10 @@ function generateReport(
     ln();
     ln('- **JSD Similarity:** Uses `1 - sqrt(JSD)` (Jensen-Shannon Distance) as the similarity metric, matching the evaluation pipeline.');
     ln(`- **Shuffled baseline:** ${SHUFFLE_ITERATIONS} iterations shuffling segment-distribution assignments within each question.`);
-    ln(`- **Permutation test:** ${PERMUTATION_ITERATIONS.toLocaleString()} iterations flipping sign of paired differences.`);
-    ln('- **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni.');
-    ln('- **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories.');
-    ln('- **Tier construction:** Union-find grouping models that are NOT significantly different. Transitive grouping may produce larger tiers.');
+    ln(`- **Permutation test:** ${PERMUTATION_ITERATIONS.toLocaleString()} iterations flipping sign of paired differences (Analysis 3) or shuffling context count labels (Analysis 4).`);
+    ln('- **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni. Applied separately within each analysis.');
+    ln('- **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories. Higher values indicate better data quality.');
+    ln('- **Context responsiveness:** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution.');
     ln();
 
     return lines.join('\n');
@@ -752,7 +977,7 @@ async function main() {
     console.log('\n── Analysis 2: Analytical Noise Floor ──');
     const noiseFloor = computeNoiseFloor(groundTruths, NOISE_THRESHOLD);
     const aboveThreshold = noiseFloor.entries.filter(e => e.aboveThreshold).length;
-    console.log(`  ${aboveThreshold}/${noiseFloor.entries.length} pairs have noise floor > ${NOISE_THRESHOLD}`);
+    console.log(`  ${aboveThreshold}/${noiseFloor.entries.length} pairs have sufficient data quality (noise floor > ${NOISE_THRESHOLD})`);
 
     // Analysis 3: Pairwise Significance
     console.log('\n── Analysis 3: Pairwise Model Significance ──');
@@ -762,7 +987,16 @@ async function main() {
     const pairwiseResults = computePairwiseSignificance(modelScores);
     const sigCount = pairwiseResults.pairwise.filter(p => p.significant).length;
     console.log(`  ${sigCount}/${pairwiseResults.pairwise.length} pairs significantly different`);
-    console.log(`  ${pairwiseResults.tiers.length} tier(s) identified`);
+
+    // Analysis 4: Context Responsiveness
+    console.log('\n── Analysis 4: Context Responsiveness ──');
+    const contextResults = computeContextResponsiveness(modelScores);
+    if (contextResults.perModel.length === 0) {
+        console.log('  Insufficient context count variation (all evals used same context count)');
+    } else {
+        const sigCtx = contextResults.perModel.filter(r => r.significant).length;
+        console.log(`  ${sigCtx}/${contextResults.perModel.length} models show significant context responsiveness`);
+    }
 
     // Generate report
     console.log('\n── Generating report ──');
@@ -771,6 +1005,7 @@ async function main() {
         modelOverallScores,
         noiseFloor,
         pairwiseResults,
+        contextResults,
         surveys.length,
         resultCount,
     );

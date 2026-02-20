@@ -1,29 +1,35 @@
 # DTEF Statistical Validity Report
 
-*Generated: 2026-02-20T13:03:35.296Z*
+*Generated: 2026-02-20T14:50:06.375Z*
 
 **Data:** 6 surveys, 1000 evaluation results
 
 ## Executive Summary
+
+### What This Report Tells You
+
+This report evaluates how well AI models predict demographic opinion distributions — that is, given a demographic group (e.g., "18-25 year olds in Brazil"), can the model predict how that group would respond to survey questions? We compare model predictions against real survey data from Global Dialogues rounds, testing whether models do better than simple baselines, whether our data quality is sufficient for reliable evaluation, whether any models are statistically distinguishable from each other, and whether giving models more demographic context actually improves their predictions.
 
 ### Key Findings
 
 - **Models vs. Uniform baseline:** Average model score (0.731) vs uniform (0.647), effect size = **+0.084**
 - **Models vs. Population Marginal:** Effect size = **-0.102** (models do not yet exceed just knowing the overall population distribution)
 - **Models vs. Shuffled Null:** Shuffled mean = 0.761 [0.760, 0.762], best model = 0.768
-- **Noise floor:** 54.5% of segment-question pairs have noise floor > 0.7
+- **Data quality:** 54.5% of segment-question pairs have high enough sample sizes for reliable evaluation (noise floor > 0.7)
 - **Pairwise significance:** 238/273 model pairs significantly different (α = 0.05, Holm-Bonferroni corrected)
-- **Model tiers:** 2 statistically distinguishable tier(s)
+- **Context responsiveness:** 3/24 models show significant improvement with more demographic context
 
 ## Analysis 1: Null Model Baselines
 
-Comparison of actual model scores against naive predictors that use no model intelligence.
+> **What this measures:** We compare model predictions against three "dumb" baselines that require no AI. If models can't beat these baselines, they aren't adding real value. The **Uniform** baseline guesses equal probability for every option. The **Population Marginal** baseline uses the overall population's answer distribution (ignoring demographics entirely). The **Shuffled** baseline assigns random demographic segments to each question, measuring how much demographic identity actually matters for each question.
 
 | Baseline | Mean Score | 95% CI | (Segment, Question) Pairs |
 |----------|-----------|--------|---------------------------|
 | Uniform | 0.647 | — | 14,292 |
 | Population Marginal | 0.833 | — | 14,292 |
 | Shuffled (Permutation Null) | 0.761 | [0.760, 0.762] | 1,000 |
+
+> **Interpretation:** The population marginal baseline currently outperforms the models. This means models aren't yet adding demographic-specific knowledge beyond what you'd get from just knowing the overall population distribution. The models know *what people in general think* but haven't learned *how specific demographics differ* from the population average.
 
 ### Model Scores vs. Baselines
 
@@ -54,16 +60,18 @@ Comparison of actual model scores against naive predictors that use no model int
 | openai/gpt-oss-20b[temp:0.3] | 0.693 | +0.046 | -0.141 | -0.068 |
 | x-ai/grok-4[temp:0.3] | 0.638 | -0.010 | -0.196 | -0.123 |
 
-## Analysis 2: Analytical Noise Floor
+## Analysis 2: Analytical Noise Floor (Data Quality)
 
-Expected JSD similarity from sampling noise alone: `1 - sqrt((k-1) / (2n × ln2))`
+> **What this measures:** The noise floor tells us how similar two samples drawn from the *same* distribution would look, given the sample size. A **higher noise floor is better** — it means the data has enough samples that random sampling variation is small, and we can reliably distinguish real differences from noise. Pairs *below* the threshold have too few samples for confident evaluation.
 
-Threshold for flagging: 0.7
+Formula: `1 - sqrt((k-1) / (2n × ln2))` where k = number of options, n = sample size.
+
+Quality threshold: 0.7 (pairs above this have sufficient data quality for reliable evaluation)
 
 ### By Segment Category
 
-| Category | Pairs | Avg Sample Size | Avg Noise Floor | % Above Threshold |
-|----------|-------|----------------|----------------|-------------------|
+| Category | Pairs | Avg Sample Size | Avg Noise Floor | % Reliable (Above Threshold) |
+|----------|-------|----------------|----------------|------------------------------|
 | environment | 909 | 350 | 0.888 | 100.0% |
 | aiConcern | 636 | 350 | 0.899 | 100.0% |
 | gender | 610 | 516 | 0.928 | 99.3% |
@@ -71,10 +79,12 @@ Threshold for flagging: 0.7
 | religion | 2121 | 149 | 0.781 | 73.6% |
 | country | 8455 | 33 | 0.640 | 30.7% |
 
+> **Reading this table:** Categories with high "% Reliable" have large sample sizes and clean data — evaluation results for these segments are trustworthy. Categories with low reliability (typically country-level segments with n~33) should be interpreted cautiously, as sampling noise alone could account for apparent model differences.
+
 ### Threshold Sweep
 
-| Noise Floor Threshold | % of Pairs Above |
-|----------------------|------------------|
+| Quality Threshold | % of Pairs Meeting Threshold |
+|-------------------|------------------------------|
 | 0.50 | 93.0% |
 | 0.60 | 70.2% |
 | 0.70 | 54.5% |
@@ -95,10 +105,10 @@ Threshold for flagging: 0.7
 
 ### Minimum Sample Size Recommendations
 
-For noise floor below 0.90 (where model differentiation is feasible):
+Minimum respondents needed per segment to achieve a given noise floor:
 
-| Options (k) | Min n for noise < 0.90 | Min n for noise < 0.80 | Min n for noise < 0.70 |
-|-------------|----------------------|----------------------|----------------------|
+| Options (k) | n for 0.90 floor | n for 0.80 floor | n for 0.70 floor |
+|-------------|-----------------|-----------------|-----------------|
 | 3 | 145 | 37 | 17 |
 | 4 | 217 | 55 | 25 |
 | 5 | 289 | 73 | 33 |
@@ -107,9 +117,13 @@ For noise floor below 0.90 (where model differentiation is feasible):
 
 ## Analysis 3: Pairwise Model Significance
 
+> **What this measures:** For each pair of models, we test whether the difference in their scores is statistically significant or could be explained by chance. A permutation test shuffles which model's score is which and checks whether the observed difference is unusually large. Statistical significance does *not* imply practical importance — a highly significant difference might still be too small to matter.
+
 Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.05.
 
-### Significant Differences
+**Summary:** 238 of 273 model pairs (87.2%) show statistically significant differences.
+
+### Pairwise Comparison Table
 
 | Model A | Model B | Mean Diff | Raw p | Adjusted p | Shared Qs | Sig? |
 |---------|---------|-----------|-------|------------|-----------|------|
@@ -226,6 +240,7 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1[temp:0.3] | -0.0121 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4o-mini[temp:0.3] | +0.0191 | 0.0000 | 0.0000 | 14335 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4o[temp:0.3] | -0.0084 | 0.0000 | 0.0000 | 9223 | **Yes** |
+| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0039 | 0.0000 | 0.0000 | 7016 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0217 | 0.0000 | 0.0000 | 9220 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0090 | 0.0000 | 0.0000 | 5675 | **Yes** |
 | meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-oss-120b[temp:0.3] | +0.0292 | 0.0000 | 0.0000 | 9223 | **Yes** |
@@ -334,7 +349,6 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | openai/gpt-5[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | +0.0280 | 0.0000 | 0.0000 | 5632 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0165 | 0.0000 | 0.0000 | 9221 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | -0.0059 | 0.0000 | 0.0000 | 9223 | **Yes** |
-| openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0058 | 0.0000 | 0.0000 | 5533 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0195 | 0.0000 | 0.0000 | 8941 | **Yes** |
 | openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0105 | 0.0000 | 0.0000 | 9180 | **Yes** |
 | openai/gpt-oss-20b[temp:0.3] | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | -0.0224 | 0.0000 | 0.0000 | 9221 | **Yes** |
@@ -343,81 +357,217 @@ Permutation test (10,000 iterations) with Holm-Bonferroni correction at α = 0.0
 | openai/gpt-oss-20b[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0270 | 0.0000 | 0.0000 | 9178 | **Yes** |
 | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0105 | 0.0000 | 0.0000 | 5533 | **Yes** |
 | qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0139 | 0.0000 | 0.0000 | 14053 | **Yes** |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0045 | 0.0000 | 0.0000 | 9180 | **Yes** |
 | qwen/qwen3-32b[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0261 | 0.0000 | 0.0000 | 5251 | **Yes** |
 | qwen/qwen3-32b[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0173 | 0.0000 | 0.0000 | 5490 | **Yes** |
 | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | +0.0088 | 0.0000 | 0.0000 | 8941 | **Yes** |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0045 | 0.0002 | 0.0078 | 9180 | **Yes** |
-| google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0039 | 0.0002 | 0.0080 | 14053 | **Yes** |
-| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0039 | 0.0003 | 0.0111 | 7016 | **Yes** |
-| anthropic/claude-sonnet-4[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0026 | 0.0003 | 0.0114 | 9220 | **Yes** |
-| openai/gpt-4o[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0044 | 0.0005 | 0.0180 | 5675 | **Yes** |
-| mistralai/mistral-large-2411[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0034 | 0.0021 | 0.0714 | 6925 | No |
-| mistralai/mistral-large-2411[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0021 | 0.0021 | 0.0735 | 9130 | No |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | anthropic/claude-sonnet-4.5[temp:0.3] | +0.0018 | 0.0027 | 0.0891 | 9222 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0016 | 0.0065 | 0.2080 | 14335 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-large-2411[temp:0.3] | +0.0018 | 0.0091 | 0.2821 | 9130 | No |
-| anthropic/claude-sonnet-4.5[temp:0.3] | openai/gpt-5.1[temp:0.3] | +0.0016 | 0.0152 | 0.4560 | 9220 | No |
-| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0001 | 0.9032 | 0.9032 | 9180 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0026 | 0.0381 | 1.0000 | 5675 | No |
-| anthropic/claude-sonnet-4[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0401 | 0.0544 | 1.0000 | 43 | No |
-| google/gemma-3-12b-it[temp:0.3] | qwen/qwen3-32b[temp:0.3] | -0.0031 | 0.0637 | 1.0000 | 5533 | No |
-| anthropic/claude-sonnet-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0377 | 0.0780 | 1.0000 | 43 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0008 | 0.0857 | 1.0000 | 14335 | No |
-| google/gemini-2.5-flash[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0388 | 0.0890 | 1.0000 | 43 | No |
-| openai/gpt-4.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0316 | 0.1125 | 1.0000 | 43 | No |
-| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0337 | 0.1223 | 1.0000 | 43 | No |
-| openai/gpt-oss-20b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0326 | 0.1268 | 1.0000 | 43 | No |
-| openai/gpt-4.1-nano[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0363 | 0.1629 | 1.0000 | 43 | No |
-| mistralai/mistral-medium-3[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0008 | 0.1886 | 1.0000 | 14335 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0247 | 0.1993 | 1.0000 | 43 | No |
-| openai/gpt-5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.2021 | 1.0000 | 43 | No |
-| openai/gpt-5.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.2124 | 1.0000 | 43 | No |
-| google/gemma-3-12b-it[temp:0.3] | openai/gpt-4.1-nano[temp:0.3] | +0.0011 | 0.2163 | 1.0000 | 14335 | No |
-| openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0223 | 0.2474 | 1.0000 | 43 | No |
-| google/gemma-3-12b-it[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0259 | 0.3539 | 1.0000 | 43 | No |
-| openai/gpt-4.1[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0010 | 0.3571 | 1.0000 | 5675 | No |
-| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0172 | 0.4698 | 1.0000 | 43 | No |
-| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0190 | 0.5040 | 1.0000 | 43 | No |
-| openai/gpt-4.1-nano[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0007 | 0.5211 | 1.0000 | 9221 | No |
-| qwen/qwen3-32b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0133 | 0.5535 | 1.0000 | 43 | No |
-| mistralai/mistral-medium-3[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0108 | 0.6113 | 1.0000 | 43 | No |
-| openai/gpt-4o[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0119 | 0.6230 | 1.0000 | 43 | No |
-| meta-llama/llama-4-maverick[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0083 | 0.7062 | 1.0000 | 43 | No |
-| openai/gpt-4.1-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0072 | 0.7545 | 1.0000 | 43 | No |
-| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-4.1[temp:0.3] | +0.0001 | 0.8356 | 1.0000 | 14335 | No |
-| mistralai/mistral-large-2411[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0037 | 0.8753 | 1.0000 | 43 | No |
+| google/gemini-2.5-flash[temp:0.3] | qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.0039 | 0.0001 | 0.0039 | 14053 | **Yes** |
+| openai/gpt-oss-120b[temp:0.3] | qwen/qwen3-32b[temp:0.3] | +0.0058 | 0.0002 | 0.0072 | 5533 | **Yes** |
+| openai/gpt-4o[temp:0.3] | openai/gpt-5[temp:0.3] | -0.0044 | 0.0002 | 0.0074 | 5675 | **Yes** |
+| anthropic/claude-sonnet-4[temp:0.3] | openai/gpt-5.1[temp:0.3] | -0.0026 | 0.0002 | 0.0076 | 9220 | **Yes** |
+| mistralai/mistral-large-2411[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0021 | 0.0026 | 0.0910 | 9130 | No |
+| mistralai/mistral-large-2411[temp:0.3] | openai/gpt-5-mini[temp:0.3] | +0.0034 | 0.0029 | 0.0986 | 6925 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | anthropic/claude-sonnet-4.5[temp:0.3] | +0.0018 | 0.0031 | 0.1023 | 9222 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0016 | 0.0058 | 0.1856 | 14335 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-large-2411[temp:0.3] | +0.0018 | 0.0107 | 0.3317 | 9130 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | openai/gpt-5.1[temp:0.3] | +0.0016 | 0.0142 | 0.4260 | 9220 | No |
+| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4.1-fast[temp:0.3] | -0.0001 | 0.9002 | 0.9002 | 9180 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0026 | 0.0378 | 1.0000 | 5675 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0401 | 0.0542 | 1.0000 | 43 | No |
+| google/gemma-3-12b-it[temp:0.3] | qwen/qwen3-32b[temp:0.3] | -0.0031 | 0.0645 | 1.0000 | 5533 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0377 | 0.0743 | 1.0000 | 43 | No |
+| google/gemini-2.5-flash[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0388 | 0.0846 | 1.0000 | 43 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | mistralai/mistral-medium-3[temp:0.3] | -0.0008 | 0.0850 | 1.0000 | 14335 | No |
+| openai/gpt-4.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0316 | 0.1184 | 1.0000 | 43 | No |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0337 | 0.1191 | 1.0000 | 43 | No |
+| openai/gpt-oss-20b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0326 | 0.1283 | 1.0000 | 43 | No |
+| openai/gpt-4.1-nano[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0363 | 0.1605 | 1.0000 | 43 | No |
+| openai/gpt-5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.1903 | 1.0000 | 43 | No |
+| mistralai/mistral-medium-3[temp:0.3] | openai/gpt-4.1-mini[temp:0.3] | -0.0008 | 0.1932 | 1.0000 | 14335 | No |
+| openai/gpt-5.1[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0249 | 0.2055 | 1.0000 | 43 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0247 | 0.2067 | 1.0000 | 43 | No |
+| google/gemma-3-12b-it[temp:0.3] | openai/gpt-4.1-nano[temp:0.3] | +0.0011 | 0.2150 | 1.0000 | 14335 | No |
+| openai/gpt-oss-120b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0223 | 0.2442 | 1.0000 | 43 | No |
+| openai/gpt-4.1[temp:0.3] | openai/gpt-5[temp:0.3] | +0.0010 | 0.3497 | 1.0000 | 5675 | No |
+| google/gemma-3-12b-it[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0259 | 0.3542 | 1.0000 | 43 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0172 | 0.4701 | 1.0000 | 43 | No |
+| openai/gpt-4o-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0190 | 0.4954 | 1.0000 | 43 | No |
+| openai/gpt-4.1-nano[temp:0.3] | openai/gpt-oss-20b[temp:0.3] | +0.0007 | 0.5117 | 1.0000 | 9221 | No |
+| qwen/qwen3-32b[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0133 | 0.5496 | 1.0000 | 43 | No |
+| mistralai/mistral-medium-3[temp:0.3] | x-ai/grok-4[temp:0.3] | -0.0108 | 0.6250 | 1.0000 | 43 | No |
+| openai/gpt-4o[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0119 | 0.6254 | 1.0000 | 43 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0083 | 0.7079 | 1.0000 | 43 | No |
+| openai/gpt-4.1-mini[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0072 | 0.7605 | 1.0000 | 43 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | openai/gpt-4.1[temp:0.3] | +0.0001 | 0.8332 | 1.0000 | 14335 | No |
+| mistralai/mistral-large-2411[temp:0.3] | x-ai/grok-4[temp:0.3] | +0.0037 | 0.8713 | 1.0000 | 43 | No |
 
-### Model Tiers
+## Analysis 4: Context Responsiveness
 
-Models within the same tier are not statistically distinguishable at the given significance level.
+> **What this measures:** When we give a model more demographic context questions in its prompt (e.g., telling it not just the country but also the age group, gender, and religion of the respondents), does its prediction accuracy improve? A positive slope means more context = better predictions. We test significance via permutation: if randomly reassigning context counts produces slopes as large as the observed one, the relationship is not meaningful.
 
-**Tier 1** (avg: 0.731):
-  - anthropic/claude-sonnet-4.5[temp:0.3] (0.768)
-  - anthropic:claude-3-7-sonnet-20250219[temp:0.3] (0.765)
-  - anthropic/claude-sonnet-4[temp:0.3] (0.763)
-  - openai/gpt-5.1[temp:0.3] (0.761)
-  - anthropic/claude-haiku-4.5[temp:0.3] (0.756)
-  - openai/gpt-4.1[temp:0.3] (0.755)
-  - openai/gpt-4o[temp:0.3] (0.749)
-  - openai/gpt-5[temp:0.3] (0.749)
-  - openai/gpt-4.1-mini[temp:0.3] (0.745)
-  - mistralai/mistral-medium-3[temp:0.3] (0.744)
-  - meta-llama/llama-4-maverick[temp:0.3] (0.743)
-  - mistralai/mistral-large-2411[temp:0.3] (0.738)
-  - openai/gpt-5-mini[temp:0.3] (0.732)
-  - google/gemini-2.5-flash[temp:0.3] (0.732)
-  - openai/gpt-4o-mini[temp:0.3] (0.724)
-  - x-ai/grok-4.1-fast[temp:0.3] (0.724)
-  - qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] (0.722)
-  - openai/gpt-oss-120b[temp:0.3] (0.712)
-  - qwen/qwen3-32b[temp:0.3] (0.705)
-  - google/gemma-3-12b-it[temp:0.3] (0.701)
-  - openai/gpt-4.1-nano[temp:0.3] (0.699)
-  - openai/gpt-oss-20b[temp:0.3] (0.693)
-  - x-ai/grok-4[temp:0.3] (0.638)
+### Per-Model Context Responsiveness
 
-**Tier 2** (avg: 0.735):
-  - qwen/qwen3-next-80b-a3b-instruct[temp:0.3] (0.735)
+| Model | Observed Slope | p-value | Adjusted p | Context Levels | Data Points | Significant? |
+|-------|---------------|---------|------------|----------------|-------------|-------------|
+| openai/gpt-5[temp:0.3] | +0.003866 | 0.0000 | 0.0000 | 5 | 6188 | **Yes** |
+| qwen/qwen3-32b[temp:0.3] | +0.003180 | 0.0000 | 0.0000 | 5 | 6026 | **Yes** |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001516 | 0.0000 | 0.0000 | 5 | 21336 | **Yes** |
+| openai/gpt-5.1[temp:0.3] | +0.000332 | 0.0036 | 0.0756 | 5 | 23244 | No |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000325 | 0.0069 | 0.1380 | 5 | 23245 | No |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000237 | 0.0131 | 0.2489 | 5 | 42628 | No |
+| openai/gpt-4o[temp:0.3] | +0.000192 | 0.0601 | 1.0000 | 5 | 23243 | No |
+| google/gemma-3-12b-it[temp:0.3] | -0.000039 | 0.6326 | 1.0000 | 5 | 42623 | No |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000240 | 0.9933 | 1.0000 | 5 | 42630 | No |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000449 | 1.0000 | 1.0000 | 5 | 42628 | No |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000477 | 0.9994 | 1.0000 | 5 | 42631 | No |
+| openai/gpt-4.1[temp:0.3] | -0.000520 | 1.0000 | 1.0000 | 5 | 42626 | No |
+| openai/gpt-4o-mini[temp:0.3] | -0.000705 | 1.0000 | 1.0000 | 5 | 42633 | No |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.000795 | 1.0000 | 1.0000 | 5 | 42631 | No |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.000821 | 1.0000 | 1.0000 | 5 | 42626 | No |
+| x-ai/grok-4[temp:0.3] | -0.000872 | 0.7231 | 1.0000 | 5 | 78 | No |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000933 | 1.0000 | 1.0000 | 5 | 42621 | No |
+| mistralai/mistral-medium-3[temp:0.3] | -0.000971 | 1.0000 | 1.0000 | 5 | 42630 | No |
+| openai/gpt-oss-120b[temp:0.3] | -0.001259 | 1.0000 | 1.0000 | 5 | 23238 | No |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001392 | 1.0000 | 1.0000 | 5 | 23156 | No |
+| openai/gpt-oss-20b[temp:0.3] | -0.001869 | 1.0000 | 1.0000 | 5 | 23154 | No |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.002970 | 1.0000 | 1.0000 | 5 | 32541 | No |
+| google/gemini-2.5-flash[temp:0.3] | -0.003843 | 1.0000 | 1.0000 | 5 | 42630 | No |
+| openai/gpt-5-mini[temp:0.3] | -0.004541 | 1.0000 | 1.0000 | 5 | 13567 | No |
+
+> **Interpretation:** 3 model(s) show statistically significant improvement with more demographic context. This suggests these models can meaningfully use additional demographic information to make better predictions about group-specific opinion distributions.
+
+### Breakdown by Segment Category
+
+Average slope per model within each demographic category (positive = more context helps):
+
+**Gender:**
+
+| Model | Avg Slope | Data Points |
+|-------|----------|-------------|
+| qwen/qwen3-32b[temp:0.3] | +0.003190 | 261 |
+| openai/gpt-5[temp:0.3] | +0.003125 | 270 |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002674 | 966 |
+| openai/gpt-5.1[temp:0.3] | +0.001481 | 966 |
+| openai/gpt-4o[temp:0.3] | +0.000610 | 965 |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000208 | 966 |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000035 | 1812 |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000127 | 1812 |
+| openai/gpt-4.1[temp:0.3] | -0.000505 | 1810 |
+| google/gemma-3-12b-it[temp:0.3] | -0.000522 | 1812 |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000563 | 1812 |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000663 | 1812 |
+| openai/gpt-4o-mini[temp:0.3] | -0.000951 | 1812 |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001265 | 1812 |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.001639 | 1812 |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001698 | 966 |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001699 | 1812 |
+| openai/gpt-5-mini[temp:0.3] | -0.001713 | 696 |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.001861 | 1812 |
+| openai/gpt-oss-120b[temp:0.3] | -0.002051 | 966 |
+| google/gemini-2.5-flash[temp:0.3] | -0.002095 | 1811 |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.002818 | 1533 |
+| openai/gpt-oss-20b[temp:0.3] | -0.002856 | 966 |
+
+**Country:**
+
+| Model | Avg Slope | Data Points |
+|-------|----------|-------------|
+| qwen/qwen3-32b[temp:0.3] | +0.002992 | 3536 |
+| openai/gpt-5[temp:0.3] | +0.002635 | 3623 |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001312 | 13004 |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000196 | 13720 |
+| openai/gpt-4o[temp:0.3] | +0.000187 | 13720 |
+| google/gemma-3-12b-it[temp:0.3] | +0.000161 | 25264 |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000139 | 25261 |
+| openai/gpt-5.1[temp:0.3] | +0.000110 | 13720 |
+| openai/gpt-4.1-nano[temp:0.3] | +0.000021 | 25266 |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000278 | 25264 |
+| openai/gpt-4o-mini[temp:0.3] | -0.000351 | 25266 |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000613 | 25262 |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.000650 | 25262 |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.000670 | 25266 |
+| openai/gpt-4.1[temp:0.3] | -0.000708 | 25265 |
+| x-ai/grok-4[temp:0.3] | -0.000872 | 78 |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000930 | 25262 |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001066 | 25265 |
+| openai/gpt-oss-120b[temp:0.3] | -0.001185 | 13718 |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001502 | 13632 |
+| openai/gpt-oss-20b[temp:0.3] | -0.001695 | 13649 |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.003138 | 18904 |
+| google/gemini-2.5-flash[temp:0.3] | -0.004479 | 25265 |
+| openai/gpt-5-mini[temp:0.3] | -0.005034 | 7536 |
+
+**Environment:**
+
+| Model | Avg Slope | Data Points |
+|-------|----------|-------------|
+| qwen/qwen3-32b[temp:0.3] | +0.005536 | 396 |
+| openai/gpt-5[temp:0.3] | +0.004210 | 405 |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.002372 | 1354 |
+| openai/gpt-5.1[temp:0.3] | +0.001244 | 1449 |
+| openai/gpt-4o[temp:0.3] | +0.001009 | 1449 |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000936 | 1449 |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000388 | 2706 |
+| x-ai/grok-4.1-fast[temp:0.3] | +0.000137 | 1449 |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000009 | 2706 |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000081 | 2706 |
+| openai/gpt-4.1[temp:0.3] | -0.000089 | 2705 |
+| openai/gpt-4.1-nano[temp:0.3] | -0.000226 | 2705 |
+| google/gemma-3-12b-it[temp:0.3] | -0.000432 | 2705 |
+| openai/gpt-oss-120b[temp:0.3] | -0.000506 | 1449 |
+| openai/gpt-5-mini[temp:0.3] | -0.000649 | 1044 |
+| mistralai/mistral-medium-3[temp:0.3] | -0.000996 | 2706 |
+| openai/gpt-4o-mini[temp:0.3] | -0.001295 | 2706 |
+| openai/gpt-oss-20b[temp:0.3] | -0.001514 | 1440 |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.001606 | 2706 |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.001697 | 2706 |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.001869 | 2700 |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001986 | 2279 |
+| google/gemini-2.5-flash[temp:0.3] | -0.002145 | 2706 |
+
+**Religion:**
+
+| Model | Avg Slope | Data Points |
+|-------|----------|-------------|
+| openai/gpt-5[temp:0.3] | +0.009213 | 944 |
+| qwen/qwen3-32b[temp:0.3] | +0.002942 | 923 |
+| anthropic:claude-3-7-sonnet-20250219[temp:0.3] | +0.001813 | 3245 |
+| qwen/qwen3-30b-a3b-instruct-2507[temp:0.3] | +0.000577 | 6314 |
+| openai/gpt-5.1[temp:0.3] | +0.000470 | 3380 |
+| openai/gpt-4o[temp:0.3] | +0.000309 | 3381 |
+| openai/gpt-4.1-nano[temp:0.3] | +0.000213 | 6313 |
+| mistralai/mistral-large-2411[temp:0.3] | +0.000194 | 3380 |
+| google/gemma-3-12b-it[temp:0.3] | -0.000158 | 6308 |
+| anthropic/claude-haiku-4.5[temp:0.3] | -0.000341 | 6313 |
+| openai/gpt-4.1[temp:0.3] | -0.000522 | 6313 |
+| openai/gpt-4.1-mini[temp:0.3] | -0.000547 | 6313 |
+| anthropic/claude-sonnet-4.5[temp:0.3] | -0.000771 | 6314 |
+| meta-llama/llama-4-maverick[temp:0.3] | -0.000775 | 6314 |
+| anthropic/claude-sonnet-4[temp:0.3] | -0.000784 | 6312 |
+| openai/gpt-4o-mini[temp:0.3] | -0.000815 | 6314 |
+| mistralai/mistral-medium-3[temp:0.3] | -0.001043 | 6312 |
+| qwen/qwen3-next-80b-a3b-instruct[temp:0.3] | -0.001411 | 5299 |
+| openai/gpt-oss-120b[temp:0.3] | -0.001460 | 3377 |
+| openai/gpt-5-mini[temp:0.3] | -0.001767 | 2435 |
+| x-ai/grok-4.1-fast[temp:0.3] | -0.001991 | 3380 |
+| openai/gpt-oss-20b[temp:0.3] | -0.002012 | 3373 |
+| google/gemini-2.5-flash[temp:0.3] | -0.003313 | 6314 |
+
+---
+
+## Future Work & Limitations
+
+### Population Baseline Blueprint Variant
+
+Currently we cannot directly test whether knowing demographics helps or hurts accuracy, because all evaluation blueprints include demographic context in the prompt. A "no-demographic" blueprint variant would allow a direct comparison: the same model predicting the same segment's distribution, with and without knowing which demographic group it's predicting for. The population marginal baseline approximates this (it measures how well you can do with zero demographic knowledge), but it isn't the same as testing the model's own ability to predict without demographics — the model might perform differently than the marginal average.
+
+### Demographic Combinations
+
+The current analysis tests single demographic dimensions (age, gender, country, etc.) independently. Real people belong to intersecting groups — a "18-25 year old male in an urban area" may have very different opinions from what you'd predict by averaging the age, gender, and environment effects separately. Future work should test combinations to understand whether models improve accuracy with intersectional demographic context, and whether certain combinations are particularly well or poorly predicted.
+
+### Cross-Round Temporal Analysis
+
+With data spanning GD1 through GD7, future analysis could examine temporal consistency. Do models perform differently on newer vs. older survey rounds? Are opinion shifts over time captured by the models, or do they reflect a static snapshot of the training data? This would help assess whether models are learning genuine cultural patterns or memorizing specific survey results.
 
 ---
 
@@ -425,7 +575,7 @@ Models within the same tier are not statistically distinguishable at the given s
 
 - **JSD Similarity:** Uses `1 - sqrt(JSD)` (Jensen-Shannon Distance) as the similarity metric, matching the evaluation pipeline.
 - **Shuffled baseline:** 1000 iterations shuffling segment-distribution assignments within each question.
-- **Permutation test:** 10,000 iterations flipping sign of paired differences.
-- **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni.
-- **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories.
-- **Tier construction:** Union-find grouping models that are NOT significantly different. Transitive grouping may produce larger tiers.
+- **Permutation test:** 10,000 iterations flipping sign of paired differences (Analysis 3) or shuffling context count labels (Analysis 4).
+- **Holm-Bonferroni:** Sequential correction that controls family-wise error rate while being less conservative than Bonferroni. Applied separately within each analysis.
+- **Noise floor formula:** `1 - sqrt((k-1) / (2n × ln2))` — the expected JSD similarity between a true distribution and one drawn from it with n samples and k categories. Higher values indicate better data quality.
+- **Context responsiveness:** For each model, computes regression slope of score vs. context count across all (segment, question) pairs. Permutation test shuffles context labels to establish the null distribution.
