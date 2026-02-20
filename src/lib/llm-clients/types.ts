@@ -42,7 +42,13 @@ export interface LLMApiCallResult {
   rateLimitReset?: number; // Unix timestamp when rate limit resets (from X-RateLimit-Reset header)
   rateLimitRemaining?: number; // Number of requests remaining (from X-RateLimit-Remaining header)
 
-  // We can add more fields here if needed, like token counts, finish reasons etc.
+  // Token usage information (for cost tracking)
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    /** Total cost in USD (only available from OpenRouter) */
+    totalCost?: number;
+  };
 }
 
 export interface ToolSpec {

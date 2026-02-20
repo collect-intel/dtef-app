@@ -70,10 +70,12 @@ export async function runLitRound(params: LitParams, deps: LitDependencies, onEv
   const anchorConfig: ComparisonConfig = deps.buildAnchorConfig(params, params.sourceText);
 
   await emit({ type: 'generation_started' });
-  const [candMap, anchorMap] = await Promise.all([
+  const [candResult, anchorResult] = await Promise.all([
     generateAllResponses(candConfig, logger, true, async (c,t)=>emit({ type: 'generation_progress', data:{ phase:'candidates', completed:c,total:t } })),
     generateAllResponses(anchorConfig, logger, true, async (c,t)=>emit({ type: 'generation_progress', data:{ phase:'anchors', completed:c,total:t } })),
   ]);
+  const candMap = candResult.allResponsesMap;
+  const anchorMap = anchorResult.allResponsesMap;
   await emit({ type: 'generation_finished' });
 
   // Normalize to <draft> and emit texts for live UI

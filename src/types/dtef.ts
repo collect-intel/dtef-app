@@ -145,6 +145,14 @@ export interface DTEFBlueprintConfig {
    */
   contextQuestionCount?: number;
 
+  /**
+   * Number of questions per batched prompt (1-5).
+   * Default: 1 (single-question mode, no batching).
+   * When > 1, multiple questions are asked in one prompt and the model
+   * returns a JSON object keyed by question label (Q1, Q2, etc.).
+   */
+  batchSize?: number;
+
   /** Blueprint template customization */
   blueprintTemplate?: {
     /** Custom system prompt */

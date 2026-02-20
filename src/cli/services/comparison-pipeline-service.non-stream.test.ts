@@ -49,7 +49,7 @@ describe('generateAllResponses circuit breaker', () => {
 
     expect(mockedGetModelResponse).toHaveBeenCalledTimes(5);
     expect(mockLogger.error).not.toHaveBeenCalledWith(expect.stringContaining('Circuit breaker'));
-    expect(result.size).toBe(5);
+    expect(result.allResponsesMap.size).toBe(5);
   });
 
   it('should trip the breaker after 10 consecutive failures and auto-fail subsequent requests', async () => {
@@ -73,8 +73,8 @@ describe('generateAllResponses circuit breaker', () => {
     );
     expect(autoFailWarnings).toHaveLength(2);
 
-    const p11Response = result.get('p11')?.modelResponses['failing-model[temp:0.7]'];
-    const p12Response = result.get('p12')?.modelResponses['failing-model[temp:0.7]'];
+    const p11Response = result.allResponsesMap.get('p11')?.modelResponses['failing-model[temp:0.7]'];
+    const p12Response = result.allResponsesMap.get('p12')?.modelResponses['failing-model[temp:0.7]'];
     
     expect(p11Response?.errorMessage).toContain('Circuit breaker for model');
     expect(p12Response?.errorMessage).toContain('Circuit breaker for model');
@@ -98,7 +98,7 @@ describe('generateAllResponses circuit breaker', () => {
     // Should call API for all 15 prompts (no breaker trip due to reset after success)
     expect(mockedGetModelResponse).toHaveBeenCalledTimes(15);
     expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining("Successful response from 'intermittent-model' received. Resetting failure counter"));
-    expect(result.size).toBe(15);
+    expect(result.allResponsesMap.size).toBe(15);
   });
 
   it('extracts tool call traces from assistant content', async () => {
@@ -108,7 +108,7 @@ describe('generateAllResponses circuit breaker', () => {
     );
 
     const result = await generateAllResponses(config, mockLogger as any, false);
-    const resp = result.get('p1')?.modelResponses['trace-model[temp:0.7]'];
+    const resp = result.allResponsesMap.get('p1')?.modelResponses['trace-model[temp:0.7]'];
     expect(resp?.toolCalls).toBeTruthy();
     expect(resp?.toolCalls?.length).toBe(1);
     expect(resp?.toolCalls?.[0]).toEqual({ name: 'calculator', arguments: { expression: '(2+3)*4' } });

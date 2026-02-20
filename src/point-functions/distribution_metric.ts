@@ -19,6 +19,8 @@ interface DistributionMetricArgs {
     expected: number[];
     /** Comparison metric to use */
     metric?: 'js-divergence' | 'cosine' | 'earth-mover';
+    /** For batched prompts: key to extract from JSON response (e.g., "Q1", "Q2") */
+    questionKey?: string;
 }
 
 /**
@@ -65,6 +67,37 @@ export function parseDistribution(text: string): number[] | null {
         labeledNumbers.push(parseFloat(labeledMatch[1]));
     }
     if (labeledNumbers.length >= 2) return labeledNumbers;
+
+    return null;
+}
+
+/**
+ * Parse a distribution for a specific question key from a batched JSON response.
+ * Expects format like: {"Q1": [35.2, 28.1], "Q2": [45.0, 35.0, 20.0]}
+ */
+export function parseDistributionByKey(text: string, key: string): number[] | null {
+    // Find a JSON object in the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const value = parsed[key];
+        if (Array.isArray(value) && value.every((n: any) => typeof n === 'number' && !isNaN(n))) {
+            return value;
+        }
+    } catch {
+        // JSON parse failed, try to extract the key manually
+        // Handle format like "Q1": [35.2, 28.1, 22.4]
+        const keyPattern = new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]+)\\]`);
+        const match = text.match(keyPattern);
+        if (match) {
+            const numbers = match[1].split(',').map(s => parseFloat(s.trim()));
+            if (numbers.length > 0 && numbers.every(n => !isNaN(n))) {
+                return numbers;
+            }
+        }
+    }
 
     return null;
 }
@@ -172,14 +205,27 @@ export const distribution_metric: PointFunction = (
 
     const expected = typedArgs.expected;
     const metric = typedArgs.metric || 'js-divergence';
+    const questionKey = typedArgs.questionKey;
 
     // Parse the predicted distribution from the LLM response
-    const predicted = parseDistribution(llmResponseText);
+    let predicted: number[] | null = null;
+
+    if (questionKey) {
+        // Batched mode: extract distribution for this specific question key
+        predicted = parseDistributionByKey(llmResponseText, questionKey);
+        // Fallback to single-distribution parsing if batched parsing fails
+        // (in case the model returned a single array instead of keyed JSON)
+        if (!predicted) {
+            predicted = parseDistribution(llmResponseText);
+        }
+    } else {
+        predicted = parseDistribution(llmResponseText);
+    }
 
     if (!predicted) {
         return {
             score: 0,
-            explain: `Could not parse a distribution from the response. Expected format: [n1, n2, n3, ...]`,
+            explain: `Could not parse a distribution from the response${questionKey ? ` for key "${questionKey}"` : ''}. Expected format: ${questionKey ? `{"${questionKey}": [n1, n2, ...]}` : '[n1, n2, n3, ...]'}`,
         };
     }
 

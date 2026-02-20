@@ -9,6 +9,12 @@ const llmCache = getCache('llm-responses');
 // Constants
 export const DEFAULT_TEMPERATURE = 0;
 
+export interface TokenUsageInfo {
+    inputTokens: number;
+    outputTokens: number;
+    totalCost?: number;
+}
+
 export interface GetModelResponseParams {
     modelId: string;
     prompt?: string;
@@ -21,6 +27,8 @@ export interface GetModelResponseParams {
     timeout?: number;
     retries?: number;
     reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+    /** Optional callback to receive token usage data from the API response */
+    onUsage?: (usage: TokenUsageInfo) => void;
 }
 
 export type StreamModelResponseParams = Omit<GetModelResponseParams, 'useCache' | 'retries'>;
@@ -41,6 +49,7 @@ export async function getModelResponse(params: GetModelResponseParams): Promise<
         timeout,
         retries,
         reasoningEffort,
+        onUsage,
     } = params;
     const { logger } = getConfig();
 
@@ -163,6 +172,10 @@ export async function getModelResponse(params: GetModelResponseParams): Promise<
             error.rateLimitReset = response.rateLimitReset;
             error.rateLimitRemaining = response.rateLimitRemaining;
             throw error;
+        }
+        // Report token usage if callback provided
+        if (onUsage && response.usage) {
+            onUsage(response.usage);
         }
         return response.responseText;
     };

@@ -96,13 +96,21 @@ class OpenRouterModuleClient {
 
       const jsonResponse = await response.json() as any;
       const responseText = jsonResponse.choices?.[0]?.message?.content || '';
-      
+
       if (!responseText && jsonResponse.error) {
         console.error('OpenRouter API Error in response:', jsonResponse.error);
         return { responseText: '', error: `OpenRouter Error: ${jsonResponse.error.message || JSON.stringify(jsonResponse.error)}` };
       }
-      
-      return { responseText };
+
+      const result: LLMApiCallResult = { responseText };
+      if (jsonResponse.usage) {
+        result.usage = {
+          inputTokens: jsonResponse.usage.prompt_tokens || 0,
+          outputTokens: jsonResponse.usage.completion_tokens || 0,
+          totalCost: jsonResponse.usage.total_cost,
+        };
+      }
+      return result;
 
     } catch (error: any) {
       if (error.name === 'AbortError') {

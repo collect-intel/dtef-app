@@ -87,7 +87,12 @@ class AnthropicClient {
             }
             const responseText = (toolPrefix + (jsonResponse.content[0]?.text?.trim() ?? '')).trim();
             const result: LLMApiCallResult = { responseText };
-
+            if (jsonResponse.usage) {
+                result.usage = {
+                    inputTokens: jsonResponse.usage.input_tokens || 0,
+                    outputTokens: jsonResponse.usage.output_tokens || 0,
+                };
+            }
             return result;
         } catch (error: any) {
             if (error.name === 'AbortError') {

@@ -1,6 +1,6 @@
 import { ComparisonConfig, EvaluationMethod, FinalComparisonOutputV2, PromptResponseData, Evaluator } from '../types/cli_types';
 import { ConversationMessage } from '@/types/shared';
-import { getModelResponse, DEFAULT_TEMPERATURE } from './llm-service';
+import { getModelResponse, DEFAULT_TEMPERATURE, TokenUsageInfo } from './llm-service';
 import { checkForErrors } from '../utils/response-utils';
 import { SimpleLogger } from '@/lib/blueprint-service';
 import pLimit from '@/lib/pLimit';
@@ -24,6 +24,19 @@ export type ProgressCallback = (completed: number, total: number) => Promise<voi
 const DEFAULT_GENERATION_CONCURRENCY = 100;
 const FAILURE_THRESHOLD = 10; // Consecutive failures to trip circuit breaker
 
+/** Per-model accumulated usage stats (thread-safe via single-threaded JS) */
+export interface AccumulatedUsage {
+    inputTokens: number;
+    outputTokens: number;
+    totalCost: number;
+    callCount: number;
+}
+
+export interface GenerateAllResponsesResult {
+    allResponsesMap: Map<string, PromptResponseData>;
+    usageByModel: Map<string, AccumulatedUsage>;
+}
+
 export async function generateAllResponses(
     config: ComparisonConfig,
     logger: SimpleLogger,
@@ -32,10 +45,19 @@ export async function generateAllResponses(
     genOptions?: { genTimeoutMs?: number; genRetries?: number },
     runLabel?: string,
     fixturesCtx?: { fixtures: FixtureSet; strict: boolean },
-): Promise<Map<string, PromptResponseData>> {
+): Promise<GenerateAllResponsesResult> {
     logger.info(`[PipelineService] Generating model responses... Caching: ${useCache}`);
 
     const allResponsesMap = new Map<string, PromptResponseData>();
+    const usageByModel = new Map<string, AccumulatedUsage>();
+    const makeUsageCallback = (mid: string) => (usage: TokenUsageInfo) => {
+        const existing = usageByModel.get(mid) || { inputTokens: 0, outputTokens: 0, totalCost: 0, callCount: 0 };
+        existing.inputTokens += usage.inputTokens;
+        existing.outputTokens += usage.outputTokens;
+        existing.totalCost += usage.totalCost || 0;
+        existing.callCount += 1;
+        usageByModel.set(mid, existing);
+    };
     const tasks: Promise<void>[] = [];
     let generatedCount = 0;
 
@@ -233,6 +255,7 @@ export async function generateAllResponses(
                                                 promptNoCache: !!promptConfig.noCache,
                                                 timeout: genOptions?.genTimeoutMs,
                                                 retries: genOptions?.genRetries,
+                                                onUsage: makeUsageCallback(modelId),
                                             });
                                             totalApiCallMs += Date.now() - callStart;
                                         }
@@ -287,6 +310,7 @@ export async function generateAllResponses(
                                         promptNoCache: !!promptConfig.noCache,
                                         timeout: genOptions?.genTimeoutMs,
                                         retries: genOptions?.genRetries,
+                                        onUsage: makeUsageCallback(modelId),
                                     });
                                     totalApiCallMs += Date.now() - callStart;
                                 }
@@ -333,6 +357,7 @@ export async function generateAllResponses(
                                             promptNoCache: !!promptConfig.noCache,
                                             timeout: genOptions?.genTimeoutMs,
                                             retries: genOptions?.genRetries,
+                                            onUsage: makeUsageCallback(modelId),
                                         });
                                         totalApiCallMs += Date.now() - callStart;
                                     }
@@ -429,7 +454,7 @@ export async function generateAllResponses(
 
     await Promise.all(tasks);
     logger.info(`[PipelineService] Finished generating ${generatedCount}/${totalResponsesToGenerate} responses.`);
-    return allResponsesMap;
+    return { allResponsesMap, usageByModel };
 }
 
 type Logger = ReturnType<typeof getConfig>['logger'];
@@ -609,7 +634,7 @@ export async function executeComparisonPipeline(
 
         if (consumerModels.length === 0) {
             // No consumer models → normal generation for all models
-            allResponsesMap = await generateAllResponses(config, logger, useCache, undefined, genOptions);
+            allResponsesMap = (await generateAllResponses(config, logger, useCache, undefined, genOptions)).allResponsesMap;
         } else {
             // Build deck XML for prompts
             const deckXml = buildDeckXml(config);
@@ -665,10 +690,10 @@ export async function executeComparisonPipeline(
 
             // Now generate API responses (only for API models)
             const apiOnlyConfig = { ...config, models: apiModels } as ComparisonConfig;
-            const apiMap = await generateAllResponses(apiOnlyConfig, logger, useCache, undefined, genOptions);
+            const apiGenResult = await generateAllResponses(apiOnlyConfig, logger, useCache, undefined, genOptions);
 
             // Merge
-            const merged = new Map(apiMap);
+            const merged = new Map(apiGenResult.allResponsesMap);
             for (const prompt of config.prompts) {
                 const promptId = prompt.id;
                 if (!merged.has(promptId)) {

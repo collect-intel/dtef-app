@@ -1,12 +1,12 @@
 import { getConfig } from '../config';
 import { ComparisonConfig, EvaluationMethod, PromptResponseData, EvaluationInput, FinalComparisonOutputV2, Evaluator, IDEAL_MODEL_ID } from '../types/cli_types';
-import { ConversationMessage, PipelineTimingMetrics, ModelTimingStats } from '@/types/shared';
+import { ConversationMessage, PipelineTimingMetrics, ModelTimingStats, UsageSummary, ModelUsageStats } from '@/types/shared';
 import { EmbeddingEvaluator } from '@/cli/evaluators/embedding-evaluator';
 import { LLMCoverageEvaluator } from '@/cli/evaluators/llm-coverage-evaluator';
 import { saveResult as saveResultToStorage } from '@/lib/storageService';
 import { toSafeTimestamp } from '@/lib/timestampUtils';
 import { generateExecutiveSummary as generateExecutiveSummary } from './executive-summary-service';
-import { generateAllResponses, ProgressCallback } from './comparison-pipeline-service.non-stream';
+import { generateAllResponses, ProgressCallback, AccumulatedUsage } from './comparison-pipeline-service.non-stream';
 import { buildDeckXml, parseResponsesXml, validateResponses } from '@/cli/services/consumer-deck';
 import { collectConsumerSlices } from '@/cli/services/consumer-service';
 import crypto from 'crypto';
@@ -293,6 +293,7 @@ export async function executeComparisonPipeline(
     const generationStartedAt = new Date().toISOString();
     const generationStartMs = Date.now();
     let allResponsesMap: Map<string, PromptResponseData>;
+    let pipelineUsageByModel = new Map<string, AccumulatedUsage>();
     if (existingResponsesMap) {
         allResponsesMap = existingResponsesMap;
     } else {
@@ -303,7 +304,9 @@ export async function executeComparisonPipeline(
 
         if (consumerModels.length === 0) {
             // No consumer models → normal generation
-            allResponsesMap = await generateAllResponses(config, logger, useCache, onProgress, genOptions, runLabel, fixturesCtx);
+            const genResult = await generateAllResponses(config, logger, useCache, onProgress, genOptions, runLabel, fixturesCtx);
+            allResponsesMap = genResult.allResponsesMap;
+            pipelineUsageByModel = genResult.usageByModel;
         } else {
             // For system permutations, step the user through each variant with a dedicated deck (global <system>)
             const sysVariants: (string | null)[] = Array.isArray(config.systems) && config.systems.length > 0
@@ -317,7 +320,9 @@ export async function executeComparisonPipeline(
             if (!bulkMode) {
                 // Standard per-prompt generation for API models
                 const apiOnlyConfig = { ...config, models: apiModels } as ComparisonConfig;
-                apiMap = await generateAllResponses(apiOnlyConfig, logger, useCache, onProgress, genOptions, runLabel, fixturesCtx);
+                const apiGenResult = await generateAllResponses(apiOnlyConfig, logger, useCache, onProgress, genOptions, runLabel, fixturesCtx);
+                apiMap = apiGenResult.allResponsesMap;
+                pipelineUsageByModel = apiGenResult.usageByModel;
             } else {
                 logger.info('[PipelineService] BULK MODE enabled for API models. Generating one deck call per model×system variant.');
                 // Build empty map
@@ -603,6 +608,43 @@ export async function executeComparisonPipeline(
         apiCallStats,
     };
 
+    // Build usage summary from accumulated data
+    let usageSummary: UsageSummary | undefined;
+    if (pipelineUsageByModel.size > 0) {
+        const byModel: ModelUsageStats[] = [];
+        let totalCalls = 0, totalIn = 0, totalOut = 0, totalCost = 0;
+        for (const [modelId, stats] of pipelineUsageByModel) {
+            byModel.push({
+                modelId,
+                callCount: stats.callCount,
+                inputTokens: stats.inputTokens,
+                outputTokens: stats.outputTokens,
+                totalCost: stats.totalCost || undefined,
+            });
+            totalCalls += stats.callCount;
+            totalIn += stats.inputTokens;
+            totalOut += stats.outputTokens;
+            totalCost += stats.totalCost;
+        }
+        usageSummary = {
+            byModel,
+            totals: {
+                callCount: totalCalls,
+                inputTokens: totalIn,
+                outputTokens: totalOut,
+                totalCost: totalCost > 0 ? totalCost : undefined,
+            },
+        };
+
+        // Log cost summary table
+        logger.info(`[PipelineService] === Token Usage Summary ===`);
+        for (const m of byModel) {
+            const costStr = m.totalCost ? ` $${m.totalCost.toFixed(4)}` : '';
+            logger.info(`  ${m.modelId}: ${m.callCount} calls, ${m.inputTokens.toLocaleString()} in / ${m.outputTokens.toLocaleString()} out${costStr}`);
+        }
+        logger.info(`  TOTAL: ${totalCalls} calls, ${totalIn.toLocaleString()} in / ${totalOut.toLocaleString()} out${totalCost > 0 ? ` $${totalCost.toFixed(4)}` : ''}`);
+    }
+
     const finalResult = await aggregateAndSaveResults(
         config,
         runLabel,
@@ -619,6 +661,11 @@ export async function executeComparisonPipeline(
         customBasePath,
         pipelineTiming,
     );
+
+    // Attach usage summary to results
+    if (usageSummary) {
+        finalResult.data.usageSummary = usageSummary;
+    }
 
     // Finalize timing (save phase + total)
     const saveDurationMs = Date.now() - saveStartMs;

@@ -32,11 +32,12 @@ dtefCommand
     .option('-f, --format <type>', 'Output format: yaml or json', 'yaml')
     .option('--questions <ids>', 'Comma-separated list of question IDs to include (default: all)')
     .option('--segments <ids>', 'Comma-separated list of segment IDs to include (default: all)')
-    .option('--models <models>', 'Comma-separated list of models or model collections', 'CORE')
+    .option('--models <models>', 'Comma-separated list of models or model collections', 'CORE_CHEAP')
     .option('--temperature <temp>', 'Model temperature', '0.3')
     .option('--context-questions <ids>', 'Comma-separated question IDs to use as context, or "all" for all non-target questions')
     .option('--context-levels <levels>', 'Generate blueprints at multiple context levels (e.g., "0,5,10,all")')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
+    .option('--batch-size <n>', 'Number of questions per batched prompt (1-5, default: 1)', '1')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -112,6 +113,12 @@ dtefCommand
             process.exit(1);
         }
 
+        const batchSize = parseInt(options.batchSize, 10);
+        if (batchSize < 1 || batchSize > 5) {
+            console.error(chalk.red('--batch-size must be between 1 and 5'));
+            process.exit(1);
+        }
+
         // Generate blueprints (possibly at multiple context levels)
         console.log(chalk.gray('Generating blueprints...'));
 
@@ -136,6 +143,7 @@ dtefCommand
                     segmentSelection: options.segments ? 'specific' : 'all',
                     segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
                     tokenBudget: parseInt(options.tokenBudget, 10),
+                    batchSize: batchSize > 1 ? batchSize : undefined,
                     modelConfig: {
                         models: options.models.split(',').map((s: string) => s.trim()),
                         temperature: parseFloat(options.temperature),
@@ -155,6 +163,7 @@ dtefCommand
                 segmentSelection: options.segments ? 'specific' : 'all',
                 segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
                 tokenBudget: parseInt(options.tokenBudget, 10),
+                batchSize: batchSize > 1 ? batchSize : undefined,
                 modelConfig: {
                     models: options.models.split(',').map((s: string) => s.trim()),
                     temperature: parseFloat(options.temperature),

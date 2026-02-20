@@ -103,7 +103,12 @@ class GoogleClient {
             }
             const responseText = (toolPrefix + (jsonResponse.candidates[0]?.content?.parts?.[0]?.text?.trim() ?? '')).trim();
             const result: LLMApiCallResult = { responseText };
-
+            if (jsonResponse.usageMetadata) {
+                result.usage = {
+                    inputTokens: jsonResponse.usageMetadata.promptTokenCount || 0,
+                    outputTokens: jsonResponse.usageMetadata.candidatesTokenCount || 0,
+                };
+            }
             return result;
         } catch (error: any) {
             if (error.name === 'AbortError') {

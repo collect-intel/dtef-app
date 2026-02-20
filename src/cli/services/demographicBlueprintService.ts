@@ -38,6 +38,17 @@ Example for a 4-option question:
 [35.2, 28.1, 22.4, 14.3]`;
 
 /**
+ * System prompt for batched multi-question mode.
+ * The model returns a JSON object keyed by question label.
+ */
+const BATCHED_SYSTEM_PROMPT = `You are a demographic survey analyst. When given a demographic group and multiple survey questions, predict how that group would respond to each question by providing percentage distributions across the answer options.
+
+Respond ONLY with a JSON object. Keys are question labels (Q1, Q2, etc.). Values are arrays of percentages summing to 100. Use one decimal place. Do not include any other text.
+
+Example:
+{"Q1": [35.2, 28.1, 22.4, 14.3], "Q2": [45.0, 35.0, 20.0]}`;
+
+/**
  * Generates DTEF blueprints from demographic survey data.
  */
 export class DemographicBlueprintService {
@@ -65,6 +76,13 @@ export class DemographicBlueprintService {
         config: DTEFBlueprintConfig,
         segment: SegmentWithResponses
     ): WevalConfig {
+        const batchSize = config.batchSize || 1;
+
+        // Use batched generation if batchSize > 1
+        if (batchSize > 1) {
+            return this.generateBatchedBlueprintForSegment(config, segment, batchSize);
+        }
+
         const prompts: WevalPromptConfig[] = [];
         let blueprintContextCount = 0;
         let blueprintContextIds: string[] = [];
@@ -133,6 +151,113 @@ export class DemographicBlueprintService {
                     groundTruthDistributions,
                     contextQuestionCount: blueprintContextCount,
                     contextQuestionIds: blueprintContextIds,
+                },
+            },
+        };
+    }
+
+    /**
+     * Generate a batched blueprint where multiple questions are asked per prompt.
+     * Each prompt contains up to batchSize questions and evaluates each with
+     * its own distribution_metric point (keyed by questionKey).
+     */
+    private static generateBatchedBlueprintForSegment(
+        config: DTEFBlueprintConfig,
+        segment: SegmentWithResponses,
+        batchSize: number
+    ): WevalConfig {
+        const prompts: WevalPromptConfig[] = [];
+
+        // Collect valid question/response pairs
+        const questionPairs: { questionId: string; question: { text: string; type: string; options?: string[] }; response: DemographicResponse }[] = [];
+        for (const questionId of config.targetQuestionIds) {
+            const question = config.surveyData.questions[questionId];
+            if (!question) continue;
+            const response = segment.responses.find(r => r.questionId === questionId);
+            if (!response) continue;
+            questionPairs.push({ questionId, question, response });
+        }
+
+        // Split into batches
+        for (let batchIdx = 0; batchIdx < questionPairs.length; batchIdx += batchSize) {
+            const batch = questionPairs.slice(batchIdx, batchIdx + batchSize);
+            const promptId = `batch-${Math.floor(batchIdx / batchSize)}-${segment.id}`;
+
+            // Build batched prompt text
+            const attributeLines = Object.entries(segment.attributes)
+                .map(([key, value]) => `- ${this.formatAttributeKey(key)}: ${value}`)
+                .join('\n');
+
+            let promptText = `Consider the following demographic group (sample size: ${segment.sampleSize}):\n`;
+            promptText += `${attributeLines}\n\n`;
+            promptText += `For each of the following survey questions, predict the percentage distribution of responses for this demographic group.\n\n`;
+
+            batch.forEach((item, idx) => {
+                const label = `Q${idx + 1}`;
+                promptText += `${label}: "${item.question.text}"\n`;
+                if (item.question.options && item.question.options.length > 0) {
+                    promptText += `  Options: ${item.question.options.map((opt, i) => `${String.fromCharCode(97 + i)}. ${opt}`).join(', ')}\n`;
+                }
+                promptText += '\n';
+            });
+
+            // Build ideal response as JSON object
+            const idealObj: Record<string, string> = {};
+            batch.forEach((item, idx) => {
+                const label = `Q${idx + 1}`;
+                idealObj[label] = `[${item.response.distribution.map(n => n.toFixed(1)).join(', ')}]`;
+            });
+            const idealResponse = JSON.stringify(
+                Object.fromEntries(batch.map((item, idx) => [`Q${idx + 1}`, item.response.distribution.map(n => parseFloat(n.toFixed(1)))]))
+            );
+
+            // Build points array — one distribution_metric per question in the batch
+            const points: WevalPromptConfig['points'] = batch.map((item, idx) => ({
+                text: `Distribution Similarity Q${idx + 1}: "${item.question.text.slice(0, 60)}..."`,
+                fn: 'distribution_metric',
+                fnArgs: {
+                    expected: item.response.distribution,
+                    metric: 'js-divergence',
+                    questionKey: `Q${idx + 1}`,
+                },
+            }));
+
+            prompts.push({
+                id: promptId,
+                description: `Batched prediction (${batch.length} Qs): ${segment.label}`,
+                promptText,
+                points,
+                idealResponse,
+                temperature: config.modelConfig?.temperature,
+            });
+        }
+
+        const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}-b${batchSize}`;
+        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label} (batch ${batchSize})`;
+
+        // Build ground truth distributions
+        const groundTruthDistributions: Record<string, number[]> = {};
+        for (const pair of questionPairs) {
+            groundTruthDistributions[pair.questionId] = pair.response.distribution;
+        }
+
+        return {
+            configId: blueprintId,
+            configTitle: blueprintTitle,
+            description: `DTEF: Batched distribution predictions (${batchSize} Qs/prompt) for ${segment.label}. Source: ${config.surveyData.source || config.surveyData.surveyName}`,
+            models: config.modelConfig?.models || ['CORE_CHEAP'],
+            system: BATCHED_SYSTEM_PROMPT,
+            temperature: config.modelConfig?.temperature || 0.3,
+            prompts,
+            tags: ['_periodic', 'dtef', 'demographic', 'batched', config.surveyData.surveyId],
+            context: {
+                dtef: {
+                    surveyId: config.surveyData.surveyId,
+                    segmentId: segment.id,
+                    segmentLabel: segment.label,
+                    segmentAttributes: segment.attributes,
+                    groundTruthDistributions,
+                    batchSize,
                 },
             },
         };

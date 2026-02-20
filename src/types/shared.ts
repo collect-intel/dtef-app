@@ -305,6 +305,9 @@ export interface WevalResult {
     /** Pipeline timing metrics (generation, evaluation, save phases + per-model stats) */
     timing?: PipelineTimingMetrics;
 
+    /** Token usage and cost summary per model and totals */
+    usageSummary?: UsageSummary;
+
     /** DTEF demographic evaluation metadata (present only for DTEF blueprints) */
     dtefMetadata?: DTEFResultMetadata;
 }
@@ -324,6 +327,26 @@ export interface ModelTimingStats {
     p95Ms: number;
     totalMs: number;
     errorCount: number;
+}
+
+/** Per-model token usage and cost summary */
+export interface ModelUsageStats {
+    modelId: string;
+    callCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalCost?: number;
+}
+
+/** Aggregate usage summary for an entire pipeline run */
+export interface UsageSummary {
+    byModel: ModelUsageStats[];
+    totals: {
+        callCount: number;
+        inputTokens: number;
+        outputTokens: number;
+        totalCost?: number;
+    };
 }
 
 /** Pipeline timing metrics, embedded in WevalResult */

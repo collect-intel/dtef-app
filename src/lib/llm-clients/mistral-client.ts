@@ -79,7 +79,12 @@ class MistralClient {
             }
             const responseText = (toolPrefix + (jsonResponse.choices[0]?.message?.content?.trim() ?? '')).trim();
             const result: LLMApiCallResult = { responseText };
-
+            if (jsonResponse.usage) {
+                result.usage = {
+                    inputTokens: jsonResponse.usage.prompt_tokens || 0,
+                    outputTokens: jsonResponse.usage.completion_tokens || 0,
+                };
+            }
             return result;
         } catch (error: any) {
             if (error.name === 'AbortError') {
