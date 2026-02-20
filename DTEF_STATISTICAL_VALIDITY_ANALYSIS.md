@@ -27,7 +27,7 @@ If we claim in a paper that "GPT-4o is more demographically representative than 
 - How much of the observed **fairness gap** is attributable to ground truth sampling error vs. genuine model behavior?
 - What is the **test-retest reliability** — would the same model produce the same ranking on a second evaluation run?
 
-We cannot currently answer any of these questions.
+As of February 2026, we have implemented analyses that answer the first two questions and partially address the third. See [Results](#results-what-we-found) below.
 
 ---
 
@@ -42,19 +42,21 @@ We cannot currently answer any of these questions.
 | Overall model score | Arithmetic mean of per-segment scores | No confidence interval |
 | Segment std deviation | Population σ across segments | Descriptive only, no inferential use |
 | Fairness gap | `max_segment - min_segment` within a category | No significance test |
-| Context responsiveness | OLS slope of score vs. context count | No R², no p-value, no CI |
+| Context responsiveness | OLS slope of score vs. context count | p-values via permutation test (offline analysis); joint Holm-Bonferroni across model × category pairs |
 | Sample size handling | Warn if < 30; exclude if < 10 | Threshold-based only |
 
-### What We Don't Compute
+### What We Don't Compute (in the live pipeline)
 
-- **No null baselines** — no comparison against random/uniform/marginal predictors
+*Note: Several of these gaps are now addressed by the offline statistical analysis script (`pnpm analyze:stats`). See [Results](#results-what-we-found) for findings.*
+
+- ~~**No null baselines**~~ → **Now computed offline** (uniform, population marginal, shuffled)
 - **No confidence intervals** on any score at any level of aggregation
-- **No significance tests** for pairwise model comparisons
+- ~~**No significance tests** for pairwise model comparisons~~ → **Now computed offline** (permutation tests with Holm-Bonferroni)
 - **No effect sizes** for fairness gaps (are they practically meaningful?)
 - **No test-retest reliability** — no repeated model sampling
 - **No sample-size weighting** in aggregation
-- **No correction for multiple comparisons** when testing across many segments/models
-- **No R² or p-values** for context responsiveness regression
+- ~~**No correction for multiple comparisons**~~ → **Now applied** in both pairwise and context analyses
+- ~~**No R² or p-values** for context responsiveness regression~~ → **Now computed offline** (permutation-based p-values with joint correction across model × category pairs)
 
 ### Data Volume Context
 
@@ -418,3 +420,167 @@ If the analysis reveals that much of what the leaderboard shows is noise, the op
 8. **Report scores as (point estimate ± CI)** instead of bare numbers, honestly communicating uncertainty
 
 None of these are bad outcomes — they're the result of doing rigorous science. A paper that says "after accounting for sampling uncertainty, we find that top-tier models are statistically indistinguishable from each other but significantly outperform naive baselines" is more credible than one that claims precise rankings without uncertainty quantification.
+
+---
+
+## Results: What We Found
+
+*Analysis run: 2026-02-20. Data: 6 GD survey rounds (GD1-GD6), 1000 evaluation results across 24 models, 929,597 individual scores, 14,292 ground truth (segment, question) pairs. Full generated report: `reports/statistical-validity-report.md`. Script: `scripts/statistical-analysis.ts`.*
+
+We implemented Options 1, 4, and 5 from the analysis plan above, plus a new Analysis 4 (context responsiveness significance) not originally scoped. Here are the findings.
+
+### Analysis 1: Null Model Baselines — Models Beat Uniform but Not Population Marginals
+
+| Baseline | Mean Score |
+|----------|-----------|
+| Uniform (equal probability across options) | 0.647 |
+| Shuffled (random segment-distribution assignment) | 0.761 |
+| **Population Marginal (overall population distribution, ignoring demographics)** | **0.833** |
+| Average model score | 0.731 |
+| Best model score | 0.768 |
+
+**The critical finding:** The population marginal baseline (0.833) **outperforms every model tested** (best: 0.768). This means a trivially simple predictor — one that ignores demographics entirely and just uses the overall population's answer distribution for every segment — produces higher JSD similarity scores than any of the 24 AI models evaluated.
+
+**What this means:** Models are learning something (they beat uniform at 0.647), but they are not yet capturing demographic-specific variation. When a model is told "predict what 18-25 year olds in Brazil think about AI regulation," it apparently produces a worse prediction than simply using "what everyone in the survey thinks about AI regulation." The models know *what people think* but haven't learned *how specific demographics differ from the average*.
+
+**Why this happens:** The population marginal is a strong baseline because most demographic segments don't differ dramatically from the overall population on most questions. A model that tries to differentiate but gets the direction wrong pays a larger penalty than one that conservatively predicts the average. Models appear to be adding noise when they attempt demographic differentiation.
+
+**Implication for the leaderboard:** Raw scores on the demographics leaderboard should be interpreted against this baseline. A model scoring 0.75 is not "75% accurate" — it is actually performing worse than a predictor with zero demographic knowledge (0.833). The meaningful metric is the gap *above* the population marginal, which is currently negative for all models.
+
+### Analysis 2: Noise Floor — 54.5% of Data Has Sufficient Quality
+
+Using the analytical noise floor formula `1 - sqrt((k-1) / (2n × ln2))`, we assessed data quality per segment-question pair:
+
+| Category | Pairs | Avg Sample Size | Avg Noise Floor | % Reliable (> 0.70) |
+|----------|-------|----------------|----------------|---------------------|
+| AI Concern | 2,256 | 266 | 0.935 | 100.0% |
+| Gender | 2,416 | 450 | 0.958 | 100.0% |
+| Age | 3,690 | 128 | 0.900 | 96.6% |
+| Environment | 2,322 | 280 | 0.939 | 100.0% |
+| Religion | 3,408 | 102 | 0.879 | 91.1% |
+| Country | 14,262 | 33 | 0.594 | 4.2% |
+
+**The critical finding:** Country-level segments (n ≈ 33 on average) have noise floors well below our 0.70 threshold — only 4.2% of country-level pairs have sufficient sample sizes for reliable evaluation. Given that country segments make up the bulk of our evaluation data, this means **nearly half of all segment-question pairs are in a quality zone where sampling noise alone could explain model score differences.**
+
+Categories with large sample sizes (AI concern, gender, environment) are reliably evaluable. Age and religion are mostly fine. But any model ranking driven primarily by country-level accuracy should be treated skeptically.
+
+### Analysis 3: Pairwise Model Significance — Most Differences Are Real
+
+Of 273 model pairs tested (24 models × 23 / 2, minus pairs with fewer than 3 shared questions):
+
+- **239 (87.5%) are significantly different** at α = 0.05 after Holm-Bonferroni correction
+- All significant pairs had adjusted p < 0.0001 (permutation test with 10,000 iterations)
+- 34 pairs are **not** significantly different
+
+This is a positive finding: despite the noise floor concerns, most model differences are large enough to be statistically significant. The leaderboard ranking is largely robust — models are not interchangeable, even if none of them beat the population marginal baseline. The 34 non-significant pairs typically involve models with very similar architectures or models with limited shared evaluation data.
+
+**Note:** Statistical significance does not imply practical importance. Many significant differences are tiny (0.001–0.005 in JSD similarity), well within what a user would consider equivalent performance.
+
+### Analysis 4: Context Responsiveness — The Headline Finding
+
+This is the most methodologically interesting analysis and required careful handling of multiple comparisons. The question: **when we give a model more demographic context questions in its prompt, does its prediction accuracy improve?**
+
+We evaluated models across 5 context levels (0, 3, 5, 10, and all available context questions per segment) using GD5 and GD6 data.
+
+#### Overall (per-model) results
+
+| Model | Observed Slope | Adjusted p | Significant? |
+|-------|---------------|------------|-------------|
+| GPT-5 | +0.00387 | 0.0000 | **Yes** |
+| Qwen3-32B | +0.00318 | 0.0000 | **Yes** |
+| Claude 3.7 Sonnet | +0.00152 | 0.0000 | **Yes** |
+| GPT-5.1 | +0.00033 | 0.0756 | No |
+| All other models (21) | negative slopes | — | No |
+
+**Three of 24 models** show statistically significant improvement with more context, after Holm-Bonferroni correction across all 24 tests. The other 21 models show flat or negative slopes — more context either doesn't help or slightly hurts their predictions.
+
+#### The multiple comparisons problem at the category level
+
+The per-model results above are correctly controlled for multiple comparisons. But the natural next question — "does context help for *specific* demographic categories?" — introduces a much larger comparison space. With 24 models × 6 categories, we're making 144 implicit comparisons. Without correction, we'd expect ~7 false positives at α = 0.05.
+
+**We ran independent permutation tests (10,000 iterations each) for every model × category pair, then applied Holm-Bonferroni jointly across all 93 testable pairs.** This is a strict correction: a raw p-value of 0.01 might need to survive multiplication by 90+ to remain significant.
+
+#### Category-level results after joint correction
+
+Of 93 model × category pairs tested, **only 8 survived** the joint Holm-Bonferroni correction:
+
+| Category | Model | Slope | Adjusted p |
+|----------|-------|-------|------------|
+| Country | Qwen3-32B | +0.00299 | 0.0000 |
+| Country | GPT-5 | +0.00264 | 0.0000 |
+| Country | Claude 3.7 Sonnet | +0.00131 | 0.0000 |
+| Religion | GPT-5 | +0.00921 | 0.0000 |
+| Religion | Claude 3.7 Sonnet | +0.00181 | 0.0000 |
+| Gender | Claude 3.7 Sonnet | +0.00267 | 0.0000 |
+| Environment | Claude 3.7 Sonnet | +0.00237 | 0.0000 |
+| Environment | GPT-5 | +0.00421 | 0.0430 |
+
+#### Notable casualties of the correction
+
+Several results that *looked* significant in isolation were correctly identified as potential false positives:
+
+- **Qwen3-32B × Gender** — raw slope +0.00319, raw p = 0.055 → adjusted p = 1.0 (261 data points, too few)
+- **GPT-5 × Gender** — raw slope +0.00313, raw p = 0.019 → adjusted p = 1.0 (270 data points, didn't survive 93-test correction)
+- **GPT-5.1 × Gender** — raw slope +0.00148, raw p = 0.004 → adjusted p = 0.36 (966 data points, but effect too small for the correction)
+
+These are exactly the kind of results that would appear in an uncorrected analysis and be reported as "GPT-5 shows significant context benefit for gender predictions" — when in fact the signal isn't strong enough to distinguish from chance across the full space of comparisons we're making.
+
+#### Interpreting the surviving results
+
+**Claude 3.7 Sonnet** is the most consistent context-responder, with significant positive slopes in 4 of 6 categories (country, religion, gender, environment). This suggests a genuine capability rather than a lucky result in one category.
+
+**GPT-5** shows the strongest individual effects (religion slope of +0.009 is the largest observed), significant in 3 categories (country, religion, environment). The religion effect is particularly large — GPT-5's predictions improve substantially when told the religious background of the respondents.
+
+**Qwen3-32B** only survives correction for country-level predictions, despite having large positive slopes in other categories. The difference is statistical power: Qwen3-32B only has data at 2 of the 5 context levels (fewer evaluation runs), giving the permutation test less data to work with.
+
+#### What the negative slopes mean
+
+21 of 24 models show negative overall slopes — they get *slightly worse* with more context. This is not statistically significant (none of the negative slopes survive even uncorrected testing), but the direction is notable. It suggests that for most models, additional demographic context acts as noise rather than signal. The model doesn't know what to do with "this person is Buddhist, urban, aged 18-25" and the additional prompt text may slightly confuse its predictions.
+
+#### The effect sizes are small
+
+Even for the significant models, the slopes are on the order of +0.001 to +0.004 per context question. With context levels ranging from 0 to ~10 questions, the total gain from maximal context is roughly +0.01 to +0.04 in JSD similarity. This is detectable with our large sample sizes but represents a tiny practical improvement. The context responsiveness capability exists but is not yet strong enough to meaningfully change model rankings.
+
+---
+
+## Updated Assessment: Answering the Original Questions
+
+The introduction to this document posed four questions a rigorous reviewer would ask. We can now partially answer them:
+
+### 1. "What is the null distribution of scores?"
+
+**Answered.** The uniform baseline scores 0.647, the population marginal 0.833, and the shuffled null 0.761. All tested models score between 0.68 and 0.77, meaning they beat uniform and shuffled baselines but **fall short of the population marginal**. The meaningful signal in current model scores is the gap above shuffled (0.761), which ranges from -0.08 to +0.007.
+
+### 2. "Are model score differences statistically significant?"
+
+**Answered.** 87.5% of pairwise model differences are statistically significant after Holm-Bonferroni correction (permutation test, 10,000 iterations). The ranking is largely real, even though all models underperform the population marginal.
+
+### 3. "How much of the observed fairness gap is attributable to ground truth sampling error?"
+
+**Partially answered.** The noise floor analysis shows that country-level segments (the largest category) have insufficient sample sizes for reliable evaluation. Fairness gaps involving country segments should not be trusted. Gender, age, environment, and AI concern categories have adequate data quality. Formal bootstrap CIs on fairness gaps (Option 2/7 from the plan) remain unimplemented.
+
+### 4. "What is the test-retest reliability?"
+
+**Not yet answered.** This requires repeated model evaluations (Option 3), which has not been run due to API costs.
+
+### New finding not originally scoped
+
+**Context responsiveness has a genuine but small signal for a few models.** Three models (GPT-5, Qwen3-32B, Claude 3.7 Sonnet) show statistically significant improvement with more demographic context, and 8 model × category pairs survive joint multiple-comparisons correction. The effect sizes are small but the statistical methodology is sound — these results are robust to the "cast a wide enough net" concern.
+
+---
+
+## Remaining Work
+
+The following analyses from the original plan have not yet been implemented:
+
+| Analysis | Status | Priority |
+|----------|--------|----------|
+| Null baselines (Option 1) | **Done** | — |
+| Analytical noise floor (Option 5) | **Done** | — |
+| Pairwise significance (Option 4) | **Done** | — |
+| Context responsiveness significance | **Done** (new, not in original plan) | — |
+| Bootstrap CIs on ground truth (Option 2) | Not started | High — would give CIs on all scores |
+| Sample-size-weighted aggregation (Option 6) | Not started | Medium — may change rankings |
+| Fairness gap significance (Option 7) | Not started | Medium — needed for fairness claims |
+| Test-retest reliability (Option 3) | Not started | High — requires API budget |
+| Prior-round predictor (Option 1d) | Not started | Low — nice-to-have temporal baseline |
