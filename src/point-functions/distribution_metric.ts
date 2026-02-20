@@ -85,7 +85,7 @@ export function normalize(dist: number[]): number[] {
  * which clusters near 1.0 for distributions that are even roughly similar.
  * Returns a similarity score: 1 - sqrt(JSD), bounded [0, 1].
  */
-function jsDivergenceSimilarity(p: number[], q: number[]): number {
+export function jsDivergenceSimilarity(p: number[], q: number[]): number {
     const pNorm = normalize(p);
     const qNorm = normalize(q);
 
