@@ -1331,6 +1331,39 @@ export default function DemographicLeaderboard() {
         fetchData();
     }, []);
 
+    const modelResults = data?.aggregation?.modelResults || [];
+    const disparities = data?.aggregation?.disparities || [];
+
+    // Build a runs lookup from contextAnalysis (fallback for data generated before pipeline update)
+    const runsLookup = useMemo(() => {
+        const map = new Map<string, RunScore[]>();
+        const ca = data?.aggregation?.contextAnalysis;
+        if (ca) {
+            for (const model of ca.models) {
+                for (const seg of model.segmentResponsiveness || []) {
+                    const key = `${model.modelId}::${seg.segmentId}`;
+                    map.set(key, seg.dataPoints.map(dp => ({
+                        score: dp.score,
+                        promptCount: 0,
+                        contextCount: dp.contextCount,
+                        configId: dp.configId,
+                        runLabel: dp.runLabel,
+                        timestamp: dp.timestamp,
+                    })));
+                }
+            }
+        }
+        // Pipeline-generated runs take priority when available
+        for (const model of modelResults) {
+            for (const seg of model.segmentScores || []) {
+                if (seg.runs && seg.runs.length > 0) {
+                    map.set(`${seg.modelId}::${seg.segmentId}`, seg.runs);
+                }
+            }
+        }
+        return map;
+    }, [data?.aggregation?.contextAnalysis, modelResults]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-16">
@@ -1367,39 +1400,6 @@ export default function DemographicLeaderboard() {
             </div>
         );
     }
-
-    const modelResults = data.aggregation?.modelResults || [];
-    const disparities = data.aggregation?.disparities || [];
-
-    // Build a runs lookup from contextAnalysis (fallback for data generated before pipeline update)
-    const runsLookup = useMemo(() => {
-        const map = new Map<string, RunScore[]>();
-        const ca = data.aggregation?.contextAnalysis;
-        if (ca) {
-            for (const model of ca.models) {
-                for (const seg of model.segmentResponsiveness || []) {
-                    const key = `${model.modelId}::${seg.segmentId}`;
-                    map.set(key, seg.dataPoints.map(dp => ({
-                        score: dp.score,
-                        promptCount: 0,
-                        contextCount: dp.contextCount,
-                        configId: dp.configId,
-                        runLabel: dp.runLabel,
-                        timestamp: dp.timestamp,
-                    })));
-                }
-            }
-        }
-        // Pipeline-generated runs take priority when available
-        for (const model of modelResults) {
-            for (const seg of model.segmentScores || []) {
-                if (seg.runs && seg.runs.length > 0) {
-                    map.set(`${seg.modelId}::${seg.segmentId}`, seg.runs);
-                }
-            }
-        }
-        return map;
-    }, [data.aggregation?.contextAnalysis, modelResults]);
 
     return (
         <div className="space-y-10">
