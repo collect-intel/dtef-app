@@ -392,10 +392,10 @@ function MiniScatterPlot({ dataPoints }: { dataPoints: FullContextDataPoint[] })
 
 /** Sorted list of individual run scores with clickable links */
 function RunScoreDrillDown({ runs }: { runs?: RunScore[] }) {
+    const sorted = useMemo(() => runs ? [...runs].sort((a, b) => b.score - a.score) : [], [runs]);
     if (!runs || runs.length === 0) {
         return <p className="text-xs text-muted-foreground italic py-1">No individual run data available</p>;
     }
-    const sorted = useMemo(() => [...runs].sort((a, b) => b.score - a.score), [runs]);
 
     return (
         <div className="pt-1.5 pb-1">
