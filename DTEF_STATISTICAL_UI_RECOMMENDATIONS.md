@@ -204,6 +204,43 @@ The current demographics API (`/api/demographics`) returns DTEFSummary data incl
 
 ---
 
+## Implementation Status (2026-02-23)
+
+### Implemented
+
+| Recommendation | Status | Implementation Details |
+|----------------|--------|----------------------|
+| **2.1 Baseline reference lines** | **Implemented** | `ScoreBar` component now accepts optional `baselines` prop with `populationMarginal` and `uniform` scores. Renders thin vertical markers at baseline positions within the progress bar. Legend below leaderboard table shows baseline values. |
+| **2.1 Score bar recoloring** | **Implemented** | When baselines are available, bar color is now relative to population marginal: green = above marginal, yellow = within 90% of marginal, red = below 90%. Falls back to absolute thresholds when baselines are not yet available. |
+| **2.5 Methodology section** | **Implemented** | Collapsible "About This Evaluation" section at bottom of demographics page. Covers: what is measured, baseline comparisons, fairness analysis interpretation, and limitations (sample size caveats, JSD properties). |
+
+### Implemented via Backend (data pipeline, not yet visible in UI without baseline results in S3)
+
+| Recommendation | Status | Implementation Details |
+|----------------|--------|----------------------|
+| **Baseline data pipeline** | **Implemented** | `DTEFSummary.baselines` field added with `populationMarginal` and `uniform` scores. `buildDTEFSummary()` extracts these from `baseline:population-marginal` and `baseline:uniform` model results when present. CLI command `dtef generate-baseline` produces synthetic WevalResult files. |
+| **Population marginal as pipeline model** | **Implemented** | `baselineGeneratorService.ts` generates synthetic WevalResult files for population-marginal and uniform predictors. Results flow through normal aggregation pipeline and appear on leaderboard. |
+
+### Partially Implemented / Deferred
+
+| Recommendation | Status | Notes |
+|----------------|--------|-------|
+| **2.2 Data quality column** | **Deferred** | Noise floor computation is available in `statisticalAnalysis.ts` (`computeNoiseFloorValue`). Requires sample sizes per segment in the API response; these are available in survey data but not yet propagated through the aggregation pipeline to the UI. |
+| **2.3 Context responsiveness significance** | **Deferred** | Permutation tests run in `pnpm analyze:stats` script and produce results in the report, but significance data is not yet served via API. Would require pre-computed JSON artifact served by demographics API. |
+| **2.4 Sample size warnings** | **Deferred** | Sample sizes are in survey data but not yet included in `SegmentModelScore`. The noise floor formula and weighted aggregation functions exist in `statisticalAnalysis.ts` for when this is connected. |
+| **2.6 Fairness gap qualification** | **Deferred** | Category-stratified comparison analysis exists in the statistical analysis pipeline. Noise-floor-informed caveats could be added once sample sizes flow through to the UI. |
+| **2.7 Statistical summary cards** | **Deferred** | Depends on baselines being visible and sample sizes being available. All underlying data exists in the analysis pipeline. |
+
+### Related Statistical Analysis Work (Completed)
+
+These analyses were implemented as part of the statistical infrastructure build-out. They produce data used by the above recommendations:
+
+1. **Gap decomposition** (`statisticalAnalysis.ts`): Decomposes prediction errors into directional accuracy and magnitude calibration relative to population marginal.
+2. **Bootstrap confidence intervals** (`statisticalAnalysis.ts`): Multinomial bootstrap resampling for CIs on JSD similarity scores.
+3. **Category-stratified marginal comparison** (`statistical-analysis.ts`): Compares model-vs-marginal broken down by demographic category.
+4. **Sample-size-weighted aggregation** (`statisticalAnalysis.ts`): sqrt(n) weighting functions for giving more influence to well-sampled segments.
+5. **Shift evaluation type** (`demographicBlueprintService.ts`): New `--eval-type shift` provides population marginal in prompt and asks models to adjust for demographics.
+
 ## Summary
 
 The core strategy is: **anchor scores against baselines, qualify results by data quality, mark statistical significance, and explain methodology** — all while keeping the default view clean and accessible. These changes transform the demographics page from a raw leaderboard into a credible, transparent evaluation dashboard that honestly communicates both what models can and cannot do.
