@@ -1539,6 +1539,7 @@ function LeaderboardSection({
     setLbCategory,
     showAll,
     setShowAll,
+    baselines,
 }: {
     data: DemographicsData;
     modelResults: ModelResult[];

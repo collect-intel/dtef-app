@@ -128,7 +128,7 @@ function generateBaselineResult(
                 pointAssessments: [{
                     keyPointText: 'Distribution Similarity',
                     coverageExtent: score,
-                    justification: `Baseline ${baselineType} prediction: [${prediction.map(n => n.toFixed(1)).join(', ')}]`,
+                    reflection: `Baseline ${baselineType} prediction: [${prediction.map(n => n.toFixed(1)).join(', ')}]`,
                     evaluationType: 'computational',
                 }],
             },
