@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
-import { jsDivergenceSimilarity, normalize } from '../src/point-functions/distribution_metric';
+import { jsDivergenceSimilarity, normalize, parseDistribution } from '../src/point-functions/distribution_metric';
 import {
     listConfigIds,
     listRunsForConfig,
@@ -23,12 +23,25 @@ import { DemographicAggregationService } from '../src/cli/services/demographicAg
 import type { ContextDataPoint } from '../src/cli/services/demographicAggregationService';
 import type { DTEFSurveyData } from '../src/types/dtef';
 import type { CoverageResult } from '../src/types/shared';
+import {
+    decomposeGap,
+    aggregateDecompositions,
+    stratifyByPrefix,
+    bootstrapScoreCI,
+    bootstrapAggregateCI,
+    computeWeightedMean,
+    computeNoiseFloorValue,
+    type GapDecomposition,
+    type ConfidenceInterval,
+    type AggregatedDecomposition,
+} from '../src/lib/statisticalAnalysis';
 
 // ── Configuration ──────────────────────────────────────────────────────────
 const SHUFFLE_ITERATIONS = 1000;
 const PERMUTATION_ITERATIONS = 10_000;
 const NOISE_THRESHOLD = 0.70;
 const SIGNIFICANCE_ALPHA = 0.05;
+const BOOTSTRAP_ITERATIONS = 1000;
 const SURVEYS_DIR = path.resolve(__dirname, '..', 'data', 'surveys');
 const REPORTS_DIR = path.resolve(__dirname, '..', 'reports');
 
@@ -48,6 +61,8 @@ interface ModelQuestionScore {
     questionId: string;
     score: number;
     contextCount: number;
+    /** Parsed model prediction distribution (when available from response text) */
+    predictedDistribution?: number[];
 }
 
 // ── Data Loading ───────────────────────────────────────────────────────────
@@ -107,6 +122,9 @@ async function loadModelScoresFromS3(): Promise<{ scores: ModelQuestionScore[]; 
                 }
             }
 
+            // Extract raw model responses for distribution parsing
+            const allResponses = result.allFinalAssistantResponses;
+
             for (const promptId of Object.keys(coverageScores)) {
                 const promptScores = coverageScores[promptId];
                 if (!promptScores) continue;
@@ -117,12 +135,21 @@ async function loadModelScoresFromS3(): Promise<{ scores: ModelQuestionScore[]; 
                     const coverage = promptScores[modelId] as CoverageResult;
                     if (!coverage || typeof coverage.avgCoverageExtent !== 'number') continue;
 
+                    // Try to extract the predicted distribution from model response
+                    let predictedDistribution: number[] | undefined;
+                    const responseText = allResponses?.[promptId]?.[modelId];
+                    if (responseText) {
+                        const parsed = parseDistribution(responseText);
+                        if (parsed) predictedDistribution = parsed;
+                    }
+
                     scores.push({
                         modelId,
                         segmentId: ctx.segmentId,
                         questionId,
                         score: coverage.avgCoverageExtent,
                         contextCount,
+                        predictedDistribution,
                     });
                 }
             }
@@ -700,6 +727,261 @@ function computeContextResponsiveness(modelScores: ModelQuestionScore[]): {
     return { perModel, categoryResults };
 }
 
+// ── Analysis 5: Gap Decomposition ────────────────────────────────────────
+
+interface ModelDecompositionResult {
+    modelId: string;
+    overall: AggregatedDecomposition;
+    byCategory: Map<string, AggregatedDecomposition>;
+}
+
+function computeGapDecompositions(
+    modelScores: ModelQuestionScore[],
+    groundTruthMap: Map<string, GroundTruth>,
+    populationMarginals: Map<string, number[]>,
+    surveys: DTEFSurveyData[],
+): ModelDecompositionResult[] {
+    // Build surveyId lookup: segmentId → surveyId
+    const segmentToSurvey = new Map<string, string>();
+    for (const survey of surveys) {
+        for (const segment of survey.segments) {
+            segmentToSurvey.set(segment.id, survey.surveyId);
+        }
+    }
+
+    // Group scores by model
+    const byModel = new Map<string, ModelQuestionScore[]>();
+    for (const ms of modelScores) {
+        if (!ms.predictedDistribution) continue; // need raw predictions
+        if (!byModel.has(ms.modelId)) byModel.set(ms.modelId, []);
+        byModel.get(ms.modelId)!.push(ms);
+    }
+
+    const results: ModelDecompositionResult[] = [];
+
+    for (const [modelId, scores] of byModel) {
+        const decompositions: { segmentId: string; decomp: GapDecomposition }[] = [];
+
+        for (const ms of scores) {
+            const gtKey = `${ms.segmentId}::${ms.questionId}`;
+            const gt = groundTruthMap.get(gtKey);
+            if (!gt) continue;
+
+            // Find the population marginal for this question
+            const surveyId = segmentToSurvey.get(ms.segmentId);
+            if (!surveyId) continue;
+            const marginalKey = `${surveyId}::${ms.questionId}`;
+            const marginal = populationMarginals.get(marginalKey);
+            if (!marginal) continue;
+
+            // Need same length distributions
+            if (ms.predictedDistribution!.length !== gt.distribution.length) continue;
+            if (marginal.length !== gt.distribution.length) continue;
+
+            const decomp = decomposeGap(ms.predictedDistribution!, gt.distribution, marginal);
+            decompositions.push({ segmentId: ms.segmentId, decomp });
+        }
+
+        if (decompositions.length === 0) continue;
+
+        // Overall aggregation
+        const allDecomps = decompositions.map(d => d.decomp);
+        const overall = aggregateDecompositions(allDecomps);
+
+        // By category (segment-agnostic stratification)
+        const byCat = stratifyByPrefix(decompositions, d => d.segmentId);
+        const catResults = new Map<string, AggregatedDecomposition>();
+        for (const [cat, catDecomps] of byCat) {
+            catResults.set(cat, aggregateDecompositions(catDecomps.map(d => d.decomp)));
+        }
+
+        results.push({ modelId, overall, byCategory: catResults });
+    }
+
+    return results.sort((a, b) => b.overall.avgDirectionalAccuracy - a.overall.avgDirectionalAccuracy);
+}
+
+// ── Analysis 6: Bootstrap CIs ───────────────────────────────────────────
+
+interface ModelBootstrapCI {
+    modelId: string;
+    overallCI: ConfidenceInterval;
+    segmentCIs: Map<string, ConfidenceInterval>;
+}
+
+function computeModelBootstrapCIs(
+    modelScores: ModelQuestionScore[],
+    groundTruthMap: Map<string, GroundTruth>,
+    bootstrapIter: number,
+): ModelBootstrapCI[] {
+    // Group by model → segment → question scores
+    const byModel = new Map<string, Map<string, number[]>>();
+    for (const ms of modelScores) {
+        if (!byModel.has(ms.modelId)) byModel.set(ms.modelId, new Map());
+        const segMap = byModel.get(ms.modelId)!;
+        if (!segMap.has(ms.segmentId)) segMap.set(ms.segmentId, []);
+        segMap.get(ms.segmentId)!.push(ms.score);
+    }
+
+    const results: ModelBootstrapCI[] = [];
+
+    for (const [modelId, segMap] of byModel) {
+        const segmentMeans: number[] = [];
+        const segmentCIs = new Map<string, ConfidenceInterval>();
+
+        for (const [segmentId, segScores] of segMap) {
+            // Bootstrap CI on segment mean
+            const ci = bootstrapAggregateCI(segScores, bootstrapIter);
+            segmentCIs.set(segmentId, ci);
+            segmentMeans.push(ci.mean);
+        }
+
+        // Overall CI from segment means
+        const overallCI = bootstrapAggregateCI(segmentMeans, bootstrapIter);
+        results.push({ modelId, overallCI, segmentCIs });
+    }
+
+    return results.sort((a, b) => b.overallCI.mean - a.overallCI.mean);
+}
+
+// ── Analysis 7: Category-Stratified Marginal Comparison ─────────────────
+
+interface CategoryMarginalComparison {
+    category: string;
+    marginalScore: number;
+    modelScores: { modelId: string; score: number; gap: number }[];
+    avgNoiseFloor: number;
+    pairCount: number;
+}
+
+function computeCategoryStratifiedComparison(
+    modelScores: ModelQuestionScore[],
+    surveys: DTEFSurveyData[],
+    populationMarginals: Map<string, number[]>,
+    groundTruthMap: Map<string, GroundTruth>,
+): CategoryMarginalComparison[] {
+    // Build segmentId → surveyId lookup
+    const segmentToSurvey = new Map<string, string>();
+    for (const survey of surveys) {
+        for (const segment of survey.segments) {
+            segmentToSurvey.set(segment.id, survey.surveyId);
+        }
+    }
+
+    // Stratify ground truth by category prefix
+    const gtByCategory = stratifyByPrefix(
+        Array.from(groundTruthMap.values()),
+        gt => gt.segmentId,
+    );
+
+    // Stratify model scores by category prefix
+    const scoresByCategory = stratifyByPrefix(modelScores, ms => ms.segmentId);
+
+    const results: CategoryMarginalComparison[] = [];
+
+    for (const [category, catGTs] of gtByCategory) {
+        // Compute marginal baseline for this category's ground truth pairs
+        let marginalTotal = 0;
+        let marginalCount = 0;
+
+        for (const gt of catGTs) {
+            const surveyId = segmentToSurvey.get(gt.segmentId);
+            if (!surveyId) continue;
+            const marginalKey = `${surveyId}::${gt.questionId}`;
+            const marginal = populationMarginals.get(marginalKey);
+            if (!marginal) continue;
+            marginalTotal += jsDivergenceSimilarity(marginal, gt.distribution);
+            marginalCount++;
+        }
+
+        if (marginalCount === 0) continue;
+        const marginalScore = marginalTotal / marginalCount;
+
+        // Compute per-model scores for this category
+        const catScores = scoresByCategory.get(category) || [];
+        const modelMap = new Map<string, { sum: number; count: number }>();
+        for (const ms of catScores) {
+            if (!modelMap.has(ms.modelId)) modelMap.set(ms.modelId, { sum: 0, count: 0 });
+            const entry = modelMap.get(ms.modelId)!;
+            entry.sum += ms.score;
+            entry.count++;
+        }
+
+        const modelResults = Array.from(modelMap.entries())
+            .map(([modelId, data]) => ({
+                modelId,
+                score: data.sum / data.count,
+                gap: (data.sum / data.count) - marginalScore,
+            }))
+            .sort((a, b) => b.score - a.score);
+
+        // Average noise floor for this category
+        const avgNoiseFloor = catGTs.reduce(
+            (sum, gt) => sum + computeNoiseFloorValue(gt.k, gt.sampleSize), 0,
+        ) / catGTs.length;
+
+        results.push({
+            category,
+            marginalScore,
+            modelScores: modelResults,
+            avgNoiseFloor,
+            pairCount: marginalCount,
+        });
+    }
+
+    return results.sort((a, b) => b.pairCount - a.pairCount);
+}
+
+// ── Analysis 8: Sample-Size Weighted Scores ─────────────────────────────
+
+interface WeightedModelScore {
+    modelId: string;
+    equalWeightedScore: number;
+    sqrtNWeightedScore: number;
+    rankChange: number; // positive = improved rank with weighting
+}
+
+function computeWeightedScores(
+    modelScores: ModelQuestionScore[],
+    groundTruthMap: Map<string, GroundTruth>,
+): WeightedModelScore[] {
+    // Group by model → array of (score, sampleSize) pairs
+    const byModel = new Map<string, { score: number; sampleSize: number }[]>();
+    for (const ms of modelScores) {
+        const gt = groundTruthMap.get(`${ms.segmentId}::${ms.questionId}`);
+        const sampleSize = gt?.sampleSize ?? 30; // fallback
+
+        if (!byModel.has(ms.modelId)) byModel.set(ms.modelId, []);
+        byModel.get(ms.modelId)!.push({ score: ms.score, sampleSize });
+    }
+
+    // Compute equal-weighted and sqrt-n-weighted scores
+    const models: { modelId: string; eqScore: number; wtScore: number }[] = [];
+    for (const [modelId, pairs] of byModel) {
+        const scores = pairs.map(p => p.score);
+        const weights = pairs.map(p => Math.sqrt(p.sampleSize));
+
+        const eqScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const wtScore = computeWeightedMean(scores, weights);
+
+        models.push({ modelId, eqScore, wtScore });
+    }
+
+    // Compute rank changes
+    const eqRanked = [...models].sort((a, b) => b.eqScore - a.eqScore);
+    const wtRanked = [...models].sort((a, b) => b.wtScore - a.wtScore);
+
+    const eqRankMap = new Map(eqRanked.map((m, i) => [m.modelId, i + 1]));
+    const wtRankMap = new Map(wtRanked.map((m, i) => [m.modelId, i + 1]));
+
+    return eqRanked.map(m => ({
+        modelId: m.modelId,
+        equalWeightedScore: m.eqScore,
+        sqrtNWeightedScore: m.wtScore,
+        rankChange: (eqRankMap.get(m.modelId)!) - (wtRankMap.get(m.modelId)!),
+    }));
+}
+
 // ── Report Generation ──────────────────────────────────────────────────────
 
 function generateReport(
@@ -708,6 +990,10 @@ function generateReport(
     noiseFloor: ReturnType<typeof computeNoiseFloor>,
     pairwiseResults: ReturnType<typeof computePairwiseSignificance>,
     contextResults: ReturnType<typeof computeContextResponsiveness>,
+    gapDecompositions: ModelDecompositionResult[],
+    bootstrapCIs: ModelBootstrapCI[],
+    categoryComparison: CategoryMarginalComparison[],
+    weightedScores: WeightedModelScore[],
     surveyCount: number,
     resultCount: number,
 ): string {
@@ -949,6 +1235,139 @@ function generateReport(
         }
     }
 
+    // ── Analysis 5: Gap Decomposition ──
+    ln('## Analysis 5: Population Marginal Gap Decomposition');
+    ln();
+    ln('> **What this measures:** When a model tries to predict how a specific demographic differs from the overall population, does it shift in the right direction? And if so, does it shift by the right amount? We decompose each prediction error into *directional accuracy* (cosine similarity of shift vectors, where 1.0 = perfectly right direction, -1.0 = completely opposite) and *magnitude ratio* (how much the model shifted relative to how much the segment actually differs, where 1.0 = perfect calibration, >1 = overshoot, <1 = undershoot).');
+    ln();
+
+    if (gapDecompositions.length === 0) {
+        ln('*No model predictions with parseable distributions available for decomposition.*');
+    } else {
+        ln('### Per-Model Decomposition Summary');
+        ln();
+        ln('| Model | Direction Accuracy | % Correct Dir | Avg Magnitude Ratio | Avg Overshoot | Avg Undershoot | Pairs |');
+        ln('|-------|--------------------|---------------|---------------------|---------------|----------------|-------|');
+        for (const m of gapDecompositions) {
+            const shortName = m.modelId.replace(/^openrouter:/, '');
+            const o = m.overall;
+            ln(`| ${shortName} | ${o.avgDirectionalAccuracy.toFixed(3)} | ${(o.fractionCorrectDirection * 100).toFixed(1)}% | ${o.avgMagnitudeRatio.toFixed(2)} | ${o.avgOvershoot.toFixed(2)} | ${o.avgUndershoot.toFixed(2)} | ${o.pairCount} |`);
+        }
+        ln();
+
+        ln('> **Reading this table:** "Direction Accuracy" near 1.0 means the model correctly identifies *which way* a demographic differs from average. "Magnitude Ratio" near 1.0 means it gets the *size* of the difference right. Values above 1.0 mean overshoot (exaggerating differences); below 1.0 means undershoot (underestimating differences).');
+        ln();
+
+        // Per-category breakdown for top models
+        const topModels = gapDecompositions.slice(0, 5);
+        if (topModels.some(m => m.byCategory.size > 0)) {
+            ln('### Decomposition by Category (Top 5 Models)');
+            ln();
+            for (const m of topModels) {
+                if (m.byCategory.size === 0) continue;
+                const shortName = m.modelId.replace(/^openrouter:/, '');
+                ln(`**${shortName}:**`);
+                ln();
+                ln('| Category | Direction | % Correct | Magnitude Ratio | Pairs |');
+                ln('|----------|-----------|-----------|-----------------|-------|');
+                for (const [cat, agg] of m.byCategory) {
+                    ln(`| ${cat} | ${agg.avgDirectionalAccuracy.toFixed(3)} | ${(agg.fractionCorrectDirection * 100).toFixed(1)}% | ${agg.avgMagnitudeRatio.toFixed(2)} | ${agg.pairCount} |`);
+                }
+                ln();
+            }
+        }
+    }
+    ln();
+
+    // ── Analysis 6: Bootstrap CIs ──
+    ln('## Analysis 6: Bootstrap Confidence Intervals');
+    ln();
+    ln('> **What this measures:** How much uncertainty is there in model scores due to the finite sample sizes of the ground truth survey data? By resampling the survey responses and recomputing scores, we estimate 95% confidence intervals on all scores. If two models\' CIs overlap, their difference may not be meaningful.');
+    ln();
+
+    if (bootstrapCIs.length === 0) {
+        ln('*No model scores available for bootstrap analysis.*');
+    } else {
+        ln(`Bootstrap iterations: ${BOOTSTRAP_ITERATIONS.toLocaleString()}`);
+        ln();
+        ln('### Overall Model Score CIs');
+        ln();
+        ln('| Model | Score | 95% CI | CI Width |');
+        ln('|-------|-------|--------|----------|');
+        for (const m of bootstrapCIs) {
+            const shortName = m.modelId.replace(/^openrouter:/, '');
+            const width = m.overallCI.ci95High - m.overallCI.ci95Low;
+            ln(`| ${shortName} | ${m.overallCI.mean.toFixed(3)} | [${m.overallCI.ci95Low.toFixed(3)}, ${m.overallCI.ci95High.toFixed(3)}] | ${width.toFixed(3)} |`);
+        }
+        ln();
+
+        // Count overlapping CIs between adjacent-ranked models
+        let overlapCount = 0;
+        for (let i = 0; i < bootstrapCIs.length - 1; i++) {
+            const a = bootstrapCIs[i].overallCI;
+            const b = bootstrapCIs[i + 1].overallCI;
+            if (a.ci95Low <= b.ci95High && b.ci95Low <= a.ci95High) {
+                overlapCount++;
+            }
+        }
+        ln(`> **${overlapCount} of ${bootstrapCIs.length - 1}** adjacent model pairs have overlapping 95% CIs, meaning their score differences may not be meaningful given ground truth uncertainty.`);
+    }
+    ln();
+
+    // ── Analysis 7: Category-Stratified Comparison ──
+    ln('## Analysis 7: Category-Stratified Marginal Comparison');
+    ln();
+    ln('> **What this measures:** We compare model performance against the population marginal baseline broken down by demographic category. This reveals whether the "models can\'t beat the marginal" finding is due to data quality (noisy country segments) or genuine model limitations (even with clean data like gender segments).');
+    ln();
+
+    if (categoryComparison.length === 0) {
+        ln('*No category-stratified data available.*');
+    } else {
+        ln('### Marginal Baseline Score by Category');
+        ln();
+        ln('| Category | Marginal Score | Avg Noise Floor | Pairs | Best Model | Best Score | Gap |');
+        ln('|----------|---------------|-----------------|-------|------------|------------|-----|');
+        for (const cat of categoryComparison) {
+            const best = cat.modelScores[0];
+            const bestName = best ? best.modelId.replace(/^openrouter:/, '') : '—';
+            const bestScore = best ? best.score.toFixed(3) : '—';
+            const bestGap = best ? (best.gap >= 0 ? '+' : '') + best.gap.toFixed(3) : '—';
+            ln(`| ${cat.category} | ${cat.marginalScore.toFixed(3)} | ${cat.avgNoiseFloor.toFixed(3)} | ${cat.pairCount} | ${bestName} | ${bestScore} | ${bestGap} |`);
+        }
+        ln();
+
+        ln('> **Reading this table:** If the "Gap" column is negative for all models in a category, no model beats the population marginal for that category. Categories with high noise floors (> 0.90) have clean data — poor model performance there reflects genuine inability. Categories with low noise floors (< 0.70) have noisy data — score differences there are unreliable.');
+        ln();
+    }
+
+    // ── Analysis 8: Sample-Size Weighted Scores ──
+    ln('## Analysis 8: Sample-Size Weighted Leaderboard');
+    ln();
+    ln('> **What this measures:** The default leaderboard weights all segments equally, but country segments (n≈33) and gender segments (n≈450) contribute the same. By weighting segments by √n, we give more influence to well-sampled segments, producing a more trustworthy ranking.');
+    ln();
+
+    if (weightedScores.length === 0) {
+        ln('*No model scores available for weighted analysis.*');
+    } else {
+        ln('| Rank (Equal) | Model | Equal-Weighted | √n-Weighted | Rank Change |');
+        ln('|-------------|-------|----------------|-------------|-------------|');
+        for (let i = 0; i < weightedScores.length; i++) {
+            const ws = weightedScores[i];
+            const shortName = ws.modelId.replace(/^openrouter:/, '');
+            const rc = ws.rankChange > 0 ? `↑${ws.rankChange}` : ws.rankChange < 0 ? `↓${Math.abs(ws.rankChange)}` : '—';
+            ln(`| ${i + 1} | ${shortName} | ${ws.equalWeightedScore.toFixed(3)} | ${ws.sqrtNWeightedScore.toFixed(3)} | ${rc} |`);
+        }
+        ln();
+
+        const anyChange = weightedScores.some(ws => ws.rankChange !== 0);
+        if (anyChange) {
+            ln('> **Interpretation:** Some rankings change with sample-size weighting, indicating that noisy small-sample segments were distorting some models\' relative performance.');
+        } else {
+            ln('> **Interpretation:** Rankings are stable under sample-size weighting, suggesting the leaderboard is robust to noise from small segments.');
+        }
+    }
+    ln();
+
     // ── Future Work ──
     ln('---');
     ln();
@@ -1066,6 +1485,43 @@ async function main() {
         console.log(`  ${sigCat}/${contextResults.categoryResults.length} model×category pairs significant (joint Holm-Bonferroni)`);
     }
 
+    // Analysis 5: Gap Decomposition
+    console.log('\n── Analysis 5: Gap Decomposition ──');
+    const gapDecompositions = computeGapDecompositions(modelScores, groundTruthMap, populationMarginals, surveys);
+    if (gapDecompositions.length > 0) {
+        const top = gapDecompositions[0];
+        console.log(`  ${gapDecompositions.length} models analyzed`);
+        console.log(`  Best directional accuracy: ${top.modelId.replace(/^openrouter:/, '')} (${top.overall.avgDirectionalAccuracy.toFixed(3)})`);
+    } else {
+        console.log('  No model predictions with parseable distributions available');
+    }
+
+    // Analysis 6: Bootstrap CIs
+    console.log('\n── Analysis 6: Bootstrap Confidence Intervals ──');
+    console.log(`  Running bootstrap (${BOOTSTRAP_ITERATIONS.toLocaleString()} iterations)...`);
+    const bootstrapCIs = computeModelBootstrapCIs(modelScores, groundTruthMap, BOOTSTRAP_ITERATIONS);
+    if (bootstrapCIs.length > 0) {
+        const avgWidth = bootstrapCIs.reduce((a, m) => a + (m.overallCI.ci95High - m.overallCI.ci95Low), 0) / bootstrapCIs.length;
+        console.log(`  ${bootstrapCIs.length} models, avg CI width: ${avgWidth.toFixed(3)}`);
+    }
+
+    // Analysis 7: Category-Stratified Comparison
+    console.log('\n── Analysis 7: Category-Stratified Marginal Comparison ──');
+    const categoryComparison = computeCategoryStratifiedComparison(modelScores, surveys, populationMarginals, groundTruthMap);
+    for (const cat of categoryComparison) {
+        const bestModel = cat.modelScores[0];
+        const gap = bestModel ? bestModel.gap : 0;
+        console.log(`  ${cat.category}: marginal=${cat.marginalScore.toFixed(3)}, best model gap=${gap >= 0 ? '+' : ''}${gap.toFixed(3)}, noise floor=${cat.avgNoiseFloor.toFixed(3)}`);
+    }
+
+    // Analysis 8: Sample-Size Weighted Scores
+    console.log('\n── Analysis 8: Sample-Size Weighted Scores ──');
+    const weightedScores = computeWeightedScores(modelScores, groundTruthMap);
+    if (weightedScores.length > 0) {
+        const changed = weightedScores.filter(ws => ws.rankChange !== 0).length;
+        console.log(`  ${changed}/${weightedScores.length} models changed rank with √n weighting`);
+    }
+
     // Generate report
     console.log('\n── Generating report ──');
     const report = generateReport(
@@ -1074,6 +1530,10 @@ async function main() {
         noiseFloor,
         pairwiseResults,
         contextResults,
+        gapDecompositions,
+        bootstrapCIs,
+        categoryComparison,
+        weightedScores,
         surveys.length,
         resultCount,
     );
@@ -1082,6 +1542,50 @@ async function main() {
     const reportPath = path.join(REPORTS_DIR, 'statistical-validity-report.md');
     await fsPromises.writeFile(reportPath, report, 'utf-8');
     console.log(`\nReport written to: ${reportPath}`);
+
+    // Write JSON summary for UI consumption
+    const jsonSummary = {
+        generatedAt: new Date().toISOString(),
+        baselines: {
+            uniform: uniformBaseline.meanScore,
+            populationMarginal: marginalBaseline.meanScore,
+            shuffled: shuffledBaseline.meanScore,
+        },
+        noiseFloor: {
+            threshold: NOISE_THRESHOLD,
+            fractionAbove: noiseFloor.thresholdAnalysis.find(t => t.threshold === NOISE_THRESHOLD)?.fractionAbove ?? 0,
+            categorySummaries: noiseFloor.categorySummaries.map(c => ({
+                category: c.category,
+                avgNoiseFloor: c.avgNoiseFloor,
+                avgSampleSize: c.avgSampleSize,
+                percentReliable: c.percentAbove,
+            })),
+        },
+        categoryComparison: categoryComparison.map(c => ({
+            category: c.category,
+            marginalScore: c.marginalScore,
+            avgNoiseFloor: c.avgNoiseFloor,
+            pairCount: c.pairCount,
+            bestModelGap: c.modelScores[0]?.gap ?? null,
+        })),
+        weightedScores: weightedScores.map(ws => ({
+            modelId: ws.modelId,
+            equalWeighted: ws.equalWeightedScore,
+            sqrtNWeighted: ws.sqrtNWeightedScore,
+            rankChange: ws.rankChange,
+        })),
+        gapDecomposition: gapDecompositions.map(m => ({
+            modelId: m.modelId,
+            avgDirectionalAccuracy: m.overall.avgDirectionalAccuracy,
+            fractionCorrectDirection: m.overall.fractionCorrectDirection,
+            avgMagnitudeRatio: m.overall.avgMagnitudeRatio,
+            pairCount: m.overall.pairCount,
+        })),
+    };
+
+    const jsonPath = path.join(REPORTS_DIR, 'statistical-summary.json');
+    await fsPromises.writeFile(jsonPath, JSON.stringify(jsonSummary, null, 2), 'utf-8');
+    console.log(`JSON summary written to: ${jsonPath}`);
     console.log('Done.');
 }
 
