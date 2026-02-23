@@ -16,10 +16,18 @@ S3_BUCKET := collect-intel-dtef
 S3_REGION := us-east-1
 
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
-	s3-status s3-runs s3-watch s3-size s3-latest
+	s3-status s3-runs s3-watch s3-size s3-latest \
+	dtef-import dtef-import-all dtef-generate dtef-baselines dtef-publish dtef-upload-baselines dtef-stats dtef-rebuild dtef-pipeline dtef-status
 
 help: ## Show available commands
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1mEvaluations:\033[0m"
+	@grep -E '^(rerun|queue|backfill|lightweight|streaming)[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1mDTEF Workflow:\033[0m"
+	@grep -E '^dtef-[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1mS3:\033[0m"
+	@grep -E '^s3-[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1mDev:\033[0m"
+	@grep -E '^(dev|build|test|test-infra):.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
 # --- Evaluations ---
 
@@ -110,6 +118,110 @@ s3-watch: ## Watch eval progress (refreshes every 30s, ctrl-c to stop)
 s3-size: ## Show total S3 bucket size
 	@aws s3 ls s3://$(S3_BUCKET)/live/ --region $(S3_REGION) --recursive --summarize \
 		| tail -2
+
+# --- DTEF Workflow ---
+# Typical workflow for new survey data:
+#   1. make dtef-import ROUND=GD8        (import new GD round)
+#   2. make dtef-generate ROUND=GD8      (generate blueprints)
+#   3. make dtef-baselines ROUND=GD8     (generate baseline predictors)
+#   4. make dtef-publish ROUND=GD8       (publish blueprints to dtef-configs repo)
+#   5. make dtef-upload-baselines ROUND=GD8  (upload baselines to S3)
+#   6. make rerun-evals                  (trigger model evaluations)
+#   7. make streaming-summaries          (rebuild summaries after evals complete)
+#   8. make dtef-stats                   (run statistical analysis)
+# Or run steps 1-5 at once: make dtef-pipeline ROUND=GD8
+
+DTEF_CONFIGS_DIR ?= ../dtef-configs
+ROUND ?=
+
+dtef-import: ## Import a GD round (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-import ROUND=GD4" && exit 1)
+	pnpm cli dtef import-gd --round $(ROUND)
+
+dtef-import-all: ## Import all available GD rounds
+	pnpm cli dtef import-gd --all
+
+dtef-generate: ## Generate blueprints for a round (ROUND=GD4, CTX=5 for context questions)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate ROUND=GD4 [CTX=5]" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	@echo "Generating blueprints from $(INPUT)..."
+	pnpm cli dtef generate -i $(INPUT) -o output/blueprints/$(ROUND_LC)
+	@if [ -n "$(CTX)" ]; then \
+		echo "Generating context blueprints ($(CTX) context questions)..."; \
+		pnpm cli dtef generate -i $(INPUT) -o output/dtef-blueprints-ctx/$(ROUND_LC) --context-questions $(CTX); \
+	fi
+
+dtef-baselines: ## Generate baseline predictor results for a round (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-baselines ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type population-marginal
+	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type uniform
+
+dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-publish ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	@test -d $(DTEF_CONFIGS_DIR) || (echo "dtef-configs repo not found at $(DTEF_CONFIGS_DIR)" && exit 1)
+	pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/configs --tag $(ROUND_LC) --dry-run
+	@echo ""
+	@echo "Above is a dry run. To actually publish, run:"
+	@echo "  pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/configs --tag $(ROUND_LC)"
+
+dtef-upload-baselines: ## Upload baseline results to S3 (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-upload-baselines ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	@test -d output/baselines/$(ROUND_LC) || (echo "Baselines not found — run 'make dtef-baselines ROUND=$(ROUND)' first" && exit 1)
+	@echo "Uploading baselines to S3..."
+	aws s3 sync output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --dryrun
+	@echo ""
+	@echo "Above is a dry run. To actually upload, run:"
+	@echo "  aws s3 sync output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION)"
+
+dtef-stats: ## Run statistical analysis report
+	pnpm analyze:stats
+
+dtef-rebuild: ## Rebuild summaries and aggregates from S3 results
+	pnpm cli streaming-summaries && pnpm cli lightweight-backfill
+
+dtef-pipeline: ## Run full pipeline for a round: import → generate → baselines (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-pipeline ROUND=GD4 [CTX=5]" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	@echo "=== Step 1/3: Import $(ROUND) ==="
+	$(MAKE) dtef-import ROUND=$(ROUND)
+	@echo ""
+	@echo "=== Step 2/3: Generate blueprints ==="
+	$(MAKE) dtef-generate ROUND=$(ROUND) CTX=$(CTX)
+	@echo ""
+	@echo "=== Step 3/3: Generate baselines ==="
+	$(MAKE) dtef-baselines ROUND=$(ROUND)
+	@echo ""
+	@echo "=== Pipeline complete ==="
+	@echo "Next steps:"
+	@echo "  make dtef-publish ROUND=$(ROUND)           # publish blueprints to dtef-configs"
+	@echo "  make dtef-upload-baselines ROUND=$(ROUND)  # upload baselines to S3"
+	@echo "  make rerun-evals                           # trigger model evaluations"
+
+dtef-status: ## Show local DTEF data: imported rounds, blueprints, baselines
+	@echo "=== Imported Survey Data ==="
+	@ls -1 output/gd*.json 2>/dev/null | sed 's|output/||' || echo "  (none)"
+	@echo ""
+	@echo "=== Generated Blueprints ==="
+	@for dir in output/blueprints/*/; do \
+		test -d "$$dir" && echo "  $$(basename $$dir): $$(ls $$dir | wc -l | xargs) configs"; \
+	done 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "=== Context Blueprints ==="
+	@for dir in output/dtef-blueprints-ctx/*/; do \
+		test -d "$$dir" && echo "  $$(basename $$dir): $$(ls $$dir | wc -l | xargs) configs"; \
+	done 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "=== Baseline Results ==="
+	@for dir in output/baselines/*/; do \
+		test -d "$$dir" && echo "  $$(basename $$dir): $$(ls $$dir | wc -l | xargs) files"; \
+	done 2>/dev/null || echo "  (none)"
 
 # --- Dev ---
 
