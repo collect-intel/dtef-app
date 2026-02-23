@@ -568,6 +568,7 @@ dtefCommand
     .requiredOption('-i, --input <path>', 'Path to DTEF survey data JSON file')
     .option('-o, --output <dir>', 'Output directory for generated results', './output/dtef-baselines')
     .option('-t, --type <baseline>', 'Baseline type: population-marginal or uniform', 'population-marginal')
+    .option('--force', 'Overwrite existing baseline files without prompting')
     .option('--dry-run', 'Show summary without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -624,13 +625,39 @@ dtefCommand
         const outputDir = path.resolve(options.output);
         fs.mkdirSync(outputDir, { recursive: true });
 
+        // Check for existing files
+        const existingFiles: string[] = [];
+        for (const result of results) {
+            const filename = `${result.configId}--${result.runLabel}.json`;
+            const filepath = path.join(outputDir, filename);
+            if (fs.existsSync(filepath)) {
+                existingFiles.push(filename);
+            }
+        }
+
+        if (existingFiles.length > 0 && !options.force) {
+            console.log(chalk.yellow(`${existingFiles.length} of ${results.length} baseline file(s) already exist in ${outputDir}:`));
+            for (const f of existingFiles.slice(0, 5)) {
+                console.log(chalk.yellow(`  ${f}`));
+            }
+            if (existingFiles.length > 5) {
+                console.log(chalk.yellow(`  ... and ${existingFiles.length - 5} more`));
+            }
+            console.log(chalk.yellow('\nBaseline results are deterministic — re-running produces identical output.'));
+            console.log(chalk.yellow('Use --force to overwrite, or --dry-run to preview without writing.\n'));
+            process.exit(0);
+        }
+
+        let written = 0;
+        let skipped = 0;
         for (const result of results) {
             const filename = `${result.configId}--${result.runLabel}.json`;
             const filepath = path.join(outputDir, filename);
             fs.writeFileSync(filepath, JSON.stringify(result, null, 2), 'utf-8');
+            written++;
             console.log(chalk.gray(`  Written: ${filepath}`));
         }
 
-        console.log(chalk.green(`\nDone! ${results.length} result(s) written to ${outputDir}`));
+        console.log(chalk.green(`\nDone! ${written} result(s) written to ${outputDir}`));
         console.log(chalk.gray('Upload to S3 with: aws s3 sync <dir> s3://<bucket>/results/'));
     });
