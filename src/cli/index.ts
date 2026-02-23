@@ -18,7 +18,7 @@ import { program } from 'commander'
 import { configure } from './config'
 import { Command } from 'commander';
 import { runConfigCommand } from './commands/run-config';
-import { backfillSummaryCommand, lightweightBackfillCommand, streamingSummariesCommand } from './commands/backfill-summary';
+import { backfillSummaryCommand, lightweightBackfillCommand, streamingSummariesCommand, dtefRebuildCommand } from './commands/backfill-summary';
 import { deleteConfigCommand } from './commands/delete-config';
 import { backfillPromptContextsCommand } from './commands/backfill-prompt-contexts';
 import { getConfig } from './config';
@@ -101,6 +101,7 @@ cli.addCommand(runConfigCommand);
 cli.addCommand(backfillSummaryCommand);
 cli.addCommand(lightweightBackfillCommand);
 cli.addCommand(streamingSummariesCommand);
+cli.addCommand(dtefRebuildCommand);
 cli.addCommand(deleteConfigCommand);
 cli.addCommand(backfillPromptContextsCommand);
 cli.addCommand(backfillExecutiveSummaryCommand);

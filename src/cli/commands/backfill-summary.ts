@@ -6,6 +6,7 @@ import {
     listConfigIds,
     listRunsForConfig,
     getResultByFileName,
+    getCoreResult,
     getConfigSummary,
     saveHomepageSummary,
     updateSummaryDataWithNewRun,
@@ -33,7 +34,7 @@ import { fromSafeTimestamp } from '../../lib/timestampUtils';
 import { ModelRunPerformance, ModelSummary } from '@/types/shared';
 import { parseModelIdForDisplay, getModelDisplayLabel } from '@/app/utils/modelIdUtils';
 import { normalizeTag } from '@/app/utils/tagUtils';
-import { buildDTEFSummary, buildAllDTEFSummaries } from '@/cli/utils/dtefSummaryUtils';
+import { buildDTEFSummary, buildAllDTEFSummaries, DTEFSummary } from '@/cli/utils/dtefSummaryUtils';
 import { saveJsonFile } from '@/lib/storageService';
 
 async function actionBackfillSummary(options: { verbose?: boolean; configId?: string; dryRun?: boolean }) {
@@ -986,6 +987,175 @@ export const streamingSummariesCommand = new Command('streaming-summaries')
     .option('--force', 'Rebuild all per-config summaries, even if they already exist.')
     .option('--dry-run', 'Log what would be saved without writing.')
     .action(streamingPerConfigSummaries);
+
+/**
+ * DTEF-only summary rebuild. Processes one survey round at a time to keep
+ * memory low (~20MB per round vs 500MB+ for full backfill-summary).
+ *
+ * Groups DTEF config IDs by survey round, fetches latest run for each config
+ * in that round, builds the summary, saves to S3, then releases memory
+ * before processing the next round.
+ */
+async function rebuildDTEFSummary(options: { dryRun?: boolean }): Promise<void> {
+    const startMs = Date.now();
+    console.log('[dtef-rebuild] Starting DTEF-only summary rebuild...');
+
+    const allConfigIds = await listConfigIds();
+    if (!allConfigIds || allConfigIds.length === 0) {
+        console.log('[dtef-rebuild] No configs found.');
+        return;
+    }
+
+    const dtefConfigIds = allConfigIds.filter(id => id.includes('dtef-'));
+    console.log(`[dtef-rebuild] Found ${dtefConfigIds.length} DTEF configs (of ${allConfigIds.length} total).`);
+
+    if (dtefConfigIds.length === 0) {
+        console.log('[dtef-rebuild] No DTEF configs found.');
+        return;
+    }
+
+    // Group config IDs by survey round (extract from config ID pattern)
+    // Config IDs look like: gd1-c3__dtef-global-dialogues-gd1-ageGroup:18-25-c3
+    // Survey prefix: dtef-global-dialogues-gd1
+    const surveyGroups = new Map<string, string[]>();
+    for (const configId of dtefConfigIds) {
+        // Extract the dtef-...-gdN part from the config ID
+        const match = configId.match(/(dtef-[^-]+-[^-]+-gd\w+)/);
+        const surveyKey = match ? match[1] : 'unknown';
+        if (!surveyGroups.has(surveyKey)) surveyGroups.set(surveyKey, []);
+        surveyGroups.get(surveyKey)!.push(configId);
+    }
+
+    console.log(`[dtef-rebuild] Grouped into ${surveyGroups.size} survey rounds: ${Array.from(surveyGroups.keys()).join(', ')}`);
+
+    // Process each survey round independently to limit memory
+    const allSurveyResults: DTEFSummary[] = [];
+    let totalFetched = 0;
+    let totalFailed = 0;
+    let totalNoRuns = 0;
+
+    for (const [surveyKey, configIds] of surveyGroups) {
+        console.log(`[dtef-rebuild] Processing ${surveyKey} (${configIds.length} configs)...`);
+
+        const limit = pLimit(10);
+        const roundResults: FetchedComparisonData[] = [];
+        let failed = 0;
+        let noRuns = 0;
+
+        const fetchPromises = configIds.map(configId =>
+            limit(async () => {
+                try {
+                    const runs = await listRunsForConfig(configId);
+                    if (!runs || runs.length === 0) {
+                        noRuns++;
+                        return;
+                    }
+                    const sorted = runs.sort((a, b) =>
+                        new Date(fromSafeTimestamp(b.timestamp ?? '')).getTime() - new Date(fromSafeTimestamp(a.timestamp ?? '')).getTime()
+                    );
+                    const latest = sorted[0];
+                    // Use getCoreResult (reads lightweight core.json ~98KB) instead of
+                    // getResultByFileName (reads full comparison.json ~240KB+) to save memory
+                    const resultData = await getCoreResult(
+                        configId, latest.runLabel, latest.timestamp ?? ''
+                    ) as FetchedComparisonData;
+                    if (!resultData) { failed++; return; }
+                    // Strip fields not needed by aggregation to further reduce memory
+                    delete (resultData as any).allFinalAssistantResponses;
+                    delete (resultData as any).allResponses;
+                    delete (resultData as any).allConversationHistories;
+                    roundResults.push(resultData);
+                } catch (err: any) {
+                    console.error(`[dtef-rebuild] Error fetching ${configId}: ${err.message}`);
+                    failed++;
+                }
+            })
+        );
+
+        await Promise.all(fetchPromises);
+        totalFetched += roundResults.length;
+        totalFailed += failed;
+        totalNoRuns += noRuns;
+
+        if (roundResults.length === 0) {
+            console.log(`[dtef-rebuild]   ${surveyKey}: no results found (${noRuns} no runs, ${failed} failed). Skipping.`);
+            continue;
+        }
+
+        const summary = buildDTEFSummary(roundResults);
+        if (!summary) {
+            console.log(`[dtef-rebuild]   ${surveyKey}: could not build summary. Skipping.`);
+            continue;
+        }
+
+        console.log(`[dtef-rebuild]   ${surveyKey}: ${roundResults.length} results, ${summary.topModels.length} models, score range ${summary.topModels[summary.topModels.length - 1]?.overallScore?.toFixed(3)}–${summary.topModels[0]?.overallScore?.toFixed(3)}`);
+        if (summary.baselines) {
+            console.log(`[dtef-rebuild]   Baselines: pop-marginal=${summary.baselines.populationMarginal?.toFixed(4)}, uniform=${summary.baselines.uniform?.toFixed(4)}`);
+        }
+
+        if (!options.dryRun) {
+            await saveJsonFile(`live/aggregates/dtef_summary_${summary.surveyId}.json`, summary);
+            console.log(`[dtef-rebuild]   Saved dtef_summary_${summary.surveyId}.json`);
+        }
+
+        allSurveyResults.push(summary);
+        // roundResults goes out of scope here, eligible for GC
+    }
+
+    // Build combined summary by merging per-survey summaries
+    // (We can't call buildDTEFSummary on all results since that would require all in memory.
+    //  Instead, merge the per-survey aggregations.)
+    if (allSurveyResults.length > 0 && !options.dryRun) {
+        // For the combined summary, use the first survey's summary as a template
+        // and merge model results across surveys
+        const allModelScores = new Map<string, { totalScore: number; count: number; segmentCount: number }>();
+        for (const summary of allSurveyResults) {
+            for (const model of summary.aggregation.modelResults) {
+                const existing = allModelScores.get(model.modelId) || { totalScore: 0, count: 0, segmentCount: 0 };
+                for (const seg of model.segmentScores) {
+                    existing.totalScore += seg.avgCoverageExtent;
+                    existing.count++;
+                }
+                existing.segmentCount += model.segmentCount;
+                allModelScores.set(model.modelId, existing);
+            }
+        }
+
+        // Pick the most complete single-survey summary as the combined one
+        // (the combined summary is mainly used for baselines + top models)
+        const largest = allSurveyResults.reduce((a, b) => a.resultCount > b.resultCount ? a : b);
+        const combinedTopModels = Array.from(allModelScores.entries())
+            .map(([modelId, data]) => ({
+                modelId,
+                modelName: modelId.replace(/^openrouter:/, ''),
+                overallScore: data.count > 0 ? data.totalScore / data.count : 0,
+                segmentCount: data.segmentCount,
+            }))
+            .sort((a, b) => b.overallScore - a.overallScore)
+            .slice(0, 10);
+
+        const combinedSummary: DTEFSummary = {
+            ...largest,
+            surveyId: 'all',
+            generatedAt: new Date().toISOString(),
+            resultCount: allSurveyResults.reduce((sum, s) => sum + s.resultCount, 0),
+            topModels: combinedTopModels,
+        };
+
+        await saveJsonFile('live/aggregates/dtef_summary.json', combinedSummary);
+        console.log('[dtef-rebuild] Saved combined dtef_summary.json');
+    } else if (options.dryRun) {
+        console.log(`[dtef-rebuild] [DRY RUN] Would save ${allSurveyResults.length} per-survey summaries + 1 combined summary.`);
+    }
+
+    const durationSec = Math.round((Date.now() - startMs) / 1000);
+    console.log(`[dtef-rebuild] Complete in ${durationSec}s. ${totalFetched} fetched, ${totalNoRuns} no runs, ${totalFailed} failed.`);
+}
+
+export const dtefRebuildCommand = new Command('dtef-rebuild')
+    .description('Rebuild DTEF demographic summary in S3 (memory-efficient, DTEF-only).')
+    .option('--dry-run', 'Log what would be saved without writing.')
+    .action(rebuildDTEFSummary);
 
 // Export the core function so other commands can use the exact same logic
 export { actionBackfillSummary };

@@ -202,7 +202,7 @@ dtef-stats: ## Run statistical analysis report
 	pnpm analyze:stats
 
 dtef-rebuild: ## Rebuild DTEF summary in S3 (includes baselines on demographics page)
-	pnpm cli backfill-summary
+	NODE_OPTIONS=--max-old-space-size=6144 pnpm cli dtef-rebuild
 
 dtef-pipeline: ## Run full pipeline for a round: import → generate → baselines (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-pipeline ROUND=GD4 [CTX=5]" && exit 1)
