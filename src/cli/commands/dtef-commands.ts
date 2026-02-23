@@ -17,6 +17,12 @@ import {
     loadGlobalDialoguesRound,
     summarizeDataset,
 } from '../services/adapters/globalDialoguesAdapter';
+import {
+    generateBaselineResults,
+    getBaselineMeanScore,
+    BASELINE_MODEL_IDS,
+    BaselineType,
+} from '../services/baselineGeneratorService';
 
 export const dtefCommand = new Command('dtef')
     .description('DTEF: Generate and manage demographic evaluation blueprints');
@@ -38,6 +44,7 @@ dtefCommand
     .option('--context-levels <levels>', 'Generate blueprints at multiple context levels (e.g., "0,5,10,all")')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
     .option('--batch-size <n>', 'Number of questions per batched prompt (1-5, default: 1)', '1')
+    .option('--eval-type <type>', 'Evaluation type: distribution (default) or shift', 'distribution')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -119,6 +126,12 @@ dtefCommand
             process.exit(1);
         }
 
+        const evalType = options.evalType as 'distribution' | 'shift';
+        if (!['distribution', 'shift'].includes(evalType)) {
+            console.error(chalk.red('--eval-type must be "distribution" or "shift"'));
+            process.exit(1);
+        }
+
         // Generate blueprints (possibly at multiple context levels)
         console.log(chalk.gray('Generating blueprints...'));
 
@@ -144,6 +157,7 @@ dtefCommand
                     segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
                     tokenBudget: parseInt(options.tokenBudget, 10),
                     batchSize: batchSize > 1 ? batchSize : undefined,
+                    evalType,
                     modelConfig: {
                         models: options.models.split(',').map((s: string) => s.trim()),
                         temperature: parseFloat(options.temperature),
@@ -164,6 +178,7 @@ dtefCommand
                 segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
                 tokenBudget: parseInt(options.tokenBudget, 10),
                 batchSize: batchSize > 1 ? batchSize : undefined,
+                evalType,
                 modelConfig: {
                     models: options.models.split(',').map((s: string) => s.trim()),
                     temperature: parseFloat(options.temperature),
@@ -542,4 +557,80 @@ dtefCommand
         }
 
         console.log(chalk.green('Done!'));
+    });
+
+/**
+ * dtef generate-baseline - Generate synthetic baseline results for leaderboard comparison
+ */
+dtefCommand
+    .command('generate-baseline')
+    .description('Generate synthetic baseline predictor results (population-marginal or uniform)')
+    .requiredOption('-i, --input <path>', 'Path to DTEF survey data JSON file')
+    .option('-o, --output <dir>', 'Output directory for generated results', './output/dtef-baselines')
+    .option('-t, --type <baseline>', 'Baseline type: population-marginal or uniform', 'population-marginal')
+    .option('--dry-run', 'Show summary without writing files')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        console.log(chalk.blue('\nDTEF Baseline Generator\n'));
+
+        const inputPath = path.resolve(options.input);
+        if (!fs.existsSync(inputPath)) {
+            console.error(chalk.red(`Input file not found: ${inputPath}`));
+            process.exit(1);
+        }
+
+        let surveyData: DTEFSurveyData;
+        try {
+            const raw = fs.readFileSync(inputPath, 'utf-8');
+            surveyData = JSON.parse(raw);
+        } catch (e: any) {
+            console.error(chalk.red(`Failed to parse input file: ${e.message}`));
+            process.exit(1);
+        }
+
+        const baselineType = options.type as BaselineType;
+        if (!['population-marginal', 'uniform'].includes(baselineType)) {
+            console.error(chalk.red('--type must be "population-marginal" or "uniform"'));
+            process.exit(1);
+        }
+
+        console.log(chalk.gray(`Baseline type: ${baselineType}`));
+        console.log(chalk.gray(`Segments: ${surveyData.segments.length}`));
+        console.log(chalk.gray(`Questions: ${Object.keys(surveyData.questions).length}\n`));
+
+        const results = generateBaselineResults(surveyData, baselineType);
+        const meanScore = getBaselineMeanScore(results);
+
+        console.log(chalk.green(`Generated ${results.length} baseline result(s)`));
+        console.log(chalk.green(`Mean JSD similarity: ${meanScore.toFixed(4)}\n`));
+
+        if (options.dryRun) {
+            console.log(chalk.yellow('Dry run - not writing files\n'));
+            for (const r of results) {
+                const scores = r.evaluationResults?.llmCoverageScores;
+                const promptScores = Object.values(scores || {}).map(ps => {
+                    const ms = Object.values(ps)[0];
+                    return ms?.avgCoverageExtent ?? 0;
+                });
+                const avg = promptScores.length > 0
+                    ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length
+                    : 0;
+                console.log(chalk.white(`  ${r.configId}: ${r.promptIds.length} prompts, avg score ${avg.toFixed(4)}`));
+            }
+            return;
+        }
+
+        const outputDir = path.resolve(options.output);
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        for (const result of results) {
+            const filename = `${result.configId}--${result.runLabel}.json`;
+            const filepath = path.join(outputDir, filename);
+            fs.writeFileSync(filepath, JSON.stringify(result, null, 2), 'utf-8');
+            console.log(chalk.gray(`  Written: ${filepath}`));
+        }
+
+        console.log(chalk.green(`\nDone! ${results.length} result(s) written to ${outputDir}`));
+        console.log(chalk.gray('Upload to S3 with: aws s3 sync <dir> s3://<bucket>/results/'));
     });

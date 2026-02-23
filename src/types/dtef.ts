@@ -162,6 +162,20 @@ export interface DTEFBlueprintConfig {
     /** Text to append to each prompt */
     promptSuffix?: string;
   };
+
+  /**
+   * Evaluation type.
+   * - 'distribution': standard prediction (default)
+   * - 'shift': provide population marginal, ask model to adjust for demographic
+   */
+  evalType?: 'distribution' | 'shift';
+
+  /**
+   * Population marginal distributions per question (for shift eval type).
+   * Keys are question IDs, values are percentage distributions.
+   * Computed from weighted average of all segment distributions.
+   */
+  populationMarginals?: Record<string, number[]>;
 }
 
 /**

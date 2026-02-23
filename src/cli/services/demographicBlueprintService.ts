@@ -49,6 +49,24 @@ Example:
 {"Q1": [35.2, 28.1, 22.4, 14.3], "Q2": [45.0, 35.0, 20.0]}`;
 
 /**
+ * System prompt for demographic shift prediction.
+ * The model is given the population marginal and asked to adjust it.
+ */
+const SHIFT_SYSTEM_PROMPT = `You are a demographic survey analyst. You will be given the overall population's response distribution to a survey question, and a specific demographic group. Predict how this demographic group's response distribution DIFFERS from the overall population.
+
+Provide the adjusted distribution in this exact format:
+[percentage1, percentage2, percentage3, ...]
+
+The percentages must sum to 100. Use one decimal place. Do not include any other text.
+Think about how this specific demographic group might differ from the general population — they may be more or less likely to choose certain options.
+
+Example for a 4-option question:
+[35.2, 28.1, 22.4, 14.3]`;
+
+/** Supported evaluation types */
+export type DTEFEvalType = 'distribution' | 'shift';
+
+/**
  * Generates DTEF blueprints from demographic survey data.
  */
 export class DemographicBlueprintService {
@@ -70,6 +88,36 @@ export class DemographicBlueprintService {
     }
 
     /**
+     * Compute population marginal distributions (weighted average across segments).
+     * Returns a map from questionId to marginal distribution.
+     */
+    static computePopulationMarginals(
+        surveyData: DTEFSurveyData,
+    ): Record<string, number[]> {
+        const accum = new Map<string, { weightedSum: number[]; totalWeight: number }>();
+
+        for (const segment of surveyData.segments) {
+            for (const resp of segment.responses) {
+                let entry = accum.get(resp.questionId);
+                if (!entry) {
+                    entry = { weightedSum: new Array(resp.distribution.length).fill(0), totalWeight: 0 };
+                    accum.set(resp.questionId, entry);
+                }
+                for (let i = 0; i < resp.distribution.length; i++) {
+                    entry.weightedSum[i] += resp.distribution[i] * segment.sampleSize;
+                }
+                entry.totalWeight += segment.sampleSize;
+            }
+        }
+
+        const result: Record<string, number[]> = {};
+        for (const [qId, entry] of accum) {
+            result[qId] = entry.weightedSum.map(v => v / entry.totalWeight);
+        }
+        return result;
+    }
+
+    /**
      * Generate a single WevalConfig for a demographic segment.
      */
     private static generateBlueprintForSegment(
@@ -77,10 +125,17 @@ export class DemographicBlueprintService {
         segment: SegmentWithResponses
     ): WevalConfig {
         const batchSize = config.batchSize || 1;
+        const evalType = config.evalType || 'distribution';
 
         // Use batched generation if batchSize > 1
         if (batchSize > 1) {
             return this.generateBatchedBlueprintForSegment(config, segment, batchSize);
+        }
+
+        // For shift eval type, compute marginals if not provided
+        let marginals: Record<string, number[]> | undefined;
+        if (evalType === 'shift') {
+            marginals = config.populationMarginals || this.computePopulationMarginals(config.surveyData);
         }
 
         const prompts: WevalPromptConfig[] = [];
@@ -99,14 +154,12 @@ export class DemographicBlueprintService {
                 segment,
                 questionId,
                 question,
-                response
+                response,
+                marginals,
             );
             prompts.push(prompt);
 
             // Track the maximum context count across all prompts.
-            // Different prompts may get different counts due to token budget constraints
-            // (longer target questions leave less room for context), so we use the max
-            // as the representative value for this blueprint.
             if (contextQuestionCount > blueprintContextCount) {
                 blueprintContextCount = contextQuestionCount;
                 blueprintContextIds = contextQuestionIds;
@@ -115,14 +168,15 @@ export class DemographicBlueprintService {
 
         // ConfigId: no suffix for 0 context, -c{N} for N context questions
         const ctxSuffix = blueprintContextCount > 0 ? `-c${blueprintContextCount}` : '';
-        const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}${ctxSuffix}`;
+        const evalSuffix = evalType === 'shift' ? '-shift' : '';
+        const blueprintId = `dtef-${config.surveyData.surveyId}-${segment.id}${ctxSuffix}${evalSuffix}`;
         const ctxLabel = blueprintContextCount > 0 ? ` (${blueprintContextCount} context Qs)` : '';
-        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label}${ctxLabel}`;
+        const evalLabel = evalType === 'shift' ? ' [shift]' : '';
+        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label}${ctxLabel}${evalLabel}`;
 
         // Build ground truth distributions map for DTEF metadata
         const groundTruthDistributions: Record<string, number[]> = {};
         for (const prompt of prompts) {
-            const response = segment.responses.find(r => r.questionId === prompt.id.split('-')[0]);
             if (prompt.idealResponse) {
                 try {
                     const dist = JSON.parse(prompt.idealResponse);
@@ -133,15 +187,20 @@ export class DemographicBlueprintService {
             }
         }
 
+        // Choose system prompt based on eval type
+        const systemPrompt = evalType === 'shift'
+            ? SHIFT_SYSTEM_PROMPT
+            : (config.blueprintTemplate?.systemPrompt || DEFAULT_SYSTEM_PROMPT);
+
         return {
             configId: blueprintId,
             configTitle: blueprintTitle,
-            description: `DTEF: Predict response distributions for ${segment.label}. Source: ${config.surveyData.source || config.surveyData.surveyName}`,
+            description: `DTEF${evalType === 'shift' ? ' (shift)' : ''}: Predict response distributions for ${segment.label}. Source: ${config.surveyData.source || config.surveyData.surveyName}`,
             models: config.modelConfig?.models || ['CORE'],
-            system: config.blueprintTemplate?.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+            system: systemPrompt,
             temperature: config.modelConfig?.temperature || 0.3,
             prompts,
-            tags: ['_periodic', 'dtef', 'demographic', config.surveyData.surveyId],
+            tags: ['_periodic', 'dtef', 'demographic', evalType === 'shift' ? 'shift' : 'distribution', config.surveyData.surveyId],
             context: {
                 dtef: {
                     surveyId: config.surveyData.surveyId,
@@ -151,6 +210,8 @@ export class DemographicBlueprintService {
                     groundTruthDistributions,
                     contextQuestionCount: blueprintContextCount,
                     contextQuestionIds: blueprintContextIds,
+                    evalType,
+                    ...(marginals ? { populationMarginals: marginals } : {}),
                 },
             },
         };
@@ -272,10 +333,11 @@ export class DemographicBlueprintService {
         segment: SegmentWithResponses,
         questionId: string,
         question: { text: string; type: string; options?: string[] },
-        response: DemographicResponse
+        response: DemographicResponse,
+        marginals?: Record<string, number[]>,
     ): { prompt: WevalPromptConfig; contextQuestionCount: number; contextQuestionIds: string[] } {
         const options = question.options || [];
-        const { text: promptText, contextQuestionCount, contextQuestionIds } = this.buildPromptText(config, segment, question, options, questionId);
+        const { text: promptText, contextQuestionCount, contextQuestionIds } = this.buildPromptText(config, segment, question, options, questionId, marginals);
 
         // Build the ideal response as the distribution string
         const idealDistribution = response.distribution
@@ -311,10 +373,12 @@ export class DemographicBlueprintService {
         segment: SegmentWithResponses,
         question: { text: string; type: string; options?: string[] },
         options: string[],
-        targetQuestionId?: string
+        targetQuestionId?: string,
+        marginals?: Record<string, number[]>,
     ): { text: string; contextQuestionCount: number; contextQuestionIds: string[] } {
         const prefix = config.blueprintTemplate?.promptPrefix || '';
         const suffix = config.blueprintTemplate?.promptSuffix || '';
+        const evalType = config.evalType || 'distribution';
 
         // Describe the demographic segment
         const attributeLines = Object.entries(segment.attributes)
@@ -328,8 +392,31 @@ export class DemographicBlueprintService {
             corePrompt += `${prefix}\n\n`;
         }
 
-        corePrompt += `Consider the following demographic group (sample size: ${segment.sampleSize}):\n`;
-        corePrompt += `${attributeLines}\n\n`;
+        // For shift eval type, include the population marginal distribution
+        if (evalType === 'shift' && marginals && targetQuestionId && marginals[targetQuestionId]) {
+            const marginal = marginals[targetQuestionId];
+            corePrompt += `The overall population responded to the following survey question as follows:\n\n`;
+            corePrompt += `"${question.text}"\n\n`;
+
+            if (options.length > 0) {
+                corePrompt += `Response distribution:\n`;
+                options.forEach((option, idx) => {
+                    const letter = String.fromCharCode(97 + idx);
+                    const pct = marginal[idx]?.toFixed(1) ?? '?';
+                    corePrompt += `  ${letter}. ${option}: ${pct}%\n`;
+                });
+                corePrompt += '\n';
+            } else {
+                corePrompt += `Distribution: [${marginal.map(n => n.toFixed(1)).join(', ')}]\n\n`;
+            }
+
+            corePrompt += `How would you adjust this distribution for the following demographic group?\n`;
+            corePrompt += `(sample size: ${segment.sampleSize})\n`;
+            corePrompt += `${attributeLines}\n\n`;
+        } else {
+            corePrompt += `Consider the following demographic group (sample size: ${segment.sampleSize}):\n`;
+            corePrompt += `${attributeLines}\n\n`;
+        }
 
         // Build context questions section if configured and budget allows
         const contextResult = this.buildContextSection(
@@ -347,18 +434,23 @@ export class DemographicBlueprintService {
             contextQuestionIds = contextResult.questionIds;
         }
 
-        corePrompt += `Survey question:\n"${question.text}"\n\n`;
+        // For distribution eval type, add the question here (shift type already added it above)
+        if (evalType !== 'shift') {
+            corePrompt += `Survey question:\n"${question.text}"\n\n`;
 
-        if (options.length > 0) {
-            corePrompt += `Answer options:\n`;
-            options.forEach((option, idx) => {
-                const letter = String.fromCharCode(97 + idx);
-                corePrompt += `  ${letter}. ${option}\n`;
-            });
-            corePrompt += '\n';
+            if (options.length > 0) {
+                corePrompt += `Answer options:\n`;
+                options.forEach((option, idx) => {
+                    const letter = String.fromCharCode(97 + idx);
+                    corePrompt += `  ${letter}. ${option}\n`;
+                });
+                corePrompt += '\n';
+            }
+
+            corePrompt += `Predict the percentage distribution of responses for this demographic group across the answer options.`;
+        } else {
+            corePrompt += `Predict the adjusted percentage distribution for this demographic group.`;
         }
-
-        corePrompt += `Predict the percentage distribution of responses for this demographic group across the answer options.`;
 
         if (suffix) {
             corePrompt += `\n\n${suffix}`;
