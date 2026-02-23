@@ -17,7 +17,7 @@ S3_REGION := us-east-1
 
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
-	dtef-import dtef-import-all dtef-generate dtef-baselines dtef-publish dtef-upload-baselines dtef-stats dtef-rebuild dtef-pipeline dtef-status
+	dtef-import dtef-import-all dtef-generate dtef-baselines dtef-baselines-all dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
@@ -158,8 +158,26 @@ dtef-baselines: ## Generate baseline predictor results for a round (ROUND=GD4)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	$(eval INPUT := output/$(ROUND_LC).json)
 	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
-	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type population-marginal
-	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type uniform
+	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type population-marginal --force
+	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type uniform --force
+
+dtef-baselines-all: ## Generate baselines for all imported survey rounds
+	@for f in output/gd*.json; do \
+		round=$$(basename $$f .json); \
+		echo "=== Generating baselines for $$round ==="; \
+		pnpm cli dtef generate-baseline -i $$f -o output/baselines/$$round --type population-marginal --force; \
+		pnpm cli dtef generate-baseline -i $$f -o output/baselines/$$round --type uniform --force; \
+		echo ""; \
+	done
+
+dtef-upload-baselines-all: ## Upload all baseline results to S3
+	@for dir in output/baselines/*/; do \
+		test -d "$$dir" || continue; \
+		round=$$(basename $$dir); \
+		echo "=== Uploading baselines for $$round ==="; \
+		aws s3 sync $$dir s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION); \
+		echo ""; \
+	done
 
 dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-publish ROUND=GD4" && exit 1)
@@ -183,8 +201,8 @@ dtef-upload-baselines: ## Upload baseline results to S3 (ROUND=GD4)
 dtef-stats: ## Run statistical analysis report
 	pnpm analyze:stats
 
-dtef-rebuild: ## Rebuild summaries and aggregates from S3 results
-	pnpm cli streaming-summaries && pnpm cli lightweight-backfill
+dtef-rebuild: ## Rebuild DTEF summary in S3 (includes baselines on demographics page)
+	pnpm cli backfill-summary
 
 dtef-pipeline: ## Run full pipeline for a round: import → generate → baselines (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-pipeline ROUND=GD4 [CTX=5]" && exit 1)
