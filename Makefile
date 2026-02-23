@@ -120,16 +120,27 @@ s3-size: ## Show total S3 bucket size
 		| tail -2
 
 # --- DTEF Workflow ---
-# Typical workflow for new survey data:
-#   1. make dtef-import ROUND=GD8        (import new GD round)
-#   2. make dtef-generate ROUND=GD8      (generate blueprints)
-#   3. make dtef-baselines ROUND=GD8     (generate baseline predictors)
-#   4. make dtef-publish ROUND=GD8       (publish blueprints to dtef-configs repo)
-#   5. make dtef-upload-baselines ROUND=GD8  (upload baselines to S3)
-#   6. make rerun-evals                  (trigger model evaluations)
-#   7. make streaming-summaries          (rebuild summaries after evals complete)
-#   8. make dtef-stats                   (run statistical analysis)
-# Or run steps 1-5 at once: make dtef-pipeline ROUND=GD8
+#
+# === Adding a new survey round ===
+#   1. make dtef-import ROUND=GD8             (import GD round → output/gd8.json)
+#   2. make dtef-generate ROUND=GD8           (generate blueprints)
+#   3. make dtef-baselines ROUND=GD8          (generate baseline predictors)
+#   4. make dtef-publish ROUND=GD8            (publish blueprints to dtef-configs repo)
+#   5. make dtef-upload-baselines ROUND=GD8   (upload baselines to S3)
+#   6. make rerun-evals                       (trigger model evaluations)
+#   7. make streaming-summaries               (rebuild summaries after evals complete)
+#   8. make dtef-rebuild                      (rebuild DTEF summary with baselines)
+#   9. make dtef-stats                        (run statistical analysis report)
+#   Shortcut: make dtef-pipeline ROUND=GD8    (runs steps 1-3 locally)
+#
+# === First-time baseline initialization (all rounds) ===
+#   1. make dtef-baselines-all                (generate baselines for all imported rounds)
+#   2. make dtef-upload-baselines-all         (upload all baselines to S3)
+#   3. make dtef-rebuild                      (rebuild DTEF summary — baselines appear on demographics page)
+#
+# === After model evals complete ===
+#   1. make streaming-summaries               (save per-config summaries)
+#   2. make dtef-rebuild                      (rebuild DTEF summary with latest scores + baselines)
 
 DTEF_CONFIGS_DIR ?= ../dtef-configs
 ROUND ?=
