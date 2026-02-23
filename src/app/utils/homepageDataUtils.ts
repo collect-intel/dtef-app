@@ -8,6 +8,7 @@ import {
 } from '@/lib/storageService'; 
 import { AggregateStatsData } from '@/app/components/home/types';
 import { PotentialDriftInfo } from '@/types/summary';
+import type { UsageSummary } from '@/types/shared';
 
 // Re-exporting this from the original source for use in the API route.
 export type { AllCoverageScores } from '@/app/analysis/components/CoverageHeatmapCanvas'; 
@@ -51,6 +52,7 @@ export interface EnhancedRunInfo {
     fastestModel?: { modelId: string; avgMs: number };
     perModelTiming?: { modelId: string; avgMs: number; callCount: number; medianMs: number; p95Ms: number; errorCount: number }[];
   };
+  usageSummary?: UsageSummary;
 }
 
 export interface EnhancedComparisonConfigInfo {

@@ -666,11 +666,46 @@ export async function lightweightBackfill(): Promise<void> {
         return { ...config, runs: [] };
     });
 
-    // DTEF summaries — only for configs with 'dtef' tag (typically ~20 configs)
-    // For these few, we need raw results to build demographic data.
-    // But for the lightweight backfill, we skip DTEF summary rebuilding since
-    // it's rarely needed and the incremental update handles per-config data.
-    // The existing DTEF summary files remain valid until a full backfill runs.
+    // Build all_blueprints_summary.json (lean version with only latest run metadata)
+    const allBlueprintsSummaryConfigs = homepageConfigs.map(config => {
+        const latestRun = config.runs.length > 0 ? { ...config.runs[0] } : null;
+        let leanLatestRun = null;
+        if (latestRun) {
+            const { allCoverageScores, ...restOfRun } = latestRun;
+            leanLatestRun = restOfRun;
+        }
+        return {
+            ...config,
+            runs: leanLatestRun ? [leanLatestRun] : [],
+        };
+    });
+
+    await saveAllBlueprintsSummary({
+        configs: allBlueprintsSummaryConfigs,
+        lastUpdated: new Date().toISOString(),
+    });
+    console.log(`[lightweight-backfill] all_blueprints_summary.json saved (${allBlueprintsSummaryConfigs.length} configs).`);
+
+    // Build latest_runs_summary.json
+    const allRunsFlat: LatestRunSummaryItem[] = homepageConfigs.flatMap(config =>
+        config.runs.map(run => {
+            const { allCoverageScores, ...leanRun } = run;
+            return {
+                ...leanRun,
+                configId: config.configId,
+                configTitle: config.title || config.configTitle,
+            };
+        })
+    );
+    const sortedRuns = allRunsFlat.sort((a, b) =>
+        new Date(fromSafeTimestamp(b.timestamp)).getTime() - new Date(fromSafeTimestamp(a.timestamp)).getTime()
+    );
+    const latest50Runs = sortedRuns.slice(0, 50);
+    await saveLatestRunsSummary({
+        runs: latest50Runs,
+        lastUpdated: new Date().toISOString(),
+    });
+    console.log(`[lightweight-backfill] latest_runs_summary.json saved (${latest50Runs.length} runs).`);
 
     const finalHomepageSummary: HomepageSummaryFileContent = {
         configs: homepageConfigsForSave,
@@ -761,5 +796,196 @@ export const backfillSummaryCommand = new Command('backfill-summary')
     .option('--dry-run', 'Log what would be saved without writing any files.')
     .action(actionBackfillSummary);
 
+export const lightweightBackfillCommand = new Command('lightweight-backfill')
+    .description('Rebuilds aggregate summary files (homepage, all_blueprints, latest_runs, model summaries) from existing per-config summaries. Memory-efficient alternative to full backfill.')
+    .action(async () => {
+        await lightweightBackfill();
+    });
+
+/**
+ * Streaming per-config summary builder. Processes one config at a time,
+ * saves its per-config summary to S3, then releases memory. No accumulation.
+ * Run this before lightweight-backfill to ensure all configs have summaries.
+ */
+async function streamingPerConfigSummaries(options: { force?: boolean; dryRun?: boolean }): Promise<void> {
+    const startMs = Date.now();
+    console.log('[streaming-summaries] Starting...');
+
+    const configIds = await listConfigIds();
+    if (!configIds || configIds.length === 0) {
+        console.log('[streaming-summaries] No configs found.');
+        return;
+    }
+    console.log(`[streaming-summaries] Found ${configIds.length} config IDs.`);
+
+    let saved = 0;
+    let skipped = 0;
+    let noRuns = 0;
+    let failed = 0;
+
+    for (let i = 0; i < configIds.length; i++) {
+        const configId = configIds[i];
+
+        // Skip configs that already have summaries (unless --force)
+        if (!options.force) {
+            try {
+                const existing = await getConfigSummary(configId);
+                if (existing) {
+                    skipped++;
+                    continue;
+                }
+            } catch {
+                // No summary exists, proceed
+            }
+        }
+
+        try {
+            const runs = await listRunsForConfig(configId);
+            if (runs.length === 0) {
+                noRuns++;
+                continue;
+            }
+
+            // Fetch only the latest run to minimize memory
+            const latestRunInfo = runs[0];
+            const resultData = await getResultByFileName(configId, latestRunInfo.fileName) as FetchedComparisonData;
+            if (!resultData) {
+                console.error(`[streaming-summaries] Failed to fetch result for ${configId}/${latestRunInfo.fileName}`);
+                failed++;
+                continue;
+            }
+
+            // Apply filename timestamp
+            if (latestRunInfo.timestamp) {
+                resultData.timestamp = latestRunInfo.timestamp;
+            }
+
+            // Normalize tags
+            if (resultData.config?.tags) {
+                resultData.config.tags = [...new Set(resultData.config.tags.map(tag => normalizeTag(tag)).filter(Boolean))];
+            }
+
+            if (!resultData.configId || !resultData.runLabel || !resultData.timestamp) {
+                console.warn(`[streaming-summaries] Skipping ${configId}: missing essential fields.`);
+                failed++;
+                continue;
+            }
+
+            // Calculate stats
+            const perModelScores = calculatePerModelScoreStatsForRun(resultData);
+            const hybridScoreStats = calculateAverageHybridScoreForRun(resultData);
+
+            // Build lite coverage scores
+            const fullCoverageScores = resultData.evaluationResults?.llmCoverageScores;
+            let liteCoverageScores: typeof fullCoverageScores | null = null;
+            if (fullCoverageScores) {
+                liteCoverageScores = {};
+                for (const promptId in fullCoverageScores) {
+                    if (Object.prototype.hasOwnProperty.call(fullCoverageScores, promptId)) {
+                        liteCoverageScores[promptId] = {};
+                        const models = fullCoverageScores[promptId];
+                        for (const modelId in models) {
+                            if (Object.prototype.hasOwnProperty.call(models, modelId)) {
+                                const result = models[modelId];
+                                if (result && !('error' in result)) {
+                                    liteCoverageScores[promptId][modelId] = {
+                                        keyPointsCount: result.keyPointsCount,
+                                        avgCoverageExtent: result.avgCoverageExtent,
+                                    };
+                                } else if (result) {
+                                    liteCoverageScores[promptId][modelId] = result;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Build timing summary
+            const timing = (resultData as any).timing;
+            let timingSummary: EnhancedRunInfo['timingSummary'] = undefined;
+            if (timing?.phases) {
+                const sorted = timing.perModelTiming?.length > 0
+                    ? [...timing.perModelTiming].sort((a: any, b: any) => b.avgMs - a.avgMs)
+                    : [];
+                timingSummary = {
+                    totalDurationMs: timing.totalDurationMs,
+                    generationDurationMs: timing.phases.generation?.durationMs,
+                    evaluationDurationMs: timing.phases.evaluation?.durationMs,
+                    saveDurationMs: timing.phases.save?.durationMs,
+                    slowestModel: sorted.length > 0 ? { modelId: sorted[0].modelId, avgMs: sorted[0].avgMs } : undefined,
+                    fastestModel: sorted.length > 0 ? { modelId: sorted[sorted.length - 1].modelId, avgMs: sorted[sorted.length - 1].avgMs } : undefined,
+                    perModelTiming: sorted.length > 0 ? sorted.map((m: any) => ({
+                        modelId: m.modelId,
+                        avgMs: m.avgMs,
+                        callCount: m.callCount,
+                        medianMs: m.medianMs,
+                        p95Ms: m.p95Ms,
+                        errorCount: m.errorCount || 0,
+                    })) : undefined,
+                };
+            }
+
+            const processedRun: EnhancedRunInfo = {
+                runLabel: resultData.runLabel,
+                timestamp: resultData.timestamp,
+                fileName: latestRunInfo.fileName,
+                temperature: resultData.config.temperature || 0,
+                numPrompts: resultData.promptIds.length,
+                numModels: resultData.effectiveModels.filter(m => m !== 'ideal').length,
+                totalModelsAttempted: resultData.config.models.length,
+                hybridScoreStats,
+                perModelScores,
+                allCoverageScores: liteCoverageScores,
+                tags: resultData.config.tags,
+                models: resultData.effectiveModels,
+                promptIds: resultData.promptIds,
+                timingSummary,
+            };
+
+            const configTags = resultData.config.tags || [];
+            const autoTags = resultData.executiveSummary?.structured?.autoTags || [];
+            const allTags = [...new Set([...configTags, ...autoTags].map(tag => normalizeTag(tag)).filter(Boolean))];
+
+            const summary: EnhancedComparisonConfigInfo = {
+                configId,
+                configTitle: resultData.configTitle || resultData.config.title || configId,
+                id: configId,
+                title: resultData.configTitle || resultData.config.title || configId,
+                description: resultData.config?.description || '',
+                runs: [processedRun],
+                totalRunCount: runs.length,
+                latestRunTimestamp: processedRun.timestamp,
+                tags: allTags.length > 0 ? allTags : configTags,
+                overallAverageHybridScore: hybridScoreStats?.average ?? null,
+                hybridScoreStdDev: null,
+            };
+
+            if (options.dryRun) {
+                console.log(`[streaming-summaries] [DRY RUN] Would save summary for ${configId}`);
+            } else {
+                await saveConfigSummary(configId, summary);
+            }
+            saved++;
+
+            if ((saved + skipped) % 100 === 0) {
+                console.log(`[streaming-summaries] Progress: ${i + 1}/${configIds.length} (${saved} saved, ${skipped} skipped, ${noRuns} no runs, ${failed} failed)`);
+            }
+        } catch (err: any) {
+            console.error(`[streaming-summaries] Error processing ${configId}: ${err.message}`);
+            failed++;
+        }
+    }
+
+    const durationSec = Math.round((Date.now() - startMs) / 1000);
+    console.log(`[streaming-summaries] Complete in ${durationSec}s. ${saved} saved, ${skipped} already existed, ${noRuns} no runs, ${failed} failed.`);
+}
+
+export const streamingSummariesCommand = new Command('streaming-summaries')
+    .description('Save per-config summaries for configs that are missing them. Run before lightweight-backfill.')
+    .option('--force', 'Rebuild all per-config summaries, even if they already exist.')
+    .option('--dry-run', 'Log what would be saved without writing.')
+    .action(streamingPerConfigSummaries);
+
 // Export the core function so other commands can use the exact same logic
-export { actionBackfillSummary }; 
+export { actionBackfillSummary };

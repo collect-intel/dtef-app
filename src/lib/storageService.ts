@@ -1073,17 +1073,24 @@ export async function listConfigIds(): Promise<string[]> {
 
   if (storageProvider === 's3' && s3Client && s3BucketName) {
     try {
-      const command = new ListObjectsV2Command({
-        Bucket: s3BucketName,
-        Prefix: s3Prefix,
-        Delimiter: '/',
-      });
-      const response = await s3Client.send(command);
-      const configIds = response.CommonPrefixes?.map(p => {
-        const prefix = p.Prefix || '';
-        return prefix.replace(s3Prefix, '').replace(/\/$/, '');
-      }).filter(Boolean) as string[] || [];
-      console.log(`[StorageService] Listed config IDs from S3: ${configIds.join(', ')}`);
+      const configIds: string[] = [];
+      let continuationToken: string | undefined = undefined;
+      do {
+        const command: ListObjectsV2Command = new ListObjectsV2Command({
+          Bucket: s3BucketName,
+          Prefix: s3Prefix,
+          Delimiter: '/',
+          ContinuationToken: continuationToken,
+        });
+        const response: ListObjectsV2CommandOutput = await s3Client.send(command);
+        for (const p of response.CommonPrefixes || []) {
+          const prefix = p.Prefix || '';
+          const id = prefix.replace(s3Prefix, '').replace(/\/$/, '');
+          if (id) configIds.push(id);
+        }
+        continuationToken = response.NextContinuationToken;
+      } while (continuationToken);
+      console.log(`[StorageService] Listed ${configIds.length} config IDs from S3.`);
       return configIds;
     } catch (error) {
       console.error('[StorageService] Error listing config IDs from S3:', error);
@@ -1411,6 +1418,7 @@ export function updateSummaryDataWithNewRun(
     models: newResultData.effectiveModels,
     promptIds: newResultData.promptIds,
     timingSummary,
+    usageSummary: (newResultData as any).usageSummary || undefined,
   };
 
   const runExists = configSummary.runs.some(

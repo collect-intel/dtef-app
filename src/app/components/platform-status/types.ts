@@ -93,12 +93,50 @@ export interface TimingInsights {
   stats: TimingStats;
 }
 
+export interface DailyUsagePoint {
+  date: string; // YYYY-MM-DD
+  byModel: {
+    modelId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    costIsEstimated: boolean;
+    callCount: number;
+  }[];
+  totalCost: number;
+  totalTokens: number;
+}
+
+export interface UsageModelTotal {
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  costIsEstimated: boolean;
+  callCount: number;
+  runs: number;
+}
+
+export interface UsageInsights {
+  daily: DailyUsagePoint[];
+  modelTotals: UsageModelTotal[];
+  totals: {
+    callCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    knownCost: number;
+    estimatedCost: number;
+    totalCost: number;
+  };
+}
+
 export interface PlatformStatusResponse {
   blueprints: BlueprintStatusItem[];
   summaryFiles: SummaryFileItem[];
   stats: ProgressStats;
   queue: QueueStatus;
   timingInsights: TimingInsights | null;
+  usageInsights: UsageInsights | null;
   generatedAt: string;
   errors: string[];
 }

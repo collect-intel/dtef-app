@@ -15,7 +15,7 @@ APP_URL := $(or $(APP_URL),http://localhost:3172)
 S3_BUCKET := collect-intel-dtef
 S3_REGION := us-east-1
 
-.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary dev build test test-infra \
+.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest
 
 help: ## Show available commands
@@ -30,8 +30,14 @@ rerun-evals: ## Trigger evaluation scheduler (respects 1-week freshness check)
 		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
 		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
 
-backfill-summary: ## Rebuild all summary/aggregate files in S3 from existing results
+backfill-summary: ## Rebuild all summary/aggregate files in S3 from existing results (heavy, may OOM)
 	pnpm cli backfill-summary
+
+lightweight-backfill: ## Rebuild aggregate files from per-config summaries (memory-efficient)
+	pnpm cli lightweight-backfill
+
+streaming-summaries: ## Save missing per-config summaries then rebuild aggregates
+	pnpm cli streaming-summaries && pnpm cli lightweight-backfill
 
 rerun-evals-batch: ## Schedule a batch of evals (default 50, override with BATCH=N)
 	$(eval BATCH ?= 50)

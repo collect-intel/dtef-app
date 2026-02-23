@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry } from './types';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry, UsageInsights, DailyUsagePoint, UsageModelTotal } from './types';
 
 // --- Helpers ---
 
@@ -176,7 +176,7 @@ function ProgressCard({ label, value, total, color, subtitle, suffix }: {
 
 // --- Tab types ---
 
-type TabId = 'timing' | 'with-runs' | 'no-runs' | 'orphaned' | 'summary-files';
+type TabId = 'timing' | 'usage' | 'with-runs' | 'no-runs' | 'orphaned' | 'summary-files';
 
 // --- Blueprint table ---
 
@@ -724,6 +724,342 @@ function TimingSection({ insights }: { insights: TimingInsights | null }) {
     );
 }
 
+// --- Usage helpers ---
+
+function formatCost(usd: number): string {
+    if (usd < 0.01) return `$${usd.toFixed(4)}`;
+    if (usd < 1) return `$${usd.toFixed(3)}`;
+    return `$${usd.toFixed(2)}`;
+}
+
+function formatTokens(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return `${n}`;
+}
+
+function cleanModelId(modelId: string): string {
+    return modelId.replace(/^openrouter:/, '').replace(/^[^/]+\//, '');
+}
+
+// --- Usage cost chart (D3 stacked bar) ---
+
+function UsageCostChart({ daily }: { daily: DailyUsagePoint[] }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const [width, setWidth] = useState(600);
+    const height = 300;
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) setWidth(entry.contentRect.width);
+        });
+        observer.observe(el);
+        setWidth(el.clientWidth);
+        return () => observer.disconnect();
+    }, []);
+
+    // Collect all unique models across all days for consistent stacking
+    const allModels = useMemo(() => {
+        const set = new Set<string>();
+        for (const day of daily) {
+            for (const m of day.byModel) set.add(m.modelId);
+        }
+        return Array.from(set).sort();
+    }, [daily]);
+
+    useEffect(() => {
+        if (!svgRef.current || daily.length === 0) return;
+
+        const svg = d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+
+        const margin = { top: 12, right: 16, bottom: 50, left: 56 };
+        const w = width - margin.left - margin.right;
+        const h = height - margin.top - margin.bottom;
+
+        const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Define hatch pattern for estimated costs
+        const defs = svg.append('defs');
+        defs.append('pattern')
+            .attr('id', 'hatch-pattern')
+            .attr('patternUnits', 'userSpaceOnUse')
+            .attr('width', 6).attr('height', 6)
+            .append('path')
+            .attr('d', 'M0,6 l6,-6 M-1.5,1.5 l3,-3 M4.5,7.5 l3,-3')
+            .attr('stroke', 'rgba(255,255,255,0.3)')
+            .attr('stroke-width', 1);
+
+        const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(allModels);
+
+        const x = d3.scaleBand<string>()
+            .domain(daily.map(d => d.date))
+            .range([0, w])
+            .padding(0.2);
+
+        const maxCost = d3.max(daily, d => d.totalCost) || 0.01;
+        const y = d3.scaleLinear().domain([0, maxCost]).nice().range([h, 0]);
+
+        // X axis
+        const xAxis = g.append('g').attr('transform', `translate(0,${h})`);
+        const step = Math.max(1, Math.ceil(daily.length / 12));
+        xAxis.call(
+            d3.axisBottom(x)
+                .tickValues(daily.map(d => d.date).filter((_, i) => i % step === 0))
+                .tickFormat(d => {
+                    const dt = new Date(d + 'T12:00:00');
+                    return d3.timeFormat('%b %d')(dt);
+                })
+        );
+        xAxis.selectAll('text').attr('class', 'fill-muted-foreground text-[10px]').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
+        xAxis.selectAll('line, path').attr('stroke', 'currentColor').attr('class', 'text-border');
+
+        // Y axis
+        const yAxis = g.append('g').call(
+            d3.axisLeft(y).ticks(5).tickFormat(d => `$${(+d).toFixed(2)}`)
+        );
+        yAxis.selectAll('text').attr('class', 'fill-muted-foreground text-[10px]');
+        yAxis.selectAll('line, path').attr('stroke', 'currentColor').attr('class', 'text-border');
+
+        // Grid
+        g.append('g')
+            .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(() => ''))
+            .selectAll('line').attr('stroke', 'currentColor').attr('opacity', 0.15);
+        g.select('.domain').remove();
+
+        // Stacked bars
+        for (const day of daily) {
+            let cumCost = 0;
+            // Sort models for consistent stacking
+            const sortedModels = [...day.byModel].sort((a, b) => allModels.indexOf(a.modelId) - allModels.indexOf(b.modelId));
+            for (const m of sortedModels) {
+                const barY = y(cumCost + m.cost);
+                const barH = Math.max(0, y(cumCost) - barY);
+                const color = colorScale(m.modelId) as string;
+
+                // Solid fill
+                g.append('rect')
+                    .attr('x', x(day.date)!)
+                    .attr('y', barY)
+                    .attr('width', x.bandwidth())
+                    .attr('height', barH)
+                    .attr('fill', color)
+                    .attr('rx', 1);
+
+                // Hatch overlay for estimated costs
+                if (m.costIsEstimated) {
+                    g.append('rect')
+                        .attr('x', x(day.date)!)
+                        .attr('y', barY)
+                        .attr('width', x.bandwidth())
+                        .attr('height', barH)
+                        .attr('fill', 'url(#hatch-pattern)')
+                        .attr('rx', 1);
+                }
+
+                cumCost += m.cost;
+            }
+
+            // Tooltip overlay
+            g.append('rect')
+                .attr('x', x(day.date)!)
+                .attr('y', 0)
+                .attr('width', x.bandwidth())
+                .attr('height', h)
+                .attr('fill', 'transparent')
+                .attr('cursor', 'pointer')
+                .on('mouseenter', (event) => {
+                    const tooltip = tooltipRef.current;
+                    if (!tooltip) return;
+                    const lines = day.byModel
+                        .sort((a, b) => b.cost - a.cost)
+                        .map(m => {
+                            const est = m.costIsEstimated ? ' <span class="text-amber-500">(est.)</span>' : '';
+                            return `<div><span style="color:${colorScale(m.modelId)}">■</span> ${cleanModelId(m.modelId)}: ${formatCost(m.cost)}${est} · ${formatTokens(m.inputTokens + m.outputTokens)} tok · ${m.callCount} calls</div>`;
+                        }).join('');
+                    tooltip.innerHTML = `
+                        <div class="font-medium text-foreground text-xs mb-1">${day.date}</div>
+                        <div class="text-[10px] space-y-0.5">${lines}</div>
+                        <div class="text-xs pt-1 mt-1 border-t border-border/50 font-medium">Total: ${formatCost(day.totalCost)}</div>
+                    `;
+                    tooltip.style.display = 'block';
+                    const rect = containerRef.current!.getBoundingClientRect();
+                    const barX = margin.left + (x(day.date) || 0) + x.bandwidth() / 2;
+                    tooltip.style.left = `${Math.min(barX, rect.width - 260)}px`;
+                    tooltip.style.top = `${margin.top + y(day.totalCost) - 8}px`;
+                })
+                .on('mouseleave', () => {
+                    if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+                });
+        }
+
+        // Legend
+        const legend = svg.append('g').attr('transform', `translate(${margin.left + 4}, ${height - 10})`);
+        const legendModels = allModels.slice(0, 8); // cap legend items
+        legendModels.forEach((modelId, i) => {
+            const lg = legend.append('g').attr('transform', `translate(${i * Math.min(130, w / legendModels.length)}, 0)`);
+            lg.append('rect').attr('width', 8).attr('height', 8).attr('rx', 1).attr('fill', colorScale(modelId) as string);
+            lg.append('text').attr('x', 12).attr('y', 8).attr('class', 'fill-muted-foreground text-[9px]').text(cleanModelId(modelId));
+        });
+
+    }, [daily, width, allModels]);
+
+    if (daily.length === 0) {
+        return (
+            <div className="bg-card border border-border/50 rounded-lg p-8 text-center text-sm text-muted-foreground">
+                No usage data available yet.
+            </div>
+        );
+    }
+
+    return (
+        <div ref={containerRef} className="bg-card border border-border/50 rounded-lg p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-muted-foreground">Daily Cost by Model</h3>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-500 rounded-sm" /> Known</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-500 rounded-sm" style={{ background: 'repeating-linear-gradient(45deg, #3B82F6, #3B82F6 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)' }} /> Estimated</span>
+                </div>
+            </div>
+            <svg ref={svgRef} width={width} height={height} className="overflow-hidden" />
+            <div
+                ref={tooltipRef}
+                className="absolute z-10 bg-popover border border-border rounded-lg shadow-lg p-2.5 pointer-events-none"
+                style={{ display: 'none', maxWidth: 300 }}
+            />
+        </div>
+    );
+}
+
+// --- Usage model table ---
+
+type UsageModelSortKey = 'modelId' | 'callCount' | 'inputTokens' | 'outputTokens' | 'cost' | 'costType' | 'runs';
+
+function UsageModelTable({ models }: { models: UsageModelTotal[] }) {
+    const [sort, toggleSort] = useSort<UsageModelSortKey>('cost', 'desc');
+
+    const sorted = useMemo(() => sortedBy(models, sort.key, sort.direction, (item, key) => {
+        switch (key as UsageModelSortKey) {
+            case 'modelId': return item.modelId;
+            case 'callCount': return item.callCount;
+            case 'inputTokens': return item.inputTokens;
+            case 'outputTokens': return item.outputTokens;
+            case 'cost': return item.cost;
+            case 'costType': return item.costIsEstimated ? 0 : 1;
+            case 'runs': return item.runs;
+            default: return 0;
+        }
+    }), [models, sort]);
+
+    if (models.length === 0) return null;
+
+    return (
+        <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/50">
+                <h3 className="text-sm font-medium text-muted-foreground">Cost by Model</h3>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <SortableHeader label="Model" sortKey="modelId" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="API Calls" sortKey="callCount" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Input Tokens" sortKey="inputTokens" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Output Tokens" sortKey="outputTokens" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Cost" sortKey="cost" current={sort} onSort={toggleSort} align="right" />
+                            <SortableHeader label="Cost Type" sortKey="costType" current={sort} onSort={toggleSort} />
+                            <SortableHeader label="Runs" sortKey="runs" current={sort} onSort={toggleSort} align="right" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map(model => (
+                            <tr key={model.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                <td className="px-4 py-3 text-sm font-mono text-foreground">{cleanModelId(model.modelId)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{model.callCount.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatTokens(model.inputTokens)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{formatTokens(model.outputTokens)}</td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-foreground">{formatCost(model.cost)}</td>
+                                <td className="px-4 py-3">
+                                    {model.costIsEstimated ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400">Estimated</span>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400">Known</span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right tabular-nums text-muted-foreground">{model.runs}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// --- Usage section ---
+
+function UsageSection({ insights }: { insights: UsageInsights | null }) {
+    if (!insights || insights.daily.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-muted-foreground text-sm">
+                    No usage data available yet. Usage tracking is recorded for runs executed after cost instrumentation was added.
+                </p>
+            </div>
+        );
+    }
+
+    const { totals, daily, modelTotals } = insights;
+    const knownPct = totals.totalCost > 0 ? Math.round((totals.knownCost / totals.totalCost) * 100) : 0;
+
+    return (
+        <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <ProgressCard
+                    label="Total Cost"
+                    value={0}
+                    color="blue"
+                    subtitle={formatCost(totals.totalCost)}
+                />
+                <ProgressCard
+                    label="Total API Calls"
+                    value={totals.callCount}
+                    color="green"
+                    subtitle={`across ${daily.length} day${daily.length !== 1 ? 's' : ''}`}
+                />
+                <ProgressCard
+                    label="Total Tokens"
+                    value={0}
+                    color="amber"
+                    subtitle={`${formatTokens(totals.inputTokens)} in / ${formatTokens(totals.outputTokens)} out`}
+                />
+                <div className="bg-card border border-border/50 rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground">Cost Confidence</p>
+                    <p className="text-2xl font-bold mt-1">{knownPct}%<span className="text-base font-normal text-muted-foreground"> known</span></p>
+                    <div className="mt-2">
+                        <div className="bg-muted rounded-full h-1.5 overflow-hidden flex">
+                            <div className="h-full bg-green-500" style={{ width: `${knownPct}%` }} />
+                            <div className="h-full bg-amber-500" style={{ width: `${100 - knownPct}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{formatCost(totals.knownCost)} known + {formatCost(totals.estimatedCost)} est.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Cost chart */}
+            <UsageCostChart daily={daily} />
+
+            {/* Model cost table */}
+            <UsageModelTable models={modelTotals} />
+        </div>
+    );
+}
+
 // --- Queue status banner ---
 
 function formatDuration(seconds: number): string {
@@ -922,9 +1258,11 @@ export default function PlatformStatusDashboard() {
     const { stats } = data;
 
     const timingRunCount = data.timingInsights?.runs.length ?? 0;
+    const usageDayCount = data.usageInsights?.daily.length ?? 0;
 
     const tabs: { id: TabId; label: string; count: number }[] = [
         { id: 'timing', label: 'Timing', count: timingRunCount },
+        { id: 'usage', label: 'Usage', count: usageDayCount },
         { id: 'with-runs', label: 'With Runs', count: filteredWithRuns.length },
         { id: 'no-runs', label: 'No Runs', count: filteredNoRuns.length },
         { id: 'orphaned', label: 'Orphaned', count: filteredOrphaned.length },
@@ -1039,6 +1377,9 @@ export default function PlatformStatusDashboard() {
             {/* Tab content */}
             {activeTab === 'timing' && (
                 <TimingSection insights={data.timingInsights} />
+            )}
+            {activeTab === 'usage' && (
+                <UsageSection insights={data.usageInsights} />
             )}
             {activeTab === 'with-runs' && (
                 <BlueprintTable items={filteredWithRuns} defaultSortKey="lastRun" defaultSortDir="desc" />

@@ -6,7 +6,7 @@ import { getS3Client, getBucketName, getAllBlueprintsSummary, getHomepageSummary
 import { fromSafeTimestamp } from '@/lib/timestampUtils';
 import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
 import { getQueueStatus } from '@/lib/evaluation-queue';
-import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry } from '@/app/components/platform-status/types';
+import type { PlatformStatusResponse, BlueprintStatusItem, SummaryFileItem, ProgressStats, QueueStatus, TimingInsights, TimingRunPoint, ModelSpeedEntry, UsageInsights, DailyUsagePoint, UsageModelTotal } from '@/app/components/platform-status/types';
 
 // Known summary files with metadata
 interface CoreFileInfo {
@@ -246,6 +246,129 @@ function computeTimingInsights(runs: LatestRunSummaryItem[]): TimingInsights | n
   };
 }
 
+// Rough per-1M-input-token pricing for cost estimation when API doesn't report cost
+const ESTIMATED_COST_PER_1M_INPUT: Record<string, number> = {
+  'gpt-4o-mini': 0.15, 'gpt-4.1-mini': 0.40, 'gpt-4.1-nano': 0.10,
+  'gpt-4.1': 2.00, 'gpt-4o': 2.50, 'gpt-4-turbo': 10.00,
+  'claude-3-5-haiku': 0.80, 'claude-3-5-sonnet': 3.00, 'claude-3-haiku': 0.25,
+  'claude-3-sonnet': 3.00, 'claude-3-opus': 15.00,
+  'gemini-2.0-flash': 0.10, 'gemini-2.5-flash': 0.15, 'gemini-1.5-flash': 0.075,
+  'gemini-1.5-pro': 1.25, 'gemini-2.5-pro': 1.25,
+  'gemma-3': 0.10, 'llama-3': 0.20, 'mistral': 0.25,
+  'deepseek-chat': 0.14, 'deepseek-r1': 0.55,
+};
+const DEFAULT_COST_PER_1M_INPUT = 1.00;
+const OUTPUT_TO_INPUT_COST_RATIO = 3; // output tokens typically ~3x input cost
+
+function estimateModelCost(modelId: string, inputTokens: number, outputTokens: number): number {
+  // Find best matching key (model IDs often have prefixes like "openrouter:")
+  const cleanId = modelId.replace(/^openrouter:/, '').replace(/^[^/]+\//, '');
+  let rate = DEFAULT_COST_PER_1M_INPUT;
+  for (const [key, val] of Object.entries(ESTIMATED_COST_PER_1M_INPUT)) {
+    if (cleanId.includes(key) || key.includes(cleanId)) {
+      rate = val;
+      break;
+    }
+  }
+  const inputCost = (inputTokens / 1_000_000) * rate;
+  const outputCost = (outputTokens / 1_000_000) * rate * OUTPUT_TO_INPUT_COST_RATIO;
+  return inputCost + outputCost;
+}
+
+function computeUsageInsights(runs: LatestRunSummaryItem[]): UsageInsights | null {
+  const usageRuns = runs.filter(r => (r as any).usageSummary);
+  if (usageRuns.length === 0) return null;
+
+  // Group by day
+  const dailyMap = new Map<string, Map<string, { inputTokens: number; outputTokens: number; cost: number; costIsEstimated: boolean; callCount: number }>>();
+  // Aggregate model totals
+  const modelTotalMap = new Map<string, { inputTokens: number; outputTokens: number; cost: number; costIsEstimated: boolean; callCount: number; runs: number }>();
+
+  let totalKnownCost = 0;
+  let totalEstimatedCost = 0;
+  let totalCallCount = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+
+  for (const run of usageRuns) {
+    const usage = (run as any).usageSummary as { byModel: { modelId: string; callCount: number; inputTokens: number; outputTokens: number; totalCost?: number }[]; totals: any };
+    const ts = fromSafeTimestamp(run.timestamp);
+    const date = new Date(ts).toISOString().slice(0, 10);
+
+    if (!dailyMap.has(date)) dailyMap.set(date, new Map());
+    const dayModels = dailyMap.get(date)!;
+
+    // Track which models appeared in this run (for run count)
+    const modelsInRun = new Set<string>();
+
+    for (const m of usage.byModel) {
+      const hasKnownCost = m.totalCost !== undefined && m.totalCost > 0;
+      const cost = hasKnownCost ? m.totalCost! : estimateModelCost(m.modelId, m.inputTokens, m.outputTokens);
+      const costIsEstimated = !hasKnownCost;
+
+      // Daily
+      const existing = dayModels.get(m.modelId) || { inputTokens: 0, outputTokens: 0, cost: 0, costIsEstimated: true, callCount: 0 };
+      existing.inputTokens += m.inputTokens;
+      existing.outputTokens += m.outputTokens;
+      existing.cost += cost;
+      if (!costIsEstimated) existing.costIsEstimated = false; // if any entry is known, mark as known
+      existing.callCount += m.callCount;
+      dayModels.set(m.modelId, existing);
+
+      // Model totals
+      const mt = modelTotalMap.get(m.modelId) || { inputTokens: 0, outputTokens: 0, cost: 0, costIsEstimated: true, callCount: 0, runs: 0 };
+      mt.inputTokens += m.inputTokens;
+      mt.outputTokens += m.outputTokens;
+      mt.cost += cost;
+      if (!costIsEstimated) mt.costIsEstimated = false;
+      mt.callCount += m.callCount;
+      modelsInRun.add(m.modelId);
+      modelTotalMap.set(m.modelId, mt);
+
+      // Grand totals
+      if (costIsEstimated) totalEstimatedCost += cost;
+      else totalKnownCost += cost;
+      totalCallCount += m.callCount;
+      totalInputTokens += m.inputTokens;
+      totalOutputTokens += m.outputTokens;
+    }
+
+    for (const mid of modelsInRun) {
+      modelTotalMap.get(mid)!.runs++;
+    }
+  }
+
+  // Build daily array sorted by date
+  const daily: DailyUsagePoint[] = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, models]) => {
+      const byModel = Array.from(models.entries()).map(([modelId, data]) => ({ modelId, ...data }));
+      return {
+        date,
+        byModel,
+        totalCost: byModel.reduce((s, m) => s + m.cost, 0),
+        totalTokens: byModel.reduce((s, m) => s + m.inputTokens + m.outputTokens, 0),
+      };
+    });
+
+  const modelTotals: UsageModelTotal[] = Array.from(modelTotalMap.entries())
+    .map(([modelId, data]) => ({ modelId, ...data }))
+    .sort((a, b) => b.cost - a.cost);
+
+  return {
+    daily,
+    modelTotals,
+    totals: {
+      callCount: totalCallCount,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      knownCost: totalKnownCost,
+      estimatedCost: totalEstimatedCost,
+      totalCost: totalKnownCost + totalEstimatedCost,
+    },
+  };
+}
+
 export async function GET() {
   const errors: string[] = [];
   const now = new Date();
@@ -464,10 +587,12 @@ export async function GET() {
 
   const queue = getQueueStatus() as QueueStatus;
 
-  // Compute timing insights from latest runs
+  // Compute timing and usage insights from latest runs
   let timingInsights: TimingInsights | null = null;
+  let usageInsights: UsageInsights | null = null;
   if (latestRunsResult.status === 'fulfilled' && latestRunsResult.value) {
     timingInsights = computeTimingInsights(latestRunsResult.value.runs);
+    usageInsights = computeUsageInsights(latestRunsResult.value.runs);
   } else if (latestRunsResult.status === 'rejected') {
     errors.push(`Latest runs summary fetch failed: ${latestRunsResult.reason?.message || 'Unknown'}`);
   }
@@ -478,6 +603,7 @@ export async function GET() {
     stats,
     queue,
     timingInsights,
+    usageInsights,
     generatedAt: now.toISOString(),
     errors,
   };
