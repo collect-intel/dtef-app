@@ -14,6 +14,7 @@ import {
     DemographicAggregation,
     AggregatedModelResult,
 } from '@/cli/services/demographicAggregationService';
+import { BASELINE_MODEL_IDS } from '@/cli/services/baselineGeneratorService';
 
 /**
  * DTEF summary data structure stored in S3.
@@ -25,6 +26,13 @@ export interface DTEFSummary {
     surveyId: string;
     /** Number of results included */
     resultCount: number;
+    /** Reference baseline scores for comparison */
+    baselines?: {
+        /** Population marginal baseline score (ignores demographics) */
+        populationMarginal?: number;
+        /** Uniform baseline score (equal probability for all options) */
+        uniform?: number;
+    };
     /** Top models by overall demographic prediction accuracy */
     topModels: {
         modelId: string;
@@ -98,10 +106,21 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
         }
         : undefined;
 
+    // Extract baseline scores from model results (if baseline results were included)
+    const baselines: DTEFSummary['baselines'] = {};
+    for (const model of aggregation.modelResults) {
+        if (model.modelId === BASELINE_MODEL_IDS.POPULATION_MARGINAL) {
+            baselines.populationMarginal = model.overallScore;
+        } else if (model.modelId === BASELINE_MODEL_IDS.UNIFORM) {
+            baselines.uniform = model.overallScore;
+        }
+    }
+
     return {
         generatedAt: new Date().toISOString(),
         surveyId: aggregation.surveyId,
         resultCount: dtefResults.length,
+        baselines: (baselines.populationMarginal != null || baselines.uniform != null) ? baselines : undefined,
         topModels,
         fairnessConcerns,
         aggregation,

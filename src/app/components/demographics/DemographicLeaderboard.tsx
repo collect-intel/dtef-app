@@ -77,12 +77,21 @@ interface FullContextAnalysis {
     contextLevelsFound: number[];
 }
 
+interface BaselineScores {
+    /** Population marginal baseline: predicts overall population distribution ignoring demographics */
+    populationMarginal?: number;
+    /** Uniform baseline: predicts equal probability for all options */
+    uniform?: number;
+}
+
 interface DemographicsData {
     status?: string;
     message?: string;
     generatedAt?: string;
     surveyId?: string;
     resultCount?: number;
+    /** Reference baseline scores for comparison */
+    baselines?: BaselineScores;
     topModels?: Array<{
         modelId: string;
         modelName: string;
@@ -191,13 +200,32 @@ function SortIndicator({ active, direction }: { active: boolean; direction: Sort
 
 // --- Shared UI Components ---
 
-function ScoreBar({ score, maxScore = 1 }: { score: number; maxScore?: number }) {
+function ScoreBar({ score, maxScore = 1, baselines }: { score: number; maxScore?: number; baselines?: BaselineScores }) {
     const pct = Math.min(100, (score / maxScore) * 100);
-    const color = score >= 0.8 ? 'bg-green-500' : score >= 0.6 ? 'bg-yellow-500' : 'bg-red-500';
+    const marginalScore = baselines?.populationMarginal;
+    // Color relative to baselines when available: green only if above population marginal
+    const color = marginalScore != null
+        ? (score >= marginalScore ? 'bg-green-500' : score >= marginalScore * 0.9 ? 'bg-yellow-500' : 'bg-red-500')
+        : (score >= 0.8 ? 'bg-green-500' : score >= 0.6 ? 'bg-yellow-500' : 'bg-red-500');
     return (
         <div className="flex items-center gap-2 w-full">
-            <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+            <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden relative">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                {/* Baseline reference markers */}
+                {baselines?.populationMarginal != null && (
+                    <div
+                        className="absolute top-0 h-full w-0.5 bg-foreground/40"
+                        style={{ left: `${Math.min(100, (baselines.populationMarginal / maxScore) * 100)}%` }}
+                        title={`Population marginal: ${(baselines.populationMarginal * 100).toFixed(1)}%`}
+                    />
+                )}
+                {baselines?.uniform != null && (
+                    <div
+                        className="absolute top-0 h-full w-0.5 bg-foreground/20 border-l border-dashed border-foreground/20"
+                        style={{ left: `${Math.min(100, (baselines.uniform / maxScore) * 100)}%` }}
+                        title={`Uniform baseline: ${(baselines.uniform * 100).toFixed(1)}%`}
+                    />
+                )}
             </div>
             <span className="text-xs text-muted-foreground w-12 text-right">
                 {(score * 100).toFixed(1)}%
@@ -1300,6 +1328,68 @@ function FairnessAnalysisTable({
     );
 }
 
+// --- Methodology Section ---
+
+function MethodologySection({ baselines }: { baselines?: BaselineScores }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <section className="mt-4">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mx-auto"
+            >
+                <span className={`text-xs transition-transform ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+                About This Evaluation
+            </button>
+            {isOpen && (
+                <div className="mt-4 bg-card border border-border/50 rounded-lg p-6 text-sm text-muted-foreground space-y-4 max-w-3xl mx-auto">
+                    <div>
+                        <h4 className="font-medium text-foreground mb-1">What is being measured?</h4>
+                        <p>
+                            Models are given a demographic group description and a survey question, then asked to predict
+                            the percentage distribution of responses. We compare their predictions against actual survey
+                            data from Global Dialogues using Jensen-Shannon Divergence (JSD) similarity, where 1.0 = perfect match.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="font-medium text-foreground mb-1">Baseline comparisons</h4>
+                        <p>
+                            Two reference baselines provide context for model scores:
+                        </p>
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                            <li>
+                                <strong>Population marginal</strong>{baselines?.populationMarginal != null && ` (${(baselines.populationMarginal * 100).toFixed(1)}%)`}: predicts the overall population
+                                distribution regardless of demographics. Models should beat this to demonstrate demographic sensitivity.
+                            </li>
+                            <li>
+                                <strong>Uniform</strong>{baselines?.uniform != null && ` (${(baselines.uniform * 100).toFixed(1)}%)`}: predicts equal probability for all options.
+                                The gap between uniform and population marginal reflects question difficulty.
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-medium text-foreground mb-1">Fairness analysis</h4>
+                        <p>
+                            Fairness gaps measure how much a model&apos;s accuracy varies across segments within
+                            the same demographic category (e.g., across age groups). Larger gaps indicate
+                            the model predicts some groups better than others.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="font-medium text-foreground mb-1">Limitations</h4>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>Sample sizes vary across segments — smaller samples have noisier ground truth distributions.</li>
+                            <li>Survey data comes from specific populations and may not generalize globally.</li>
+                            <li>JSD similarity can be high even when predictions miss demographic-specific shifts from the population average.</li>
+                        </ul>
+                    </div>
+                </div>
+            )}
+        </section>
+    );
+}
+
 // --- Main component ---
 
 type LeaderboardSortKey = 'score' | 'model' | 'consistency' | 'segments';
@@ -1333,6 +1423,7 @@ export default function DemographicLeaderboard() {
 
     const modelResults = data?.aggregation?.modelResults || [];
     const disparities = data?.aggregation?.disparities || [];
+    const baselines = data?.baselines;
 
     // Build a runs lookup from contextAnalysis (fallback for data generated before pipeline update)
     const runsLookup = useMemo(() => {
@@ -1414,6 +1505,7 @@ export default function DemographicLeaderboard() {
                 setLbCategory={setLbCategory}
                 showAll={showAllLeaderboard}
                 setShowAll={setShowAllLeaderboard}
+                baselines={baselines}
             />
 
             {modelResults.length > 0 && <SegmentExplorer modelResults={modelResults} runsLookup={runsLookup} />}
@@ -1428,6 +1520,8 @@ export default function DemographicLeaderboard() {
             {disparities.length > 0 && (
                 <FairnessAnalysisTable disparities={disparities} modelResults={modelResults} runsLookup={runsLookup} />
             )}
+
+            <MethodologySection baselines={baselines} />
         </div>
     );
 }
@@ -1456,6 +1550,7 @@ function LeaderboardSection({
     setLbCategory: (cat: string) => void;
     showAll: boolean;
     setShowAll: (v: boolean) => void;
+    baselines?: BaselineScores;
 }) {
     // Derive available segment types from model results
     const segmentTypes = useMemo(() => {
@@ -1589,7 +1684,7 @@ function LeaderboardSection({
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3"><ScoreBar score={model.score} /></td>
+                                                <td className="px-4 py-3"><ScoreBar score={model.score} baselines={baselines} /></td>
                                                 <td className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">
                                                     ±{(model.segmentStdDev * 100).toFixed(1)}%
                                                 </td>
@@ -1614,8 +1709,24 @@ function LeaderboardSection({
                         </table>
                     </div>
                     <ShowAllToggle totalCount={rankedModels.length} isShowingAll={showAll} onToggle={() => setShowAll(!showAll)} />
+                    {baselines && (baselines.populationMarginal != null || baselines.uniform != null) && (
+                        <div className="flex items-center justify-center gap-6 mt-3 text-xs text-muted-foreground">
+                            {baselines.populationMarginal != null && (
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="inline-block w-3 h-0.5 bg-foreground/40" />
+                                    Pop. marginal: {(baselines.populationMarginal * 100).toFixed(1)}%
+                                </span>
+                            )}
+                            {baselines.uniform != null && (
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="inline-block w-3 h-0.5 bg-foreground/20 border-t border-dashed border-foreground/20" />
+                                    Uniform: {(baselines.uniform * 100).toFixed(1)}%
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-3 text-center">
-                        Score = average coverage extent{lbCategory !== 'overall' ? ` across ${SEGMENT_TYPE_LABELS[lbCategory]} segments` : ' across all demographic segments'}.
+                        Score = JSD similarity{lbCategory !== 'overall' ? ` across ${SEGMENT_TYPE_LABELS[lbCategory]} segments` : ' across all demographic segments'}.
                         Consistency = standard deviation (lower is better). Click a row to see per-segment breakdown.
                     </p>
                 </>
