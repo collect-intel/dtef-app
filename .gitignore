@@ -8,6 +8,7 @@
 !.yarn/versions
 
 .results
+/reports
 .vscode
 
 /src/data/*
