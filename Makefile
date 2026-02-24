@@ -185,10 +185,13 @@ dtef-upload-baselines-all: ## Upload all baseline results to S3
 	@for dir in output/baselines/*/; do \
 		test -d "$$dir" || continue; \
 		round=$$(basename $$dir); \
-		echo "=== Uploading baselines for $$round ==="; \
-		aws s3 sync $$dir s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION); \
-		echo ""; \
+		count=$$(ls "$$dir" | wc -l | xargs); \
+		echo "=== Uploading $$count baselines for $$round ==="; \
+		aws s3 cp "$$dir" s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --recursive --only-show-errors; \
+		echo "  ✓ $$round done ($$count files)"; \
 	done
+	@echo ""
+	@echo "All baselines uploaded. Run 'make dtef-rebuild' to update the demographics page."
 
 dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-publish ROUND=GD4" && exit 1)
@@ -203,11 +206,10 @@ dtef-upload-baselines: ## Upload baseline results to S3 (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-upload-baselines ROUND=GD4" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	@test -d output/baselines/$(ROUND_LC) || (echo "Baselines not found — run 'make dtef-baselines ROUND=$(ROUND)' first" && exit 1)
-	@echo "Uploading baselines to S3..."
-	aws s3 sync output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --dryrun
-	@echo ""
-	@echo "Above is a dry run. To actually upload, run:"
-	@echo "  aws s3 sync output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION)"
+	$(eval COUNT := $(shell ls output/baselines/$(ROUND_LC) | wc -l | xargs))
+	@echo "Uploading $(COUNT) baselines for $(ROUND_LC) to S3..."
+	aws s3 cp output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --recursive --only-show-errors
+	@echo "✓ Done. Run 'make dtef-rebuild' to update the demographics page."
 
 dtef-stats: ## Run statistical analysis report
 	pnpm analyze:stats
