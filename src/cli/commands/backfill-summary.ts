@@ -9,6 +9,8 @@ import {
     getCoreResult,
     getConfigSummary,
     saveHomepageSummary,
+    getHomepageSummary,
+    saveJsonFile,
     updateSummaryDataWithNewRun,
     HomepageSummaryFileContent,
     saveConfigSummary,
@@ -35,7 +37,7 @@ import { ModelRunPerformance, ModelSummary } from '@/types/shared';
 import { parseModelIdForDisplay, getModelDisplayLabel } from '@/app/utils/modelIdUtils';
 import { normalizeTag } from '@/app/utils/tagUtils';
 import { buildDTEFSummary, buildAllDTEFSummaries, DTEFSummary } from '@/cli/utils/dtefSummaryUtils';
-import { saveJsonFile } from '@/lib/storageService';
+import { BASELINE_MODEL_IDS } from '@/cli/services/baselineGeneratorService';
 
 async function actionBackfillSummary(options: { verbose?: boolean; configId?: string; dryRun?: boolean }) {
     const { logger } = getConfig();
@@ -1122,9 +1124,33 @@ async function rebuildDTEFSummary(options: { dryRun?: boolean }): Promise<void> 
         }
 
         // Pick the most complete single-survey summary as the combined one
-        // (the combined summary is mainly used for baselines + top models)
         const largest = allSurveyResults.reduce((a, b) => a.resultCount > b.resultCount ? a : b);
+
+        // Compute combined baselines across all surveys (weighted average by segment count)
+        const combinedBaselines: DTEFSummary['baselines'] = {};
+        let pmTotal = 0, pmCount = 0, uTotal = 0, uCount = 0;
+        for (const summary of allSurveyResults) {
+            if (summary.baselines?.populationMarginal != null) {
+                const segs = summary.aggregation?.modelResults?.find(
+                    m => m.modelId === BASELINE_MODEL_IDS.POPULATION_MARGINAL
+                )?.segmentCount || 1;
+                pmTotal += summary.baselines.populationMarginal * segs;
+                pmCount += segs;
+            }
+            if (summary.baselines?.uniform != null) {
+                const segs = summary.aggregation?.modelResults?.find(
+                    m => m.modelId === BASELINE_MODEL_IDS.UNIFORM
+                )?.segmentCount || 1;
+                uTotal += summary.baselines.uniform * segs;
+                uCount += segs;
+            }
+        }
+        if (pmCount > 0) combinedBaselines.populationMarginal = pmTotal / pmCount;
+        if (uCount > 0) combinedBaselines.uniform = uTotal / uCount;
+
+        // Exclude baseline models from the leaderboard topModels
         const combinedTopModels = Array.from(allModelScores.entries())
+            .filter(([modelId]) => !modelId.startsWith('baseline:'))
             .map(([modelId, data]) => ({
                 modelId,
                 modelName: modelId.replace(/^openrouter:/, ''),
@@ -1140,10 +1166,26 @@ async function rebuildDTEFSummary(options: { dryRun?: boolean }): Promise<void> 
             generatedAt: new Date().toISOString(),
             resultCount: allSurveyResults.reduce((sum, s) => sum + s.resultCount, 0),
             topModels: combinedTopModels,
+            baselines: combinedBaselines,
         };
 
         await saveJsonFile('live/aggregates/dtef_summary.json', combinedSummary);
         console.log('[dtef-rebuild] Saved combined dtef_summary.json');
+
+        // Also update homepage_summary.json with the DTEF summary
+        try {
+            const homepageSummary = await getHomepageSummary();
+            if (homepageSummary) {
+                homepageSummary.dtefSummary = combinedSummary;
+                homepageSummary.lastUpdated = new Date().toISOString();
+                await saveHomepageSummary(homepageSummary);
+                console.log('[dtef-rebuild] Updated homepage_summary.json with DTEF data');
+            } else {
+                console.log('[dtef-rebuild] No homepage_summary.json found — skipping homepage update');
+            }
+        } catch (err: any) {
+            console.error(`[dtef-rebuild] Failed to update homepage summary: ${err.message}`);
+        }
     } else if (options.dryRun) {
         console.log(`[dtef-rebuild] [DRY RUN] Would save ${allSurveyResults.length} per-survey summaries + 1 combined summary.`);
     }

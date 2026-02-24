@@ -23,6 +23,8 @@ import {
     BASELINE_MODEL_IDS,
     BaselineType,
 } from '../services/baselineGeneratorService';
+import { saveResult } from '@/lib/storageService';
+import { toSafeTimestamp } from '@/lib/timestampUtils';
 
 export const dtefCommand = new Command('dtef')
     .description('DTEF: Generate and manage demographic evaluation blueprints');
@@ -568,6 +570,7 @@ dtefCommand
     .requiredOption('-i, --input <path>', 'Path to DTEF survey data JSON file')
     .option('-o, --output <dir>', 'Output directory for generated results', './output/dtef-baselines')
     .option('-t, --type <baseline>', 'Baseline type: population-marginal or uniform', 'population-marginal')
+    .option('--upload', 'Save results directly to S3 using the standard result storage path')
     .option('--force', 'Overwrite existing baseline files without prompting')
     .option('--dry-run', 'Show summary without writing files')
     .action(async (options) => {
@@ -622,6 +625,28 @@ dtefCommand
             return;
         }
 
+        // --upload: save directly to S3 using the standard result directory structure
+        // so dtef-rebuild can discover them via listConfigIds/listRunsForConfig
+        if (options.upload) {
+            let uploaded = 0;
+            let failed = 0;
+            for (const result of results) {
+                const safeTs = toSafeTimestamp(result.timestamp);
+                const fileName = `${result.runLabel}_${safeTs}_comparison.json`;
+                const saved = await saveResult(result.configId, fileName, result);
+                if (saved) {
+                    uploaded++;
+                } else {
+                    console.error(chalk.red(`  Failed to save: ${result.configId}`));
+                    failed++;
+                }
+            }
+            console.log(chalk.green(`\nDone! ${uploaded} result(s) saved to storage.`));
+            if (failed > 0) console.log(chalk.red(`${failed} failed.`));
+            console.log(chalk.gray('Run "make dtef-rebuild" to update the demographics page.'));
+            return;
+        }
+
         const outputDir = path.resolve(options.output);
         fs.mkdirSync(outputDir, { recursive: true });
 
@@ -649,7 +674,6 @@ dtefCommand
         }
 
         let written = 0;
-        let skipped = 0;
         for (const result of results) {
             const filename = `${result.configId}--${result.runLabel}.json`;
             const filepath = path.join(outputDir, filename);
@@ -659,5 +683,5 @@ dtefCommand
         }
 
         console.log(chalk.green(`\nDone! ${written} result(s) written to ${outputDir}`));
-        console.log(chalk.gray('Upload to S3 with: aws s3 sync <dir> s3://<bucket>/results/'));
+        console.log(chalk.gray('Use --upload to save directly to S3, or upload manually.'));
     });

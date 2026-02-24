@@ -71,8 +71,9 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
 
     const aggregation = DemographicAggregationService.aggregate(dtefResults);
 
-    // Top 10 models by score
+    // Top 10 models by score (exclude baseline pseudo-models from leaderboard)
     const topModels = aggregation.modelResults
+        .filter(m => !m.modelId.startsWith('baseline:'))
         .slice(0, 10)
         .map(m => ({
             modelId: m.modelId,
@@ -81,9 +82,9 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
             segmentCount: m.segmentCount,
         }));
 
-    // Fairness concerns: per-category entries with >10% gap, sorted by gap descending
+    // Fairness concerns: per-category entries with >10% gap (exclude baselines)
     const fairnessConcerns = aggregation.disparities
-        .filter(d => d.absoluteGap > 0.10)
+        .filter(d => d.absoluteGap > 0.10 && !d.modelId.startsWith('baseline:'))
         .slice(0, 10)
         .map(d => ({
             modelId: d.modelId,

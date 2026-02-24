@@ -76,7 +76,9 @@ function generateBaselineResult(
         : BASELINE_MODEL_IDS.UNIFORM;
 
     const ctxSuffix = contextCount > 0 ? `-c${contextCount}` : '';
-    const configId = `dtef-${surveyData.surveyId}-${segment.id}${ctxSuffix}`;
+    // Include baseline type in configId so population-marginal and uniform
+    // don't collide — the rebuild picks only the latest run per configId
+    const configId = `dtef-${surveyData.surveyId}-${segment.id}${ctxSuffix}--${baselineType}`;
     const timestamp = new Date().toISOString();
 
     // Build prompts, scores, and responses for each question

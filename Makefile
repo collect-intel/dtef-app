@@ -124,19 +124,17 @@ s3-size: ## Show total S3 bucket size
 # === Adding a new survey round ===
 #   1. make dtef-import ROUND=GD8             (import GD round → output/gd8.json)
 #   2. make dtef-generate ROUND=GD8           (generate blueprints)
-#   3. make dtef-baselines ROUND=GD8          (generate baseline predictors)
+#   3. make dtef-baselines ROUND=GD8          (generate + upload baseline predictors to S3)
 #   4. make dtef-publish ROUND=GD8            (publish blueprints to dtef-configs repo)
-#   5. make dtef-upload-baselines ROUND=GD8   (upload baselines to S3)
-#   6. make rerun-evals                       (trigger model evaluations)
-#   7. make streaming-summaries               (rebuild summaries after evals complete)
-#   8. make dtef-rebuild                      (rebuild DTEF summary with baselines)
-#   9. make dtef-stats                        (run statistical analysis report)
+#   5. make rerun-evals                       (trigger model evaluations)
+#   6. make streaming-summaries               (rebuild summaries after evals complete)
+#   7. make dtef-rebuild                      (rebuild DTEF summary with baselines)
+#   8. make dtef-stats                        (run statistical analysis report)
 #   Shortcut: make dtef-pipeline ROUND=GD8    (runs steps 1-3 locally)
 #
 # === First-time baseline initialization (all rounds) ===
-#   1. make dtef-baselines-all                (generate baselines for all imported rounds)
-#   2. make dtef-upload-baselines-all         (upload all baselines to S3)
-#   3. make dtef-rebuild                      (rebuild DTEF summary — baselines appear on demographics page)
+#   1. make dtef-baselines-all                (generate + upload baselines for all rounds)
+#   2. make dtef-rebuild                      (rebuild DTEF summary — baselines appear on demographics page)
 #
 # === After model evals complete ===
 #   1. make streaming-summaries               (save per-config summaries)
@@ -164,33 +162,22 @@ dtef-generate: ## Generate blueprints for a round (ROUND=GD4, CTX=5 for context 
 		pnpm cli dtef generate -i $(INPUT) -o output/dtef-blueprints-ctx/$(ROUND_LC) --context-questions $(CTX); \
 	fi
 
-dtef-baselines: ## Generate baseline predictor results for a round (ROUND=GD4)
+dtef-baselines: ## Generate and upload baseline results for a round (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-baselines ROUND=GD4" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	$(eval INPUT := output/$(ROUND_LC).json)
 	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
-	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type population-marginal --force
-	pnpm cli dtef generate-baseline -i $(INPUT) -o output/baselines/$(ROUND_LC) --type uniform --force
+	pnpm cli dtef generate-baseline -i $(INPUT) --type population-marginal --upload
+	pnpm cli dtef generate-baseline -i $(INPUT) --type uniform --upload
 
-dtef-baselines-all: ## Generate baselines for all imported survey rounds
+dtef-baselines-all: ## Generate and upload baselines for all imported survey rounds
 	@for f in output/gd*.json; do \
 		round=$$(basename $$f .json); \
 		echo "=== Generating baselines for $$round ==="; \
-		pnpm cli dtef generate-baseline -i $$f -o output/baselines/$$round --type population-marginal --force; \
-		pnpm cli dtef generate-baseline -i $$f -o output/baselines/$$round --type uniform --force; \
+		pnpm cli dtef generate-baseline -i $$f --type population-marginal --upload; \
+		pnpm cli dtef generate-baseline -i $$f --type uniform --upload; \
 		echo ""; \
 	done
-
-dtef-upload-baselines-all: ## Upload all baseline results to S3
-	@for dir in output/baselines/*/; do \
-		test -d "$$dir" || continue; \
-		round=$$(basename $$dir); \
-		count=$$(ls "$$dir" | wc -l | xargs); \
-		echo "=== Uploading $$count baselines for $$round ==="; \
-		aws s3 cp "$$dir" s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --recursive --only-show-errors; \
-		echo "  ✓ $$round done ($$count files)"; \
-	done
-	@echo ""
 	@echo "All baselines uploaded. Run 'make dtef-rebuild' to update the demographics page."
 
 dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
@@ -202,14 +189,8 @@ dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
 	@echo "Above is a dry run. To actually publish, run:"
 	@echo "  pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/configs --tag $(ROUND_LC)"
 
-dtef-upload-baselines: ## Upload baseline results to S3 (ROUND=GD4)
-	@test -n "$(ROUND)" || (echo "Usage: make dtef-upload-baselines ROUND=GD4" && exit 1)
-	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
-	@test -d output/baselines/$(ROUND_LC) || (echo "Baselines not found — run 'make dtef-baselines ROUND=$(ROUND)' first" && exit 1)
-	$(eval COUNT := $(shell ls output/baselines/$(ROUND_LC) | wc -l | xargs))
-	@echo "Uploading $(COUNT) baselines for $(ROUND_LC) to S3..."
-	aws s3 cp output/baselines/$(ROUND_LC)/ s3://$(S3_BUCKET)/live/blueprints/ --region $(S3_REGION) --recursive --only-show-errors
-	@echo "✓ Done. Run 'make dtef-rebuild' to update the demographics page."
+dtef-upload-baselines: ## (deprecated) Baselines now upload automatically via --upload flag
+	@echo "dtef-baselines now uploads directly. Just run: make dtef-baselines ROUND=GD4"
 
 dtef-stats: ## Run statistical analysis report
 	pnpm analyze:stats
@@ -229,10 +210,9 @@ dtef-pipeline: ## Run full pipeline for a round: import → generate → baselin
 	@echo "=== Step 3/3: Generate baselines ==="
 	$(MAKE) dtef-baselines ROUND=$(ROUND)
 	@echo ""
-	@echo "=== Pipeline complete ==="
+	@echo "=== Pipeline complete (baselines already uploaded to S3) ==="
 	@echo "Next steps:"
 	@echo "  make dtef-publish ROUND=$(ROUND)           # publish blueprints to dtef-configs"
-	@echo "  make dtef-upload-baselines ROUND=$(ROUND)  # upload baselines to S3"
 	@echo "  make rerun-evals                           # trigger model evaluations"
 
 dtef-status: ## Show local DTEF data: imported rounds, blueprints, baselines
