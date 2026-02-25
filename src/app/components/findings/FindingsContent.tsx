@@ -196,7 +196,7 @@ export default function FindingsContent() {
 
                     <div className="space-y-2.5 max-w-3xl">
                         <ScoreBar score={STATS.baselines.populationMarginal} label="Population Marginal" color="bg-amber-500/80" />
-                        <ScoreBar score={STATS.baselines.shuffled} label="Shuffled Null" color="bg-slate-400/60" />
+                        <ScoreBar score={STATS.baselines.shuffled} label="Random Segment" color="bg-slate-400/60" />
                         <ScoreBar score={STATS.bestModel.score} label={STATS.bestModel.name} color="bg-primary/80" showBaselines />
                         <ScoreBar score={STATS.avgModelScore} label="Average Model" color="bg-primary/50" showBaselines />
                         <ScoreBar score={STATS.baselines.uniform} label="Uniform (Random)" color="bg-red-400/50" />
@@ -218,7 +218,9 @@ export default function FindingsContent() {
                         </div>
 
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            However, all models significantly outperform the <strong>uniform baseline</strong> ({STATS.baselines.uniform.toFixed(3)}),
+                            The <strong>random segment</strong> baseline ({STATS.baselines.shuffled.toFixed(3)}) shuffles which demographic group&rsquo;s
+                            answers go with which question &mdash; it measures how well you&rsquo;d score if group identity were irrelevant.
+                            All models significantly outperform the <strong>uniform baseline</strong> ({STATS.baselines.uniform.toFixed(3)}),
                             which guesses equal probability for every option. Models have learned <em>what people in general think</em>,
                             but not yet <em>how specific demographics differ from the average</em>.
                         </p>
