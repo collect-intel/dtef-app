@@ -3,7 +3,7 @@ import FindingsContent from '@/app/components/findings/FindingsContent';
 
 export const metadata: Metadata = {
     title: 'Research Findings | DTEF',
-    description: 'Key findings from the Digital Twin Evaluation Framework: how well can AI models predict demographic-specific survey responses?',
+    description: 'Preliminary findings from the Digital Twin Evaluation Framework: exploring how well AI models predict demographic-specific survey responses.',
 };
 
 export const revalidate = 3600;
@@ -19,8 +19,8 @@ export default function FindingsPage() {
                             Research Findings
                         </h1>
                         <p className="text-muted-foreground max-w-3xl mx-auto text-base sm:text-lg">
-                            Can AI models serve as &ldquo;digital twins&rdquo; that faithfully represent how different communities think?
-                            Here&rsquo;s what we&rsquo;ve found so far.
+                            Can AI models serve as &ldquo;digital twins&rdquo; that approximate how different communities think?
+                            Here are some preliminary observations from our ongoing research.
                         </p>
                     </header>
 

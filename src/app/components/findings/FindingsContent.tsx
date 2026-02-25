@@ -161,19 +161,19 @@ export default function FindingsContent() {
                 <div className="text-sm text-foreground/80 leading-relaxed space-y-3 max-w-4xl">
                     <p>
                         Imagine asking an AI: <em>&ldquo;How would 18&ndash;25 year olds in Brazil respond to this policy question?&rdquo;</em> If the model could reliably predict their collective response distribution, it would function
-                        as a <strong>digital twin</strong> of that demographic group &mdash; a computational stand-in that faithfully mirrors
-                        the views of a real community.
+                        as a <strong>digital twin</strong> of that demographic group &mdash; a computational proxy that
+                        approximates the views of a real community.
                     </p>
                     <p>
-                        This capability could transform how we understand public opinion, design inclusive policies, and build
-                        AI systems that genuinely represent diverse perspectives. But first, we need to know: <strong>can today&rsquo;s
+                        If this were possible, it could change how we understand public opinion, design inclusive policies, and think about
+                        AI systems that claim to represent diverse perspectives. But an open question remains: <strong>can today&rsquo;s
                         AI models actually do this?</strong>
                     </p>
                     <p>
-                        The Digital Twin Evaluation Framework (DTEF) answers that question. Using real survey data from
+                        The Digital Twin Evaluation Framework (DTEF) is an early-stage research project that attempts to answer that question. Using real survey data from
                         the <a href="https://globaldialogues.ai/" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors underline">Global Dialogues</a> project &mdash; {STATS.surveyRounds} rounds
                         of surveys covering topics from AI governance to social values &mdash; we test {STATS.modelCount} AI models on their
-                        ability to predict how specific demographic groups actually responded.
+                        ability to predict how specific demographic groups actually responded. These are preliminary findings from an ongoing investigation.
                     </p>
                 </div>
             </section>
@@ -190,8 +190,8 @@ export default function FindingsContent() {
             <FindingSection number={1} title="The Baseline Challenge">
                 <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-5">
                     <p className="text-sm text-foreground/80 leading-relaxed max-w-4xl">
-                        Before evaluating AI models, we established three &ldquo;dumb&rdquo; baselines that require no AI at all.
-                        If models can&rsquo;t beat these, they aren&rsquo;t adding real value for demographic prediction.
+                        Before evaluating AI models, we established three simple baselines that require no AI at all.
+                        If models can&rsquo;t beat these, it suggests they may not yet be adding value for demographic-specific prediction.
                     </p>
 
                     <div className="space-y-2.5 max-w-3xl">
@@ -227,13 +227,14 @@ export default function FindingsContent() {
             </FindingSection>
 
             {/* ── Finding 2: The Leaderboard Is Real ────────────────────────── */}
-            <FindingSection number={2} title="The Leaderboard Is Real">
+            <FindingSection number={2} title="Model Differences Are Statistically Meaningful">
                 <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-5">
                     <p className="text-sm text-foreground/80 leading-relaxed max-w-4xl">
-                        Despite all models falling below the population marginal baseline, their differences are
+                        Despite all models falling below the population marginal baseline, their differences appear
                         statistically meaningful. Permutation testing (10,000 iterations) with Holm-Bonferroni correction
-                        shows that <strong>{STATS.pairwise.significantPairs} of {STATS.pairwise.totalPairs}</strong> model
-                        pairs ({STATS.pairwise.percentage}%) are significantly different at the 0.05 level.
+                        suggests that <strong>{STATS.pairwise.significantPairs} of {STATS.pairwise.totalPairs}</strong> model
+                        pairs ({STATS.pairwise.percentage}%) are significantly different at the 0.05 level. However,
+                        statistical significance does not necessarily imply practical importance &mdash; many differences are small.
                     </p>
 
                     <div className="overflow-x-auto">
@@ -286,10 +287,10 @@ export default function FindingsContent() {
             <FindingSection number={3} title="Not All Demographics Are Equal">
                 <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-5">
                     <p className="text-sm text-foreground/80 leading-relaxed max-w-4xl">
-                        The reliability of our evaluation depends on how many survey respondents we have per demographic
-                        segment. Categories like <strong>gender</strong> (avg. 516 respondents) produce rock-solid benchmarks,
-                        while <strong>country-level</strong> segments (avg. 33 respondents) have so much sampling noise that
-                        apparent model differences may not be real.
+                        The reliability of these evaluations depends heavily on how many survey respondents we have per demographic
+                        segment. Categories like <strong>gender</strong> (avg. 516 respondents) produce relatively stable benchmarks,
+                        while <strong>country-level</strong> segments (avg. 33 respondents) have enough sampling noise that
+                        apparent model differences may not be real. This is a significant limitation of the current dataset.
                     </p>
 
                     <div className="overflow-x-auto">
@@ -403,9 +404,9 @@ export default function FindingsContent() {
                             </p>
                             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                                 Of the {STATS.modelCount} models tested, 15 show flat or <em>negative</em> slopes &mdash; meaning
-                                more demographic evidence doesn&rsquo;t help (or slightly hurts) their predictions. This suggests
-                                these models rely on fixed assumptions about demographic groups rather than genuinely reasoning
-                                from the provided data.
+                                more demographic evidence doesn&rsquo;t help (or slightly hurts) their predictions. One interpretation is
+                                that these models may rely on fixed assumptions about demographic groups rather than reasoning
+                                from the provided data, though other explanations are possible.
                                 At the category level, only <strong>{STATS.significantModelCategoryPairs}</strong> of {STATS.totalModelCategoryPairs} model-category
                                 pairs survive joint statistical correction.
                             </p>
@@ -434,13 +435,13 @@ export default function FindingsContent() {
                             <div className="text-2xl font-bold text-primary">0</div>
                             <div className="text-sm text-foreground/80">rank changes from sample-size weighting</div>
                             <div className="text-xs text-muted-foreground mt-1">
-                                The leaderboard is robust: weighting by respondent count (&#8730;n) produces no rank changes.
+                                Rankings appear stable: weighting by respondent count (&#8730;n) produces no rank changes in this dataset.
                             </div>
                         </div>
                     </div>
 
                     <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
-                        Translation: the broad tiers are real (top performers vs. middle vs. bottom), but don&rsquo;t read too
+                        In other words: broad tiers may be meaningful (top performers vs. middle vs. bottom), but don&rsquo;t read too
                         much into a model being ranked #3 vs. #4. Focus on clusters rather than individual positions.
                     </p>
                 </div>
@@ -449,35 +450,36 @@ export default function FindingsContent() {
             {/* ── What This Means ───────────────────────────────────────────── */}
             <section className="space-y-5">
                 <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-center">
-                    What Does This Mean?
+                    Preliminary Takeaways
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-3">
                         <h3 className="text-base font-semibold text-foreground">The Gap Is Measurable</h3>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            AI models know what people in general think, but haven&rsquo;t yet learned how specific
+                            In our tests, AI models appear to know what people in general think, but haven&rsquo;t yet learned how specific
                             demographics <em>differ</em> from that average. The gap between the best model ({STATS.bestModel.score.toFixed(3)})
                             and the population marginal baseline ({STATS.baselines.populationMarginal.toFixed(3)}) gives us a concrete
-                            target for improvement.
+                            metric to track over time.
                         </p>
                     </div>
 
                     <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-3">
-                        <h3 className="text-base font-semibold text-foreground">Progress Is Trackable</h3>
+                        <h3 className="text-base font-semibold text-foreground">Progress May Be Trackable</h3>
                         <p className="text-sm text-foreground/80 leading-relaxed">
                             With {STATS.pairwise.percentage}% of model pairs being statistically distinguishable, the
-                            leaderboard provides a meaningful signal. As new model versions are released, we can
-                            measure whether they&rsquo;re actually getting better at representing diverse perspectives.
+                            rankings appear to carry signal. As new model versions are released, this framework could help
+                            measure whether they&rsquo;re getting better at representing diverse perspectives &mdash; though
+                            more work is needed to validate that the metric reliably captures real-world representational quality.
                         </p>
                     </div>
 
                     <div className="bg-card/40 backdrop-blur-sm rounded-lg ring-1 ring-border/50 p-6 space-y-3">
-                        <h3 className="text-base font-semibold text-foreground">Some Models Learn, Most Don&rsquo;t</h3>
+                        <h3 className="text-base font-semibold text-foreground">Some Models Appear to Learn</h3>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            The context responsiveness test distinguishes models that genuinely reason from evidence
-                            vs. those applying fixed stereotypes. Only a few models (notably Claude 3.7 Sonnet across 4 categories)
-                            consistently improve when given more data about a demographic group.
+                            The context responsiveness test attempts to distinguish models that reason from evidence
+                            vs. those relying on fixed priors. In our data, only a few models (notably Claude 3.7 Sonnet across 4 categories)
+                            consistently improve when given more information about a demographic group. These results warrant further investigation.
                         </p>
                     </div>
 
@@ -485,8 +487,8 @@ export default function FindingsContent() {
                         <h3 className="text-base font-semibold text-foreground">Better Data Needed</h3>
                         <p className="text-sm text-foreground/80 leading-relaxed">
                             Country-level evaluation is currently unreliable (only 30.7% of data points meet quality
-                            thresholds). For DTEF to fully assess cross-cultural representation, larger and more diverse
-                            survey samples are needed &mdash; particularly at the country and religion level.
+                            thresholds). For this framework to meaningfully assess cross-cultural representation, larger and more diverse
+                            survey samples would be needed &mdash; particularly at the country and religion level.
                         </p>
                     </div>
                 </div>
@@ -497,8 +499,8 @@ export default function FindingsContent() {
                 <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">What&rsquo;s Next</h2>
                 <div className="text-sm text-foreground/80 leading-relaxed space-y-3 max-w-4xl">
                     <p>
-                        DTEF is an ongoing research project. These findings represent a snapshot from {STATS.analysisDate},
-                        and the leaderboard updates as new models and survey data become available.
+                        DTEF is an early-stage, ongoing research project. These findings are preliminary and represent a snapshot from {STATS.analysisDate}.
+                        The methodology, metrics, and interpretations are all subject to revision as we learn more.
                     </p>
                     <ul className="space-y-2 ml-4">
                         <li className="flex items-start gap-2">
