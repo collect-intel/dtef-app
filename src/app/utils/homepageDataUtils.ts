@@ -1,11 +1,12 @@
 import { cache } from 'react';
 import {
   getHomepageSummary,
+  getJsonFile,
   HomepageSummaryFileContent, // Import the type from storageService
   getAllBlueprintsSummary as storageGetAllBlueprintsSummary,
   listConfigIds,
   getConfigSummary,
-} from '@/lib/storageService'; 
+} from '@/lib/storageService';
 import { AggregateStatsData } from '@/app/components/home/types';
 import { PotentialDriftInfo } from '@/types/summary';
 import type { UsageSummary } from '@/types/shared';
@@ -73,9 +74,21 @@ export interface EnhancedComparisonConfigInfo {
 
 const getFullHomepageData = cache(async (): Promise<HomepageSummaryFileContent | null> => {
   console.log("[homepageDataUtils] getFullHomepageData CALLED. This should now only appear once per page render.");
-  // Caching is handled by React's cache() and Next.js's Data Cache (ISR via revalidate).
   try {
-    return await getHomepageSummary();
+    const data = await getHomepageSummary();
+    // Fallback: if dtefSummary is missing from homepage_summary, load standalone file
+    if (data && !data.dtefSummary) {
+      try {
+        const standalone = await getJsonFile('live/aggregates/dtef_summary.json');
+        if (standalone) {
+          data.dtefSummary = standalone as any;
+          console.log("[homepageDataUtils] Loaded DTEF summary from standalone file (fallback).");
+        }
+      } catch {
+        // No standalone DTEF summary available — that's fine
+      }
+    }
+    return data;
   } catch (error: any) {
     console.error("[homepageDataUtils] Error fetching homepage summary via getHomepageSummary:", error);
     return null;

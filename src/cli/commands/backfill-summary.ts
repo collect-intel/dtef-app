@@ -11,6 +11,7 @@ import {
     saveHomepageSummary,
     getHomepageSummary,
     saveJsonFile,
+    getJsonFile,
     updateSummaryDataWithNewRun,
     HomepageSummaryFileContent,
     saveConfigSummary,
@@ -710,11 +711,23 @@ export async function lightweightBackfill(): Promise<void> {
     });
     console.log(`[lightweight-backfill] latest_runs_summary.json saved (${latest50Runs.length} runs).`);
 
+    // Preserve existing DTEF summary from the standalone file
+    let dtefSummary = null;
+    try {
+        dtefSummary = await getJsonFile('live/aggregates/dtef_summary.json');
+        if (dtefSummary) {
+            console.log(`[lightweight-backfill] Loaded existing DTEF summary for inclusion in homepage.`);
+        }
+    } catch (err: any) {
+        console.log(`[lightweight-backfill] No DTEF summary found (${err.message}), skipping.`);
+    }
+
     const finalHomepageSummary: HomepageSummaryFileContent = {
         configs: homepageConfigsForSave,
         headlineStats,
         driftDetectionResult,
         topicChampions,
+        dtefSummary,
         modelCardMappings: Object.keys(modelCardMappings).length > 0 ? modelCardMappings : undefined,
         lastUpdated: new Date().toISOString(),
     };
