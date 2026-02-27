@@ -57,7 +57,7 @@ Please analyze these questions and return a JSON object with exactly two fields:
    - Are badly worded or ambiguous
    - Have answer options that don't form a meaningful scale or set
 
-2. "subjectRanking": Array of question IDs ranked from MOST to LEAST informative for demographic evaluation. Prioritize questions that:
+2. "subjectRanking": Array of the TOP {rankLimit} question IDs (out of {totalQuestions} total) ranked from MOST to LEAST informative for demographic evaluation. Return EXACTLY {rankLimit} IDs — no more, no fewer. Prioritize questions that:
    - Have high topic diversity (cover different domains)
    - Show likely inter-segment variance (different demographics would answer differently)
    - Are substantive opinion/value questions (not factual knowledge)
@@ -78,10 +78,15 @@ export function buildCurationPrompt(surveyData: DTEFSurveyData): string {
         })
         .join('\n');
 
+    const totalQuestions = Object.keys(surveyData.questions).length;
+    const rankLimit = Math.max(20, Math.round(totalQuestions * 0.3));
+
     return CURATION_PROMPT_TEMPLATE
         .replace('{surveyName}', surveyData.surveyName)
         .replace('{surveyId}', surveyData.surveyId)
-        .replace('{questionList}', questionList);
+        .replace('{questionList}', questionList)
+        .replace(/\{rankLimit\}/g, String(rankLimit))
+        .replace('{totalQuestions}', String(totalQuestions));
 }
 
 /**
