@@ -17,17 +17,20 @@ S3_REGION := us-east-1
 
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
-	dtef-import dtef-import-all dtef-generate dtef-baselines dtef-baselines-all dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status
+	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
+	dtef-curate dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
-	@grep -E '^(rerun|queue|backfill|lightweight|streaming)[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(rerun|queue|backfill|lightweight|streaming)[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
 	@echo "\033[1mDTEF Workflow:\033[0m"
-	@grep -E '^dtef-[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^dtef-(import|generate|baselines|publish|rebuild|pipeline|status|stats)[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1mExperiments:\033[0m"
+	@grep -E '^dtef-(experiment|curate)[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
 	@echo "\033[1mS3:\033[0m"
-	@grep -E '^s3-[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^s3-[a-zA-Z0-9_-]*:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
 	@echo "\033[1mDev:\033[0m"
-	@grep -E '^(dev|build|test|test-infra):.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(dev|build|test|test-infra):.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
 
 # --- Evaluations ---
 
@@ -162,7 +165,21 @@ dtef-generate: ## Generate blueprints for a round (ROUND=GD4, CTX=5 for context 
 		pnpm cli dtef generate -i $(INPUT) -o output/dtef-blueprints-ctx/$(ROUND_LC) --context-questions $(CTX); \
 	fi
 
-dtef-baselines: ## Generate and upload baseline results for a round (ROUND=GD4)
+dtef-generate-cot: ## Generate CoT blueprints for a round (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate-cot ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef generate -i $(INPUT) -o output/blueprints/$(ROUND_LC)-cot --reasoning-mode cot
+
+dtef-generate-narrative: ## Generate narrative-context blueprints (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate-narrative ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef generate -i $(INPUT) -o output/blueprints/$(ROUND_LC)-narrative --context-questions all --context-format narrative
+
+dtef-baselines: ## Generate and upload core baselines for a round (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-baselines ROUND=GD4" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	$(eval INPUT := output/$(ROUND_LC).json)
@@ -170,7 +187,17 @@ dtef-baselines: ## Generate and upload baseline results for a round (ROUND=GD4)
 	pnpm cli dtef generate-baseline -i $(INPUT) --type population-marginal --upload
 	pnpm cli dtef generate-baseline -i $(INPUT) --type uniform --upload
 
-dtef-baselines-all: ## Generate and upload baselines for all imported survey rounds
+dtef-baselines-full: ## Generate ALL baselines for a round including Dirichlet + shuffled (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-baselines-full ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef generate-baseline -i $(INPUT) --type population-marginal --upload
+	pnpm cli dtef generate-baseline -i $(INPUT) --type uniform --upload
+	pnpm cli dtef generate-baseline -i $(INPUT) --type random-dirichlet --upload
+	pnpm cli dtef generate-baseline -i $(INPUT) --type shuffled --upload
+
+dtef-baselines-all: ## Generate and upload core baselines for all imported rounds
 	@for f in output/gd*.json; do \
 		round=$$(basename $$f .json); \
 		echo "=== Generating baselines for $$round ==="; \
@@ -233,6 +260,31 @@ dtef-status: ## Show local DTEF data: imported rounds, blueprints, baselines
 	@for dir in output/baselines/*/; do \
 		test -d "$$dir" && echo "  $$(basename $$dir): $$(ls $$dir | wc -l | xargs) files"; \
 	done 2>/dev/null || echo "  (none)"
+
+# --- Experiments & Curation ---
+
+dtef-curate: ## Generate question curation prompt for a round (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-curate ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef curate-questions -i $(INPUT) --dry-run
+
+dtef-experiment-create: ## Create a new experiment (ID=test-1 TITLE="Test" HYPOTHESIS="...")
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-create ID=test-1 TITLE=\"CoT test\" HYPOTHESIS=\"CoT improves accuracy\"" && exit 1)
+	pnpm cli dtef experiment create --id "$(ID)" --title "$(TITLE)" --hypothesis "$(HYPOTHESIS)"
+
+dtef-experiment-status: ## Show experiment status (ID=test-1)
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-status ID=test-1" && exit 1)
+	pnpm cli dtef experiment status --id "$(ID)"
+
+dtef-experiment-conclude: ## Conclude an experiment (ID=test-1 CONCLUSION=promoted|rejected|needs-more-data)
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-conclude ID=test-1 CONCLUSION=promoted" && exit 1)
+	@test -n "$(CONCLUSION)" || (echo "CONCLUSION required: promoted, rejected, or needs-more-data" && exit 1)
+	pnpm cli dtef experiment conclude --id "$(ID)" --conclusion "$(CONCLUSION)"
+
+dtef-experiment-index: ## Rebuild the experiments index from S3
+	pnpm cli dtef experiment rebuild-index
 
 # --- Dev ---
 
