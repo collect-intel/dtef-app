@@ -97,7 +97,7 @@ describe('LIT Core Logic', () => {
           },
         });
       }
-      return responses;
+      return { allResponsesMap: responses };
     });
 
     // Mock evaluator
