@@ -380,6 +380,14 @@ export interface DTEFResultMetadata {
     groundTruthDistributions?: Record<string, number[]>;
     /** Whether this result has been aggregated across segments */
     isAggregated?: boolean;
+    /** Evaluation type used (string for JSON compatibility) */
+    evalType?: string;
+    /** Context format used */
+    contextFormat?: string;
+    /** Reasoning mode used */
+    reasoningMode?: string;
+    /** Experiment ID if part of an experiment */
+    experimentId?: string;
 }
 
 // New structured executive summary types

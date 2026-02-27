@@ -31,6 +31,13 @@ interface DistributionMetricArgs {
  *   45.2%, 30.1%, 15.5%, 9.2%
  */
 export function parseDistribution(text: string): number[] | null {
+    // Try CoT DISTRIBUTION: marker first (highest priority)
+    const distMarker = text.match(/DISTRIBUTION:\s*\[([^\]]+)\]/i);
+    if (distMarker) {
+        const numbers = distMarker[1].split(',').map(s => parseFloat(s.trim().replace('%', ''))).filter(n => !isNaN(n));
+        if (numbers.length > 0) return numbers;
+    }
+
     // Try JSON array format first: [45.2, 30.1, 15.5, 9.2]
     const bracketMatch = text.match(/\[([^\]]+)\]/);
     if (bracketMatch) {

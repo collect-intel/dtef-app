@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DemographicBlueprintService } from '../services/demographicBlueprintService';
 import { validateDTEFSurveyData } from '@/lib/dtef-validation';
-import { DTEFSurveyData, DTEFBlueprintConfig } from '@/types/dtef';
+import { DTEFSurveyData, DTEFBlueprintConfig, DTEFEvalType, DTEFContextFormat, DTEFReasoningMode } from '@/types/dtef';
 import * as yaml from 'js-yaml';
 import {
     convertGlobalDialogues,
@@ -23,8 +23,19 @@ import {
     BASELINE_MODEL_IDS,
     BaselineType,
 } from '../services/baselineGeneratorService';
-import { saveResult } from '@/lib/storageService';
+import { saveResult, getJsonFile, saveJsonFile } from '@/lib/storageService';
 import { toSafeTimestamp } from '@/lib/timestampUtils';
+import type {
+    ExperimentRecord,
+    ExperimentIndex,
+    ExperimentStatus,
+    ExperimentConclusion,
+} from '@/types/experiment';
+import {
+    buildCurationPrompt,
+    parseCurationResponse,
+    buildCurationResult,
+} from '../services/questionCurationService';
 
 export const dtefCommand = new Command('dtef')
     .description('DTEF: Generate and manage demographic evaluation blueprints');
@@ -46,7 +57,11 @@ dtefCommand
     .option('--context-levels <levels>', 'Generate blueprints at multiple context levels (e.g., "0,5,10,all")')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
     .option('--batch-size <n>', 'Number of questions per batched prompt (1-5, default: 1)', '1')
-    .option('--eval-type <type>', 'Evaluation type: distribution (default) or shift', 'distribution')
+    .option('--eval-type <type>', 'Evaluation type: distribution, shift, synthetic-individual, or individual-answer', 'distribution')
+    .option('--context-format <format>', 'Context format: attribute-label, distribution-context, or narrative')
+    .option('--reasoning-mode <mode>', 'Reasoning mode: standard or cot', 'standard')
+    .option('--synthetic-n <n>', 'Number of synthetic individuals (for synthetic-individual eval type)', '20')
+    .option('--experiment <id>', 'Tag blueprints with experiment ID')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -128,11 +143,26 @@ dtefCommand
             process.exit(1);
         }
 
-        const evalType = options.evalType as 'distribution' | 'shift';
-        if (!['distribution', 'shift'].includes(evalType)) {
-            console.error(chalk.red('--eval-type must be "distribution" or "shift"'));
+        const evalType = options.evalType as DTEFEvalType;
+        if (!['distribution', 'shift', 'synthetic-individual', 'individual-answer'].includes(evalType)) {
+            console.error(chalk.red('--eval-type must be "distribution", "shift", "synthetic-individual", or "individual-answer"'));
             process.exit(1);
         }
+
+        const reasoningMode = options.reasoningMode as DTEFReasoningMode;
+        if (!['standard', 'cot'].includes(reasoningMode)) {
+            console.error(chalk.red('--reasoning-mode must be "standard" or "cot"'));
+            process.exit(1);
+        }
+
+        const contextFormat = options.contextFormat as DTEFContextFormat | undefined;
+        if (contextFormat && !['attribute-label', 'distribution-context', 'narrative', 'raw-survey', 'interview', 'first-person'].includes(contextFormat)) {
+            console.error(chalk.red('--context-format must be one of: attribute-label, distribution-context, narrative, raw-survey, interview, first-person'));
+            process.exit(1);
+        }
+
+        const syntheticN = parseInt(options.syntheticN, 10);
+        const experimentId = options.experiment as string | undefined;
 
         // Generate blueprints (possibly at multiple context levels)
         console.log(chalk.gray('Generating blueprints...'));
@@ -160,6 +190,10 @@ dtefCommand
                     tokenBudget: parseInt(options.tokenBudget, 10),
                     batchSize: batchSize > 1 ? batchSize : undefined,
                     evalType,
+                    contextFormat,
+                    reasoningMode,
+                    syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
+                    experimentId,
                     modelConfig: {
                         models: options.models.split(',').map((s: string) => s.trim()),
                         temperature: parseFloat(options.temperature),
@@ -181,6 +215,10 @@ dtefCommand
                 tokenBudget: parseInt(options.tokenBudget, 10),
                 batchSize: batchSize > 1 ? batchSize : undefined,
                 evalType,
+                contextFormat,
+                reasoningMode,
+                syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
+                experimentId,
                 modelConfig: {
                     models: options.models.split(',').map((s: string) => s.trim()),
                     temperature: parseFloat(options.temperature),
@@ -594,8 +632,8 @@ dtefCommand
         }
 
         const baselineType = options.type as BaselineType;
-        if (!['population-marginal', 'uniform'].includes(baselineType)) {
-            console.error(chalk.red('--type must be "population-marginal" or "uniform"'));
+        if (!['population-marginal', 'uniform', 'random-dirichlet', 'shuffled'].includes(baselineType)) {
+            console.error(chalk.red('--type must be "population-marginal", "uniform", "random-dirichlet", or "shuffled"'));
             process.exit(1);
         }
 
@@ -684,4 +722,264 @@ dtefCommand
 
         console.log(chalk.green(`\nDone! ${written} result(s) written to ${outputDir}`));
         console.log(chalk.gray('Use --upload to save directly to S3, or upload manually.'));
+    });
+
+/**
+ * dtef experiment - Manage experiments
+ */
+const experimentCommand = dtefCommand
+    .command('experiment')
+    .description('Manage A/B experiments');
+
+/**
+ * dtef experiment create
+ */
+experimentCommand
+    .command('create')
+    .description('Create a new experiment')
+    .requiredOption('--id <id>', 'Experiment ID (alphanumeric + hyphens)')
+    .requiredOption('--title <title>', 'Experiment title')
+    .requiredOption('--hypothesis <text>', 'Experiment hypothesis')
+    .option('--success-criteria <text>', 'Success criteria', 'Treatment condition outperforms control')
+    .option('--independent-variable <var>', 'Independent variable', 'contextFormat')
+    .option('--status <status>', 'Initial status', 'planned')
+    .option('--dry-run', 'Show experiment JSON without saving')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        const record: ExperimentRecord = {
+            id: options.id,
+            title: options.title,
+            status: options.status as ExperimentStatus,
+            createdAt: new Date().toISOString(),
+            completedAt: null,
+            hypothesis: options.hypothesis,
+            successCriteria: options.successCriteria,
+            design: {
+                independentVariable: options.independentVariable,
+                conditions: [],
+                segments: 'all',
+                models: 'CORE',
+                subjectQuestions: 'all',
+            },
+            configIds: [],
+            results: null,
+            conclusion: null,
+            notes: '',
+        };
+
+        if (options.dryRun) {
+            console.log(chalk.yellow('Dry run — experiment JSON:'));
+            console.log(JSON.stringify(record, null, 2));
+            return;
+        }
+
+        await saveJsonFile(`live/experiments/${record.id}.json`, record);
+        console.log(chalk.green(`Experiment "${record.id}" created at live/experiments/${record.id}.json`));
+    });
+
+/**
+ * dtef experiment status
+ */
+experimentCommand
+    .command('status')
+    .description('Show experiment status')
+    .requiredOption('--id <id>', 'Experiment ID')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        const record = await getJsonFile<ExperimentRecord>(`live/experiments/${options.id}.json`);
+        if (!record) {
+            console.error(chalk.red(`Experiment "${options.id}" not found`));
+            process.exit(1);
+        }
+
+        console.log(chalk.blue(`\nExperiment: ${record.title}`));
+        console.log(`  ID:         ${record.id}`);
+        console.log(`  Status:     ${record.status}`);
+        console.log(`  Hypothesis: ${record.hypothesis}`);
+        console.log(`  Configs:    ${record.configIds.length}`);
+        if (record.results) {
+            console.log(`  Summary:    ${record.results.summary}`);
+            if (record.results.conditionScores) {
+                for (const [name, score] of Object.entries(record.results.conditionScores)) {
+                    console.log(`  ${name}: ${score.toFixed(4)}`);
+                }
+            }
+        }
+        if (record.conclusion) {
+            console.log(`  Conclusion: ${record.conclusion}`);
+        }
+    });
+
+/**
+ * dtef experiment conclude
+ */
+experimentCommand
+    .command('conclude')
+    .description('Set experiment conclusion')
+    .requiredOption('--id <id>', 'Experiment ID')
+    .requiredOption('--conclusion <conclusion>', 'Conclusion: promoted, rejected, or needs-more-data')
+    .option('--summary <text>', 'Results summary')
+    .option('--notes <text>', 'Additional notes')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        const validConclusions = ['promoted', 'rejected', 'needs-more-data'];
+        if (!validConclusions.includes(options.conclusion)) {
+            console.error(chalk.red(`--conclusion must be one of: ${validConclusions.join(', ')}`));
+            process.exit(1);
+        }
+
+        const record = await getJsonFile<ExperimentRecord>(`live/experiments/${options.id}.json`);
+        if (!record) {
+            console.error(chalk.red(`Experiment "${options.id}" not found`));
+            process.exit(1);
+        }
+
+        record.status = 'completed';
+        record.completedAt = new Date().toISOString();
+        record.conclusion = options.conclusion as ExperimentConclusion;
+        if (options.summary) {
+            record.results = record.results || { summary: '' };
+            record.results.summary = options.summary;
+        }
+        if (options.notes) {
+            record.notes = options.notes;
+        }
+
+        await saveJsonFile(`live/experiments/${record.id}.json`, record);
+        console.log(chalk.green(`Experiment "${record.id}" concluded as: ${record.conclusion}`));
+    });
+
+/**
+ * dtef experiment rebuild-index
+ */
+experimentCommand
+    .command('rebuild-index')
+    .description('Rebuild the experiments index from individual experiment files')
+    .action(async () => {
+        const chalk = (await import('chalk')).default;
+        const { S3Client: S3, ListObjectsV2Command: ListCmd } = await import('@aws-sdk/client-s3');
+
+        console.log(chalk.blue('\nRebuilding experiments index...\n'));
+
+        // List all experiment files
+        const experiments: ExperimentRecord[] = [];
+        const prefix = 'live/experiments/';
+
+        try {
+            const s3Client = new S3({ region: process.env.AWS_REGION || 'us-east-1' });
+            const bucket = process.env.S3_BUCKET_NAME;
+            if (!bucket) {
+                console.error(chalk.red('S3_BUCKET_NAME not set'));
+                process.exit(1);
+            }
+
+            let continuationToken: string | undefined;
+            const keys: string[] = [];
+            do {
+                const resp = await s3Client.send(new ListCmd({
+                    Bucket: bucket,
+                    Prefix: prefix,
+                    ContinuationToken: continuationToken,
+                }));
+                for (const obj of resp.Contents || []) {
+                    if (obj.Key && obj.Key.endsWith('.json')) {
+                        keys.push(obj.Key);
+                    }
+                }
+                continuationToken = resp.NextContinuationToken;
+            } while (continuationToken);
+
+            console.log(chalk.gray(`Found ${keys.length} experiment file(s)`));
+
+            for (const key of keys) {
+                const record = await getJsonFile<ExperimentRecord>(key);
+                if (record && record.id) {
+                    experiments.push(record);
+                    console.log(chalk.gray(`  ${record.id}: ${record.status}`));
+                }
+            }
+        } catch (err: any) {
+            console.error(chalk.red(`Error listing experiments: ${err.message}`));
+            process.exit(1);
+        }
+
+        const index: ExperimentIndex = {
+            experiments: experiments.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+            lastUpdated: new Date().toISOString(),
+        };
+
+        await saveJsonFile('live/aggregates/experiments_index.json', index);
+        console.log(chalk.green(`\nIndex rebuilt: ${experiments.length} experiment(s)`));
+    });
+
+/**
+ * dtef curate-questions - LLM-powered question curation
+ */
+dtefCommand
+    .command('curate-questions')
+    .description('Use frontier LLMs to curate survey questions for evaluation')
+    .requiredOption('-i, --input <path>', 'Path to DTEF survey data JSON file')
+    .option('-o, --output <path>', 'Output path for curation results')
+    .option('--models <list>', 'Comma-separated model IDs for curation', 'claude-sonnet-4,gpt-4.1,gemini-2.5-pro')
+    .option('--top-n <n>', 'Number of top-ranked questions to highlight', '50')
+    .option('--force', 'Overwrite existing curation file')
+    .option('--dry-run', 'Show the curation prompt without calling models')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        console.log(chalk.blue('\nDTEF Question Curation\n'));
+
+        const inputPath = path.resolve(options.input);
+        if (!fs.existsSync(inputPath)) {
+            console.error(chalk.red(`Input file not found: ${inputPath}`));
+            process.exit(1);
+        }
+
+        let surveyData: DTEFSurveyData;
+        try {
+            const raw = fs.readFileSync(inputPath, 'utf-8');
+            surveyData = JSON.parse(raw);
+        } catch (e: any) {
+            console.error(chalk.red(`Failed to parse input file: ${e.message}`));
+            process.exit(1);
+        }
+
+        const questionCount = Object.keys(surveyData.questions).length;
+        console.log(chalk.gray(`Survey: ${surveyData.surveyName} (${surveyData.surveyId})`));
+        console.log(chalk.gray(`Questions: ${questionCount}\n`));
+
+        const prompt = buildCurationPrompt(surveyData);
+
+        if (options.dryRun) {
+            console.log(chalk.yellow('Dry run — curation prompt:\n'));
+            console.log(prompt);
+            console.log(chalk.yellow(`\nPrompt length: ~${prompt.length} chars`));
+            console.log(chalk.gray(`\nModels that would be queried: ${options.models}`));
+            return;
+        }
+
+        // Check for existing output
+        const outputPath = options.output
+            ? path.resolve(options.output)
+            : path.resolve(`data/question-curation/${surveyData.surveyId}.json`);
+
+        if (fs.existsSync(outputPath) && !options.force) {
+            console.log(chalk.yellow(`Curation file already exists: ${outputPath}`));
+            console.log(chalk.yellow('Use --force to overwrite.'));
+            process.exit(0);
+        }
+
+        console.log(chalk.yellow('Note: Full LLM curation requires API calls to the specified models.'));
+        console.log(chalk.yellow('This is a prompt-generation mode. To run full curation:'));
+        console.log(chalk.gray('  1. Send the prompt (shown with --dry-run) to each model'));
+        console.log(chalk.gray('  2. Save responses as JSON files'));
+        console.log(chalk.gray('  3. Use the curation library to compute consensus'));
+        console.log(chalk.gray(`\nPrompt saved to: ${outputPath.replace('.json', '.prompt.txt')}`));
+
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath.replace('.json', '.prompt.txt'), prompt, 'utf-8');
+        console.log(chalk.green('\nDone!'));
     });

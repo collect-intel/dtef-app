@@ -13,6 +13,21 @@ import { QuestionType, SurveyQuestion } from './survey';
 // Re-export useful types from survey.ts
 export type { QuestionType, SurveyQuestion } from './survey';
 
+/** Supported evaluation types */
+export type DTEFEvalType = 'distribution' | 'shift' | 'synthetic-individual' | 'individual-answer';
+
+/** Supported context formats */
+export type DTEFContextFormat =
+  | 'attribute-label'
+  | 'distribution-context'
+  | 'narrative'
+  | 'raw-survey'
+  | 'interview'
+  | 'first-person';
+
+/** Supported reasoning modes */
+export type DTEFReasoningMode = 'standard' | 'cot';
+
 /**
  * Represents a demographic segment (e.g., "Men aged 18-29 in USA").
  * Each segment aggregates responses from multiple survey respondents
@@ -165,10 +180,24 @@ export interface DTEFBlueprintConfig {
 
   /**
    * Evaluation type.
-   * - 'distribution': standard prediction (default)
+   * - 'distribution': standard distribution prediction (default)
    * - 'shift': provide population marginal, ask model to adjust for demographic
+   * - 'synthetic-individual': simulate N individuals, aggregate to distribution
+   * - 'individual-answer': predict single individual's answer
    */
-  evalType?: 'distribution' | 'shift';
+  evalType?: DTEFEvalType;
+
+  /** Context format for prompt generation */
+  contextFormat?: DTEFContextFormat;
+
+  /** Reasoning mode: standard (direct answer) or cot (chain-of-thought) */
+  reasoningMode?: DTEFReasoningMode;
+
+  /** Number of synthetic individuals to simulate (for synthetic-individual eval type, default: 20) */
+  syntheticN?: number;
+
+  /** Tag blueprints as belonging to an experiment */
+  experimentId?: string;
 
   /**
    * Population marginal distributions per question (for shift eval type).

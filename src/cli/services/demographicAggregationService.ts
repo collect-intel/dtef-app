@@ -61,6 +61,8 @@ export interface AggregatedModelResult {
     bestSegment?: { id: string; label: string; score: number };
     /** Worst performing segment */
     worstSegment?: { id: string; label: string; score: number };
+    /** Overall DPD (max gap between best and worst segment across all dimensions) */
+    overallDPD?: number;
 }
 
 /**
@@ -127,6 +129,41 @@ export interface ContextAnalysis {
 }
 
 /**
+ * Per-dimension DPD (Demographic Parity Difference) for a model.
+ * Aggregates within-category gaps into overall fairness metrics.
+ */
+export interface ModelDPD {
+    modelId: string;
+    /** Overall DPD: max gap across all dimensions */
+    overallDPD: number;
+    /** Per-dimension DPD */
+    dimensionDPD: { dimension: string; dimensionLabel: string; dpd: number }[];
+}
+
+/**
+ * Per-question DPD analysis — identifies questions with highest bias.
+ */
+export interface QuestionDPD {
+    questionId: string;
+    modelId: string;
+    dpd: number;
+    bestSegment: { id: string; score: number };
+    worstSegment: { id: string; score: number };
+}
+
+/**
+ * Stereotype score: compares zero-context vs full-context performance.
+ * High zero-context accuracy + low improvement = possible stereotype application.
+ */
+export interface StereotypeScore {
+    modelId: string;
+    zeroContextScore: number;
+    fullContextScore: number;
+    /** (full - zero) / full. Low or negative = likely stereotyping. */
+    improvementRatio: number;
+}
+
+/**
  * Full aggregation output.
  */
 export interface DemographicAggregation {
@@ -143,6 +180,10 @@ export interface DemographicAggregation {
     leaderboard: DTEFLeaderboardEntry[];
     /** Context responsiveness analysis (present when multiple context levels exist) */
     contextAnalysis?: ContextAnalysis;
+    /** Per-model DPD analysis */
+    modelDPDs?: ModelDPD[];
+    /** Stereotype scores (present when multi-context results exist) */
+    stereotypeScores?: StereotypeScore[];
 }
 
 /**
@@ -184,6 +225,18 @@ export class DemographicAggregationService {
         return result.config?.tags?.includes('dtef') ||
             !!(result.config?.context as any)?.dtef ||
             !!result.dtefMetadata;
+    }
+
+    /**
+     * Check if a WevalResult is tagged as part of an experiment.
+     * Experimental results should be excluded from production leaderboard/demographics.
+     */
+    static isExperimentalResult(result: WevalResult): boolean {
+        const ctx = (result.config?.context as any)?.dtef;
+        if (ctx?.experimentId) return true;
+        if (result.dtefMetadata?.experimentId) return true;
+        if (result.config?.tags?.some((t: string) => t.startsWith('experiment:'))) return true;
+        return false;
     }
 
     /**
@@ -404,9 +457,17 @@ export class DemographicAggregationService {
 
     /**
      * Aggregate DTEF results across all segments for a survey.
+     * By default, experimental results are excluded from aggregation.
      */
-    static aggregate(results: WevalResult[]): DemographicAggregation {
-        const dtefResults = results.filter(r => this.isDTEFResult(r));
+    static aggregate(
+        results: WevalResult[],
+        options?: { includeExperimental?: boolean },
+    ): DemographicAggregation {
+        let dtefResults = results.filter(r => this.isDTEFResult(r));
+
+        if (!options?.includeExperimental) {
+            dtefResults = dtefResults.filter(r => !this.isExperimentalResult(r));
+        }
 
         if (dtefResults.length === 0) {
             return {
@@ -502,6 +563,9 @@ export class DemographicAggregationService {
             const best = sorted[0];
             const worst = sorted[sorted.length - 1];
 
+            // Overall DPD = max_segment - min_segment score
+            const overallDPD = (best && worst) ? best.avgCoverageExtent - worst.avgCoverageExtent : 0;
+
             modelResults.push({
                 modelId,
                 overallScore,
@@ -511,6 +575,7 @@ export class DemographicAggregationService {
                 segmentStdDev: stdDev,
                 bestSegment: best ? { id: best.segmentId, label: best.segmentLabel, score: best.avgCoverageExtent } : undefined,
                 worstSegment: worst ? { id: worst.segmentId, label: worst.segmentLabel, score: worst.avgCoverageExtent } : undefined,
+                overallDPD,
             });
         }
 
@@ -564,6 +629,29 @@ export class DemographicAggregationService {
         // Compute context responsiveness analysis
         const contextAnalysis = this.computeContextAnalysis(dtefResults);
 
+        // Compute per-model DPD (aggregate per-dimension disparities)
+        const modelDPDs: ModelDPD[] = [];
+        const disparitiesByModel = new Map<string, StrataDisparityEntry[]>();
+        for (const d of disparities) {
+            if (!disparitiesByModel.has(d.modelId)) disparitiesByModel.set(d.modelId, []);
+            disparitiesByModel.get(d.modelId)!.push(d);
+        }
+        for (const [modelId, modelDisparities] of disparitiesByModel) {
+            const dimensionDPD = modelDisparities.map(d => ({
+                dimension: d.category,
+                dimensionLabel: d.categoryLabel,
+                dpd: d.absoluteGap,
+            }));
+            const overallDPD = dimensionDPD.length > 0
+                ? Math.max(...dimensionDPD.map(d => d.dpd))
+                : 0;
+            modelDPDs.push({ modelId, overallDPD, dimensionDPD });
+        }
+        modelDPDs.sort((a, b) => a.overallDPD - b.overallDPD);
+
+        // Compute stereotype scores from context analysis
+        const stereotypeScores = this.computeStereotypeScores(contextAnalysis);
+
         return {
             surveyId,
             aggregatedAt: new Date().toISOString(),
@@ -572,6 +660,59 @@ export class DemographicAggregationService {
             disparities,
             leaderboard,
             contextAnalysis,
+            modelDPDs,
+            stereotypeScores,
         };
+    }
+
+    /**
+     * Compute stereotype scores from context analysis.
+     * Compares zero-context vs highest-context performance.
+     * A model with high zero-context accuracy that doesn't improve with context
+     * may be applying stereotypes rather than using evidence.
+     */
+    static computeStereotypeScores(
+        contextAnalysis?: ContextAnalysis,
+    ): StereotypeScore[] | undefined {
+        if (!contextAnalysis || contextAnalysis.contextLevelsFound.length < 2) return undefined;
+
+        const minLevel = Math.min(...contextAnalysis.contextLevelsFound);
+        const maxLevel = Math.max(...contextAnalysis.contextLevelsFound);
+        if (minLevel === maxLevel) return undefined;
+
+        const scores: StereotypeScore[] = [];
+
+        for (const model of contextAnalysis.models) {
+            let zeroContextScores: number[] = [];
+            let fullContextScores: number[] = [];
+
+            for (const seg of model.segmentResponsiveness) {
+                for (const dp of seg.dataPoints) {
+                    if (dp.contextCount === minLevel) zeroContextScores.push(dp.score);
+                    if (dp.contextCount === maxLevel) fullContextScores.push(dp.score);
+                }
+            }
+
+            if (zeroContextScores.length === 0 || fullContextScores.length === 0) continue;
+
+            const zeroAvg = zeroContextScores.reduce((a, b) => a + b, 0) / zeroContextScores.length;
+            const fullAvg = fullContextScores.reduce((a, b) => a + b, 0) / fullContextScores.length;
+
+            const improvementRatio = fullAvg > 0
+                ? (fullAvg - zeroAvg) / fullAvg
+                : 0;
+
+            scores.push({
+                modelId: model.modelId,
+                zeroContextScore: zeroAvg,
+                fullContextScore: fullAvg,
+                improvementRatio,
+            });
+        }
+
+        // Sort by improvement ratio ascending (most stereotyping first)
+        scores.sort((a, b) => a.improvementRatio - b.improvementRatio);
+
+        return scores.length > 0 ? scores : undefined;
     }
 }

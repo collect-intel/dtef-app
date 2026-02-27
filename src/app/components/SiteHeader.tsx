@@ -39,6 +39,9 @@ export function SiteHeader({ contentMaxWidth = 'max-w-7xl' }: SiteHeaderProps) {
             <Link href="/findings" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               Findings
             </Link>
+            <Link href="/experiments" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              Experiments
+            </Link>
           </nav>
         </div>
       </div>

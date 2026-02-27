@@ -32,6 +32,10 @@ export interface DTEFSummary {
         populationMarginal?: number;
         /** Uniform baseline score (equal probability for all options) */
         uniform?: number;
+        /** Random Dirichlet baseline score (random distribution guessing) */
+        randomDirichlet?: number;
+        /** Shuffled-segment baseline score (wrong segment assignment) */
+        shuffled?: number;
     };
     /** Top models by overall demographic prediction accuracy */
     topModels: {
@@ -69,7 +73,7 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
 
     if (dtefResults.length === 0) return null;
 
-    const aggregation = DemographicAggregationService.aggregate(dtefResults);
+    const aggregation = DemographicAggregationService.aggregate(dtefResults, { includeExperimental: false });
 
     // Top 10 models by score (exclude baseline pseudo-models from leaderboard)
     const topModels = aggregation.modelResults
@@ -114,14 +118,20 @@ export function buildDTEFSummary(allResults: WevalResult[]): DTEFSummary | null 
             baselines.populationMarginal = model.overallScore;
         } else if (model.modelId === BASELINE_MODEL_IDS.UNIFORM) {
             baselines.uniform = model.overallScore;
+        } else if (model.modelId === BASELINE_MODEL_IDS.RANDOM_DIRICHLET) {
+            baselines.randomDirichlet = model.overallScore;
+        } else if (model.modelId === BASELINE_MODEL_IDS.SHUFFLED) {
+            baselines.shuffled = model.overallScore;
         }
     }
+
+    const hasBaselines = Object.values(baselines).some(v => v != null);
 
     return {
         generatedAt: new Date().toISOString(),
         surveyId: aggregation.surveyId,
         resultCount: dtefResults.length,
-        baselines: (baselines.populationMarginal != null || baselines.uniform != null) ? baselines : undefined,
+        baselines: hasBaselines ? baselines : undefined,
         topModels,
         fairnessConcerns,
         aggregation,

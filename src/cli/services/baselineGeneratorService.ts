@@ -22,9 +22,11 @@ import { jsDivergenceSimilarity, normalize } from '@/point-functions/distributio
 export const BASELINE_MODEL_IDS = {
     POPULATION_MARGINAL: 'baseline:population-marginal',
     UNIFORM: 'baseline:uniform',
+    RANDOM_DIRICHLET: 'baseline:random-dirichlet',
+    SHUFFLED: 'baseline:shuffled-null',
 } as const;
 
-export type BaselineType = 'population-marginal' | 'uniform';
+export type BaselineType = 'population-marginal' | 'uniform' | 'random-dirichlet' | 'shuffled';
 
 /**
  * Compute the population-marginal distribution for each question:
@@ -57,6 +59,35 @@ function computePopulationMarginals(
 }
 
 /**
+ * Sample a single Dirichlet(α=1,...,1) distribution using the gamma trick.
+ * Each component is sampled as -ln(random()), then normalized.
+ */
+function sampleDirichlet(k: number): number[] {
+    const samples = new Array(k);
+    let sum = 0;
+    for (let i = 0; i < k; i++) {
+        // Gamma(1,1) = Exp(1) = -ln(U)
+        samples[i] = -Math.log(Math.random());
+        sum += samples[i];
+    }
+    // Normalize and scale to percentages
+    return samples.map(s => (s / sum) * 100);
+}
+
+/**
+ * Compute the mean Dirichlet baseline score for a segment-question pair.
+ * Samples N random distributions and averages their JSD similarity to ground truth.
+ */
+function dirichletMeanScore(groundTruth: number[], nSamples: number = 100): number {
+    let total = 0;
+    for (let i = 0; i < nSamples; i++) {
+        const sample = sampleDirichlet(groundTruth.length);
+        total += jsDivergenceSimilarity(sample, groundTruth);
+    }
+    return total / nSamples;
+}
+
+/**
  * Generate a synthetic WevalResult for a baseline predictor on a single segment.
  *
  * The result has the same structure as a real evaluation run:
@@ -70,9 +101,14 @@ function generateBaselineResult(
     baselineType: BaselineType,
     marginals: Map<string, number[]>,
     contextCount: number = 0,
+    allSegments?: SegmentWithResponses[],
 ): WevalResult {
     const modelId = baselineType === 'population-marginal'
         ? BASELINE_MODEL_IDS.POPULATION_MARGINAL
+        : baselineType === 'random-dirichlet'
+        ? BASELINE_MODEL_IDS.RANDOM_DIRICHLET
+        : baselineType === 'shuffled'
+        ? BASELINE_MODEL_IDS.SHUFFLED
         : BASELINE_MODEL_IDS.UNIFORM;
 
     const ctxSuffix = contextCount > 0 ? `-c${contextCount}` : '';
@@ -92,20 +128,49 @@ function generateBaselineResult(
 
         const promptId = `${resp.questionId}-${segment.id}`;
 
-        // Compute baseline prediction
+        // Compute baseline prediction and score
         let prediction: number[];
+        let score: number;
+
         if (baselineType === 'population-marginal') {
             const marginal = marginals.get(resp.questionId);
             if (!marginal) continue;
             prediction = marginal;
+            score = jsDivergenceSimilarity(prediction, resp.distribution);
+        } else if (baselineType === 'random-dirichlet') {
+            // Mean score from N random Dirichlet samples
+            score = dirichletMeanScore(resp.distribution, 100);
+            // Use uniform as the "prediction" for display
+            const k = resp.distribution.length;
+            prediction = new Array(k).fill(100 / k);
+        } else if (baselineType === 'shuffled') {
+            // Average JSD similarity between this segment and all OTHER segments
+            const otherSegments = (allSegments || surveyData.segments)
+                .filter(s => s.id !== segment.id);
+            if (otherSegments.length === 0) {
+                const k = resp.distribution.length;
+                prediction = new Array(k).fill(100 / k);
+                score = 0;
+            } else {
+                let totalSim = 0;
+                let count = 0;
+                for (const other of otherSegments) {
+                    const otherResp = other.responses.find(r => r.questionId === resp.questionId);
+                    if (!otherResp) continue;
+                    totalSim += jsDivergenceSimilarity(otherResp.distribution, resp.distribution);
+                    count++;
+                }
+                score = count > 0 ? totalSim / count : 0;
+                // Use the population marginal as display prediction
+                const marginal = marginals.get(resp.questionId);
+                prediction = marginal || new Array(resp.distribution.length).fill(100 / resp.distribution.length);
+            }
         } else {
             // Uniform baseline
             const k = resp.distribution.length;
             prediction = new Array(k).fill(100 / k);
+            score = jsDivergenceSimilarity(prediction, resp.distribution);
         }
-
-        // Compute JSD similarity score
-        const score = jsDivergenceSimilarity(prediction, resp.distribution);
 
         // Create prompt config
         prompts.push({
@@ -207,6 +272,8 @@ export function generateBaselineResults(
             segment,
             baselineType,
             marginals,
+            0,
+            surveyData.segments,
         );
         results.push(result);
     }
