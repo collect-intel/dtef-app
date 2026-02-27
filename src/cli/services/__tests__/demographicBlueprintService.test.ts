@@ -107,8 +107,10 @@ describe('DemographicBlueprintService — shift evaluation', () => {
             for (const bp of blueprints) {
                 for (const prompt of bp.prompts) {
                     expect(prompt.points).toHaveLength(1);
-                    expect(prompt.points![0].fn).toBe('distribution_metric');
-                    expect(prompt.points![0].fnArgs?.metric).toBe('js-divergence');
+                    const point = prompt.points![0];
+                    expect(typeof point).toBe('object');
+                    expect((point as any).fn).toBe('distribution_metric');
+                    expect((point as any).fnArgs?.metric).toBe('js-divergence');
                 }
             }
         });
