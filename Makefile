@@ -18,7 +18,7 @@ S3_REGION := us-east-1
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
 	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
-	dtef-generate-matrix dtef-curate dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
+	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
@@ -124,16 +124,32 @@ s3-size: ## Show total S3 bucket size
 
 # --- DTEF Workflow ---
 #
-# === Adding a new survey round ===
-#   1. make dtef-import ROUND=GD8             (import GD round → output/gd8.json)
-#   2. make dtef-generate ROUND=GD8           (generate blueprints)
-#   3. make dtef-baselines ROUND=GD8          (generate + upload baseline predictors to S3)
-#   4. make dtef-publish ROUND=GD8            (publish blueprints to dtef-configs repo)
-#   5. make rerun-evals                       (trigger model evaluations)
-#   6. make streaming-summaries               (rebuild summaries after evals complete)
-#   7. make dtef-rebuild                      (rebuild DTEF summary with baselines)
-#   8. make dtef-stats                        (run statistical analysis report)
-#   Shortcut: make dtef-pipeline ROUND=GD8    (runs steps 1-3 locally)
+# === Adding a new survey round (full pipeline) ===
+#   1. make dtef-import ROUND=GD8                     (import GD round → output/gd8.json)
+#   2. make dtef-curate ROUND=GD8                     (LLM curation: exclude bad Qs, rank by informativeness)
+#   3. make dtef-generate-matrix ROUND=GD8             (generate blueprints across batch sizes, uses curation)
+#      — or: make dtef-generate ROUND=GD8              (simple: all questions, batch_size=1)
+#   4. make dtef-baselines ROUND=GD8                   (generate + upload baseline predictors to S3)
+#   5. make dtef-publish ROUND=GD8                     (publish blueprints to dtef-configs repo)
+#   6. make rerun-evals                                (trigger model evaluations)
+#   7. make streaming-summaries                        (rebuild summaries after evals complete)
+#   8. make dtef-rebuild                               (rebuild DTEF summary with baselines)
+#   9. make dtef-stats                                 (run statistical analysis report)
+#
+# === Quick pipeline (import + generate + baselines) ===
+#   make dtef-pipeline ROUND=GD8              (runs steps 1, 3-simple, 4)
+#
+# === Curation details ===
+#   make dtef-curate ROUND=GD8               calls 3 frontier LLMs via OpenRouter,
+#                                             saves to data/question-curation/{surveyId}.json
+#   make dtef-curate-dry-run ROUND=GD8       preview the curation prompt without calling APIs
+#   Curation is auto-loaded by dtef-generate when a curation file exists.
+#   --questions flag overrides curation entirely.
+#
+# === Generation matrix details ===
+#   make dtef-generate-matrix ROUND=GD8 BATCH_SIZES=1,2,3 NUM_EVALS=10
+#   Produces blueprints at each batch size, consuming top-ranked questions.
+#   Top questions repeat across batch sizes intentionally (comparison data).
 #
 # === First-time baseline initialization (all rounds) ===
 #   1. make dtef-baselines-all                (generate + upload baselines for all rounds)
@@ -272,8 +288,15 @@ dtef-status: ## Show local DTEF data: imported rounds, blueprints, baselines
 
 # --- Experiments & Curation ---
 
-dtef-curate: ## Generate question curation prompt for a round (ROUND=GD4)
+dtef-curate: ## Run LLM curation for a round (ROUND=GD4) — calls 3 models, saves results
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-curate ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef curate-questions -i $(INPUT)
+
+dtef-curate-dry-run: ## Preview the curation prompt without calling APIs (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-curate-dry-run ROUND=GD4" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	$(eval INPUT := output/$(ROUND_LC).json)
 	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
