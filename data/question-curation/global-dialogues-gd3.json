@@ -1,0 +1,369 @@
+{
+  "surveyId": "global-dialogues-gd3",
+  "curatedAt": "2026-02-28T07:41:37.399Z",
+  "models": [
+    {
+      "modelId": "claude-sonnet-4",
+      "exclusions": [
+        {
+          "questionId": "c909ca6a-ef51-4505-92a3-6f19645cd2b0",
+          "reason": "Question text is missing - only shows 'Do you agree or disagree?' without the statement"
+        },
+        {
+          "questionId": "18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7",
+          "reason": "Question text is missing - only shows 'Do you agree or disagree?' without the statement"
+        },
+        {
+          "questionId": "b6c5e939-455a-4c81-a676-9be1bccaa582",
+          "reason": "Question text is missing - only shows 'Do you agree or disagree?' without the statement"
+        },
+        {
+          "questionId": "ec5fd6c7-ba70-46c0-a5c7-75e4f75163de",
+          "reason": "Question text is missing - only shows 'Do you agree or disagree?' without the statement"
+        },
+        {
+          "questionId": "78975667-0a8d-452f-9569-c7447732ba49",
+          "reason": "Meta-question about survey experience, not substantive opinion content"
+        },
+        {
+          "questionId": "fb7e02bc-de8f-453d-bfcc-10feb179f4ce",
+          "reason": "Meta-question about survey experience, not substantive opinion content"
+        }
+      ],
+      "subjectRanking": [
+        "b1869877-1015-43ec-9645-84bf2db39c6f",
+        "96e5895f-d640-4a37-bc16-6e095f38ba7e",
+        "96ccfd7b-8f99-4d0a-b700-9fd835e23bd8",
+        "38964f80-772f-4e5d-a355-b4857f2de101",
+        "18cc2f33-6373-49f0-aa7e-e2fa04a04575",
+        "f435994f-e66e-4681-8334-4d6ee5f39e6b",
+        "8ed2d795-acca-47d8-abb0-8c446310dbf0",
+        "4c5ed164-eb69-4e41-906f-1e7a93f1d5bd",
+        "8d058cce-8ccf-4816-8ef7-c9c9e37038dc",
+        "4f234e17-2d57-4709-b29a-4a2909683566",
+        "30324a2e-b5b2-4e0a-a8f2-af599b55c40e",
+        "8c50a77a-3fc2-49ce-b568-b7832c9b99e0",
+        "f932063f-700c-4327-9c34-59b7c3e19190",
+        "0e0a2736-2ac9-490c-adb9-bf7dfd25b14b",
+        "8a9d1c12-44f6-42dc-9238-daaaca0d85d0",
+        "983893d8-07ab-4c8e-bdb2-14335638633d",
+        "5afe8617-7e71-40c8-8a33-1b356a8ca674",
+        "289f8b3b-d97c-4585-8e41-5e41602aaedb",
+        "e7a8b7e2-9077-4c8c-9cca-29f3c957ca16",
+        "29453c82-de9b-4be1-ba27-723906fb7dcf"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"c909ca6a-ef51-4505-92a3-6f19645cd2b0\",\n      \"reason\": \"Question text is missing - only shows 'Do you agree or disagree?' without the statement\"\n    },\n    {\n      \"questionId\": \"18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7\",\n      \"reason\": \"Question text is missing - only shows 'Do you agree or disagree?' without the statement\"\n    },\n    {\n      \"questionId\": \"b6c5e939-455a-4c81-a676-9be1bccaa582\",\n      \"reason\": \"Question text is missing - only shows 'Do you agree or disagree?' without the statement\"\n    },\n    {\n      \"questionId\": \"ec5fd6c7-ba70-46c0-a5c7-75e4f75163de\",\n      \"reason\": \"Question text is missing - only shows 'Do you agree or disagree?' without the statement\"\n    },\n    {\n      \"questionId\": \"78975667-0a8d-452f-9569-c7447732ba49\",\n      \"reason\": \"Meta-question about survey experience, not substantive opinion content\"\n    },\n    {\n      \"questionId\": \"fb7e02bc-de8f-453d-bfcc-10feb179f4ce\",\n      \"reason\": \"Meta-question about survey experience, not substantive opinion content\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"b1869877-1015-43ec-9645-84bf2db39c6f\",\n    \"96e5895f-d640-4a37-bc16-6e095f38ba7e\",\n    \"96ccfd7b-8f99-4d0a-b700-9fd835e23bd8\",\n    \"38964f80-772f-4e5d-a355-b4857f2de101\",\n    \"18cc2f33-6373-49f0-aa7e-e2fa04a04575\",\n    \"f435994f-e66e-4681-8334-4d6ee5f39e6b\",\n    \"8ed2d795-acca-47d8-abb0-8c446310dbf0\",\n    \"4c5ed164-eb69-4e41-906f-1e7a93f1d5bd\",\n    \"8d058cce-8ccf-4816-8ef7-c9c9e37038dc\",\n    \"4f234e17-2d57-4709-b29a-4a2909683566\",\n    \"30324a2e-b5b2-4e0a-a8f2-af599b55c40e\",\n    \"8c50a77a-3fc2-49ce-b568-b7832c9b99e0\",\n    \"f932063f-700c-4327-9c34-59b7c3e19190\",\n    \"0e0a2736-2ac9-490c-adb9-bf7dfd25b14b\",\n    \"8a9d1c12-44f6-42dc-9238-daaaca0d85d0\",\n    \"983893d8-07ab-4c8e-bdb2-14335638633d\",\n    \"5afe8617-7e71-40c8-8a33-1b356a8ca674\",\n    \"289f8b3b-d97c-4585-8e41-5e41602aaedb\",\n    \"e7a8b7e2-9077-4c8c-9cca-29f3c957ca16\",\n    \"29453c82-de9b-4be1-ba27-723906fb7dcf\"\n  ]\n}\n```"
+    },
+    {
+      "modelId": "gpt-4.1",
+      "exclusions": [
+        {
+          "questionId": "c909ca6a-ef51-4505-92a3-6f19645cd2b0",
+          "reason": "Question text is missing; cannot evaluate content or relevance."
+        },
+        {
+          "questionId": "18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7",
+          "reason": "Question text is missing; cannot evaluate content or relevance."
+        },
+        {
+          "questionId": "b6c5e939-455a-4c81-a676-9be1bccaa582",
+          "reason": "Question text is missing; cannot evaluate content or relevance."
+        },
+        {
+          "questionId": "ec5fd6c7-ba70-46c0-a5c7-75e4f75163de",
+          "reason": "Question text is missing; cannot evaluate content or relevance."
+        },
+        {
+          "questionId": "78975667-0a8d-452f-9569-c7447732ba49",
+          "reason": "Meta-question about survey experience, not substantive for demographic benchmarking."
+        },
+        {
+          "questionId": "fb7e02bc-de8f-453d-bfcc-10feb179f4ce",
+          "reason": "Meta-question about self-understanding after survey, not substantive for demographic benchmarking."
+        }
+      ],
+      "subjectRanking": [
+        "f932063f-700c-4327-9c34-59b7c3e19190",
+        "11ebc80e-d3e2-4dc5-987c-e4d637cf6bec",
+        "47cdf76a-9abf-4b5c-abbe-2d5b00ef172d",
+        "d633720f-a159-4922-925c-fd9f3245711e",
+        "8b361c6c-eb59-415b-8536-7f80713c3e5e",
+        "9d1baeb26-baca-414f-91f6-72b023c02a65",
+        "8c50a77a-3fc2-49ce-b568-b7832c9b99e0",
+        "30324a2e-b5b2-4e0a-a8f2-af599b55c40e",
+        "4f234e17-2d57-4709-b29a-4a2909683566",
+        "96ccfd7b-8f99-4d0a-b700-9fd835e23bd8",
+        "b1869877-1015-43ec-9645-84bf2db39c6f",
+        "8ed2d795-acca-47d8-abb0-8c446310dbf0",
+        "8d058cce-8ccf-4816-8ef7-c9c9e37038dc",
+        "f435994f-e66e-4681-8334-4d6ee5f39e6b",
+        "18cc2f33-6373-49f0-aa7e-e2fa04a04575",
+        "27e80f0f47-44d0-4d1a-bbda-d2334ff056ac",
+        "983893d8-07ab-4c8e-bdb2-14335638633d",
+        "96e5895f-d640-4a37-bc16-6e095f38ba7e",
+        "289f8b3b-d97c-4585-8e41-5e41602aaedb",
+        "e7a8b7e2-9077-4c8c-9cca-29f3c957ca16"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"c909ca6a-ef51-4505-92a3-6f19645cd2b0\",\n      \"reason\": \"Question text is missing; cannot evaluate content or relevance.\"\n    },\n    {\n      \"questionId\": \"18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7\",\n      \"reason\": \"Question text is missing; cannot evaluate content or relevance.\"\n    },\n    {\n      \"questionId\": \"b6c5e939-455a-4c81-a676-9be1bccaa582\",\n      \"reason\": \"Question text is missing; cannot evaluate content or relevance.\"\n    },\n    {\n      \"questionId\": \"ec5fd6c7-ba70-46c0-a5c7-75e4f75163de\",\n      \"reason\": \"Question text is missing; cannot evaluate content or relevance.\"\n    },\n    {\n      \"questionId\": \"78975667-0a8d-452f-9569-c7447732ba49\",\n      \"reason\": \"Meta-question about survey experience, not substantive for demographic benchmarking.\"\n    },\n    {\n      \"questionId\": \"fb7e02bc-de8f-453d-bfcc-10feb179f4ce\",\n      \"reason\": \"Meta-question about self-understanding after survey, not substantive for demographic benchmarking.\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"f932063f-700c-4327-9c34-59b7c3e19190\",\n    \"11ebc80e-d3e2-4dc5-987c-e4d637cf6bec\",\n    \"47cdf76a-9abf-4b5c-abbe-2d5b00ef172d\",\n    \"d633720f-a159-4922-925c-fd9f3245711e\",\n    \"8b361c6c-eb59-415b-8536-7f80713c3e5e\",\n    \"9d1baeb26-baca-414f-91f6-72b023c02a65\",\n    \"8c50a77a-3fc2-49ce-b568-b7832c9b99e0\",\n    \"30324a2e-b5b2-4e0a-a8f2-af599b55c40e\",\n    \"4f234e17-2d57-4709-b29a-4a2909683566\",\n    \"96ccfd7b-8f99-4d0a-b700-9fd835e23bd8\",\n    \"b1869877-1015-43ec-9645-84bf2db39c6f\",\n    \"8ed2d795-acca-47d8-abb0-8c446310dbf0\",\n    \"8d058cce-8ccf-4816-8ef7-c9c9e37038dc\",\n    \"f435994f-e66e-4681-8334-4d6ee5f39e6b\",\n    \"18cc2f33-6373-49f0-aa7e-e2fa04a04575\",\n    \"27e80f0f47-44d0-4d1a-bbda-d2334ff056ac\",\n    \"983893d8-07ab-4c8e-bdb2-14335638633d\",\n    \"96e5895f-d640-4a37-bc16-6e095f38ba7e\",\n    \"289f8b3b-d97c-4585-8e41-5e41602aaedb\",\n    \"e7a8b7e2-9077-4c8c-9cca-29f3c957ca16\"\n  ]\n}\n```"
+    },
+    {
+      "modelId": "google/gemini-2.5-pro-preview",
+      "exclusions": [],
+      "subjectRanking": [],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"c909ca6a-ef51-4505-92a3-6f19645cd2b0\",\n      \"reason\": \"The question text is incomplete ('Do you agree or disagree?') and lacks the necessary context of the statement to which the respondent should react.\"\n    },\n    {\n      \"questionId\": \"18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7\",\n      \"reason\": \"The question text is incomplete ('Do you agree or disagree?') and lacks the necessary context of the statement to which the"
+    }
+  ],
+  "consensus": {
+    "exclusions": [
+      {
+        "questionId": "c909ca6a-ef51-4505-92a3-6f19645cd2b0",
+        "reason": "[claude-sonnet-4] Question text is missing - only shows 'Do you agree or disagree?' without the statement; [gpt-4.1] Question text is missing; cannot evaluate content or relevance.",
+        "voteCount": 2
+      },
+      {
+        "questionId": "18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7",
+        "reason": "[claude-sonnet-4] Question text is missing - only shows 'Do you agree or disagree?' without the statement; [gpt-4.1] Question text is missing; cannot evaluate content or relevance.",
+        "voteCount": 2
+      },
+      {
+        "questionId": "b6c5e939-455a-4c81-a676-9be1bccaa582",
+        "reason": "[claude-sonnet-4] Question text is missing - only shows 'Do you agree or disagree?' without the statement; [gpt-4.1] Question text is missing; cannot evaluate content or relevance.",
+        "voteCount": 2
+      },
+      {
+        "questionId": "ec5fd6c7-ba70-46c0-a5c7-75e4f75163de",
+        "reason": "[claude-sonnet-4] Question text is missing - only shows 'Do you agree or disagree?' without the statement; [gpt-4.1] Question text is missing; cannot evaluate content or relevance.",
+        "voteCount": 2
+      },
+      {
+        "questionId": "78975667-0a8d-452f-9569-c7447732ba49",
+        "reason": "[claude-sonnet-4] Meta-question about survey experience, not substantive opinion content; [gpt-4.1] Meta-question about survey experience, not substantive for demographic benchmarking.",
+        "voteCount": 2
+      },
+      {
+        "questionId": "fb7e02bc-de8f-453d-bfcc-10feb179f4ce",
+        "reason": "[claude-sonnet-4] Meta-question about survey experience, not substantive opinion content; [gpt-4.1] Meta-question about self-understanding after survey, not substantive for demographic benchmarking.",
+        "voteCount": 2
+      }
+    ],
+    "subjectRanking": [
+      {
+        "questionId": "b1869877-1015-43ec-9645-84bf2db39c6f",
+        "voteCount": 2,
+        "avgRank": 5
+      },
+      {
+        "questionId": "96ccfd7b-8f99-4d0a-b700-9fd835e23bd8",
+        "voteCount": 2,
+        "avgRank": 5.5
+      },
+      {
+        "questionId": "f932063f-700c-4327-9c34-59b7c3e19190",
+        "voteCount": 2,
+        "avgRank": 6
+      },
+      {
+        "questionId": "8c50a77a-3fc2-49ce-b568-b7832c9b99e0",
+        "voteCount": 2,
+        "avgRank": 8.5
+      },
+      {
+        "questionId": "30324a2e-b5b2-4e0a-a8f2-af599b55c40e",
+        "voteCount": 2,
+        "avgRank": 8.5
+      },
+      {
+        "questionId": "4f234e17-2d57-4709-b29a-4a2909683566",
+        "voteCount": 2,
+        "avgRank": 8.5
+      },
+      {
+        "questionId": "8ed2d795-acca-47d8-abb0-8c446310dbf0",
+        "voteCount": 2,
+        "avgRank": 8.5
+      },
+      {
+        "questionId": "f435994f-e66e-4681-8334-4d6ee5f39e6b",
+        "voteCount": 2,
+        "avgRank": 9
+      },
+      {
+        "questionId": "18cc2f33-6373-49f0-aa7e-e2fa04a04575",
+        "voteCount": 2,
+        "avgRank": 9
+      },
+      {
+        "questionId": "96e5895f-d640-4a37-bc16-6e095f38ba7e",
+        "voteCount": 2,
+        "avgRank": 9
+      },
+      {
+        "questionId": "8d058cce-8ccf-4816-8ef7-c9c9e37038dc",
+        "voteCount": 2,
+        "avgRank": 10
+      },
+      {
+        "questionId": "983893d8-07ab-4c8e-bdb2-14335638633d",
+        "voteCount": 2,
+        "avgRank": 15.5
+      },
+      {
+        "questionId": "289f8b3b-d97c-4585-8e41-5e41602aaedb",
+        "voteCount": 2,
+        "avgRank": 17.5
+      },
+      {
+        "questionId": "e7a8b7e2-9077-4c8c-9cca-29f3c957ca16",
+        "voteCount": 2,
+        "avgRank": 18.5
+      },
+      {
+        "questionId": "47cdf76a-9abf-4b5c-abbe-2d5b00ef172d",
+        "voteCount": 1,
+        "avgRank": 2
+      },
+      {
+        "questionId": "d633720f-a159-4922-925c-fd9f3245711e",
+        "voteCount": 1,
+        "avgRank": 3
+      },
+      {
+        "questionId": "38964f80-772f-4e5d-a355-b4857f2de101",
+        "voteCount": 1,
+        "avgRank": 3
+      },
+      {
+        "questionId": "8b361c6c-eb59-415b-8536-7f80713c3e5e",
+        "voteCount": 1,
+        "avgRank": 4
+      },
+      {
+        "questionId": "4c5ed164-eb69-4e41-906f-1e7a93f1d5bd",
+        "voteCount": 1,
+        "avgRank": 7
+      },
+      {
+        "questionId": "0e0a2736-2ac9-490c-adb9-bf7dfd25b14b",
+        "voteCount": 1,
+        "avgRank": 13
+      },
+      {
+        "questionId": "8a9d1c12-44f6-42dc-9238-daaaca0d85d0",
+        "voteCount": 1,
+        "avgRank": 14
+      },
+      {
+        "questionId": "5afe8617-7e71-40c8-8a33-1b356a8ca674",
+        "voteCount": 1,
+        "avgRank": 16
+      },
+      {
+        "questionId": "29453c82-de9b-4be1-ba27-723906fb7dcf",
+        "voteCount": 1,
+        "avgRank": 19
+      },
+      {
+        "questionId": "ae768935-002f-49e2-b08f-92c7616b0533",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "926a5461-6a68-43c9-8279-94430dc9323e",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "1ebc80e1-d3e2-4dc5-987c-e4d637cf6bec",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "3c74ec68-77f6-46a5-9918-0c8e97fb7bc8",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "d1baeb26-baca-414f-91f6-72b023c02a65",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "dc5e8d2a-c20b-47fa-89e2-b4db635a8ad4",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "e80f0f47-44d0-4d1a-bbda-d2334ff056ac",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "a6fa1236-c145-498b-8c30-7ca307461789",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "951f11a0-3307-4507-805c-86d17562d21a",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "522df4e6-3a3b-48d9-9c83-a03a6a7bb22e",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "e26549f8-5c9a-426b-b22a-57d8fe0d5e03",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "332cec0c-afeb-4c18-a0e4-146c656750a8",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "b1288e79-aec5-43e4-a34e-c6d474737305",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "41f7cf6e-c4ee-42c7-b453-77320c78b294",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "c909ca6a-ef51-4505-92a3-6f19645cd2b0",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "18e6fbb1-c242-41ab-9e56-17b8ac4b4ca7",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "b6c5e939-455a-4c81-a676-9be1bccaa582",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "ec5fd6c7-ba70-46c0-a5c7-75e4f75163de",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "78975667-0a8d-452f-9569-c7447732ba49",
+        "voteCount": 0,
+        "avgRank": 43
+      },
+      {
+        "questionId": "fb7e02bc-de8f-453d-bfcc-10feb179f4ce",
+        "voteCount": 0,
+        "avgRank": 43
+      }
+    ]
+  },
+  "questionCount": 43,
+  "excludedCount": 6
+}

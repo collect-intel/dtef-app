@@ -1,0 +1,616 @@
+{
+  "surveyId": "global-dialogues-gd6",
+  "curatedAt": "2026-02-28T07:42:01.463Z",
+  "models": [
+    {
+      "modelId": "claude-sonnet-4",
+      "exclusions": [
+        {
+          "questionId": "d1e7db5c-b64f-4255-8654-03efcb49f232",
+          "reason": "Comprehension check question testing understanding of instructions, not measuring opinions"
+        },
+        {
+          "questionId": "ecba93d1-4204-4195-8f4d-838fbd517889",
+          "reason": "Attention check question asking respondents to select a specific answer"
+        },
+        {
+          "questionId": "535d8f31-7417-43ce-91d1-93642026df23",
+          "reason": "Nonsensical statement about phones and bananas - attention check with trivially predictable answer"
+        },
+        {
+          "questionId": "3249ff80-d73d-46c4-87bd-c40fb8252a1c",
+          "reason": "Meta-question about survey design rather than substantive opinion"
+        },
+        {
+          "questionId": "eadfc769-2907-4c59-be57-9ebf4d0c7d7a",
+          "reason": "Meta-question about survey participation behavior, not substantive opinion"
+        },
+        {
+          "questionId": "2c1a077d-d969-4df8-8bbd-9f569feb2774",
+          "reason": "Meta-question about survey experience, not substantive opinion"
+        },
+        {
+          "questionId": "f5a834e3-55a7-42b6-b363-b5c768da3541",
+          "reason": "Meta-question about self-understanding from survey participation"
+        },
+        {
+          "questionId": "ab8d91fa-cb00-4044-828e-59e165532ed5",
+          "reason": "Duplicate of question 85 - same exact question and options"
+        },
+        {
+          "questionId": "87a7c03c-831b-4463-a0eb-1a40b2b47a17",
+          "reason": "Duplicate of question 86 - same exact question and options"
+        },
+        {
+          "questionId": "a40ac181-e276-4d6d-9f17-c9e079bd1467",
+          "reason": "Duplicate of question 87 - same exact question and options"
+        }
+      ],
+      "subjectRanking": [
+        "40f058f5-5298-4648-b6e0-29b97111a3cf",
+        "2617912e-463a-4fb4-8781-0ada7a788fb2",
+        "249238a9-3050-4e7c-a3d4-ef799733b865",
+        "fee867c7-70e2-46ae-98e0-3dd3dd2865f6",
+        "49aaef31-00eb-40e1-ac68-a1b388d81ca9",
+        "75cce6ea-4a31-4103-a791-90e6db9ecd8f",
+        "2072e5fb-6a4f-46f5-98b5-17da5d70a776",
+        "84779ba6-1191-4840-862d-e9eacc2defe9",
+        "e97db5cf-118a-4016-ab42-fabb172ce5cd",
+        "7dd026f5-c70d-4126-bc78-68e823880f65",
+        "90ff5658-c6f7-4d37-a353-ec448940914d",
+        "1259ab9a-7157-4df6-87ef-4982508b49cc",
+        "ae245a88-3cc1-4ca1-8273-cdb64f43d10a",
+        "71deb6a0-82e9-4856-ac6d-e6b500904847",
+        "b894e8ff-78fd-4213-b0a3-8d81cde284b2",
+        "0a526274-32bc-4566-86c0-5015e80208c1",
+        "a5d5196f-4f5e-4b57-a26f-3baedb054cb6",
+        "b9a2819d-9924-4172-99d5-7a3630022d4b",
+        "13a2c7d0-b480-4cf4-946e-b54d19e065a2",
+        "fec8ed72-2275-423e-928d-d6683e720cab",
+        "fac8ce7a-1654-4517-94a3-9f6e5a5280b3",
+        "677830d5-3ee0-462b-8b56-73a939beb53d",
+        "5258fc4e-10cf-464d-ac27-d7c05b221be7",
+        "4d85b7fe-c1a8-47f4-843f-74eac3aaaeb5",
+        "471504dc-486c-4c3a-97fb-8b9a39026c6e",
+        "05cb1e2e-a790-41c3-b899-0dec305fe818",
+        "15497069-f42b-44cb-8fb6-7bdcfaea6f86",
+        "4eea4448-2896-4d6f-94c6-4dfdd597e77e",
+        "948ef76c-9b89-4461-84e3-43608d98c252"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"d1e7db5c-b64f-4255-8654-03efcb49f232\",\n      \"reason\": \"Comprehension check question testing understanding of instructions, not measuring opinions\"\n    },\n    {\n      \"questionId\": \"ecba93d1-4204-4195-8f4d-838fbd517889\",\n      \"reason\": \"Attention check question asking respondents to select a specific answer\"\n    },\n    {\n      \"questionId\": \"535d8f31-7417-43ce-91d1-93642026df23\",\n      \"reason\": \"Nonsensical statement about phones and bananas - attention check with trivially predictable answer\"\n    },\n    {\n      \"questionId\": \"3249ff80-d73d-46c4-87bd-c40fb8252a1c\",\n      \"reason\": \"Meta-question about survey design rather than substantive opinion\"\n    },\n    {\n      \"questionId\": \"eadfc769-2907-4c59-be57-9ebf4d0c7d7a\",\n      \"reason\": \"Meta-question about survey participation behavior, not substantive opinion\"\n    },\n    {\n      \"questionId\": \"2c1a077d-d969-4df8-8bbd-9f569feb2774\",\n      \"reason\": \"Meta-question about survey experience, not substantive opinion\"\n    },\n    {\n      \"questionId\": \"f5a834e3-55a7-42b6-b363-b5c768da3541\",\n      \"reason\": \"Meta-question about self-understanding from survey participation\"\n    },\n    {\n      \"questionId\": \"ab8d91fa-cb00-4044-828e-59e165532ed5\",\n      \"reason\": \"Duplicate of question 85 - same exact question and options\"\n    },\n    {\n      \"questionId\": \"87a7c03c-831b-4463-a0eb-1a40b2b47a17\",\n      \"reason\": \"Duplicate of question 86 - same exact question and options\"\n    },\n    {\n      \"questionId\": \"a40ac181-e276-4d6d-9f17-c9e079bd1467\",\n      \"reason\": \"Duplicate of question 87 - same exact question and options\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"40f058f5-5298-4648-b6e0-29b97111a3cf\",\n    \"2617912e-463a-4fb4-8781-0ada7a788fb2\",\n    \"249238a9-3050-4e7c-a3d4-ef799733b865\",\n    \"fee867c7-70e2-46ae-98e0-3dd3dd2865f6\",\n    \"49aaef31-00eb-40e1-ac68-a1b388d81ca9\",\n    \"75cce6ea-4a31-4103-a791-90e6db9ecd8f\",\n    \"2072e5fb-6a4f-46f5-98b5-17da5d70a776\",\n    \"84779ba6-1191-4840-862d-e9eacc2defe9\",\n    \"e97db5cf-118a-4016-ab42-fabb172ce5cd\",\n    \"7dd026f5-c70d-4126-bc78-68e823880f65\",\n    \"90ff5658-c6f7-4d37-a353-ec448940914d\",\n    \"1259ab9a-7157-4df6-87ef-4982508b49cc\",\n    \"ae245a88-3cc1-4ca1-8273-cdb64f43d10a\",\n    \"71deb6a0-82e9-4856-ac6d-e6b500904847\",\n    \"b894e8ff-78fd-4213-b0a3-8d81cde284b2\",\n    \"0a526274-32bc-4566-86c0-5015e80208c1\",\n    \"a5d5196f-4f5e-4b57-a26f-3baedb054cb6\",\n    \"b9a2819d-9924-4172-99d5-7a3630022d4b\",\n    \"13a2c7d0-b480-4cf4-946e-b54d19e065a2\",\n    \"fec8ed72-2275-423e-928d-d6683e720cab\",\n    \"fac8ce7a-1654-4517-94a3-9f6e5a5280b3\",\n    \"677830d5-3ee0-462b-8b56-73a939beb53d\",\n    \"5258fc4e-10cf-464d-ac27-d7c05b221be7\",\n    \"4d85b7fe-c1a8-47f4-843f-74eac3aaaeb5\",\n    \"471504dc-486c-4c3a-97fb-8b9a39026c6e\",\n    \"05cb1e2e-a790-41c3-b899-0dec305fe818\",\n    \"15497069-f42b-44cb-8fb6-7bdcfaea6f86\",\n    \"4eea4448-2896-4d6f-94c6-4dfdd597e77e\",\n    \"948ef76c-9b89-4461-84e3-43608d98c252\"\n  ]\n}\n```"
+    },
+    {
+      "modelId": "gpt-4.1",
+      "exclusions": [
+        {
+          "questionId": "47",
+          "reason": "Instructional/attention check; not a substantive opinion or value question."
+        },
+        {
+          "questionId": "71",
+          "reason": "Instructional/attention check; not a substantive opinion or value question."
+        },
+        {
+          "questionId": "82",
+          "reason": "Nonsense/factual question with trivially predictable answer (about charging phones with bananas)."
+        },
+        {
+          "questionId": "88",
+          "reason": "Meta-survey feedback; not substantive for demographic benchmarking."
+        },
+        {
+          "questionId": "89",
+          "reason": "Meta-survey feedback; not substantive for demographic benchmarking."
+        },
+        {
+          "questionId": "90",
+          "reason": "Meta-survey feedback; not substantive for demographic benchmarking."
+        },
+        {
+          "questionId": "91",
+          "reason": "Meta-survey feedback; not substantive for demographic benchmarking."
+        }
+      ],
+      "subjectRanking": [
+        "1",
+        "13",
+        "40",
+        "42",
+        "39",
+        "38",
+        "41",
+        "43",
+        "27",
+        "28",
+        "31",
+        "35",
+        "36",
+        "9",
+        "10",
+        "11",
+        "12",
+        "14",
+        "18",
+        "17",
+        "24",
+        "26",
+        "44",
+        "45",
+        "49",
+        "53",
+        "66",
+        "64",
+        "75"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"47\",\n      \"reason\": \"Instructional/attention check; not a substantive opinion or value question.\"\n    },\n    {\n      \"questionId\": \"71\",\n      \"reason\": \"Instructional/attention check; not a substantive opinion or value question.\"\n    },\n    {\n      \"questionId\": \"82\",\n      \"reason\": \"Nonsense/factual question with trivially predictable answer (about charging phones with bananas).\"\n    },\n    {\n      \"questionId\": \"88\",\n      \"reason\": \"Meta-survey feedback; not substantive for demographic benchmarking.\"\n    },\n    {\n      \"questionId\": \"89\",\n      \"reason\": \"Meta-survey feedback; not substantive for demographic benchmarking.\"\n    },\n    {\n      \"questionId\": \"90\",\n      \"reason\": \"Meta-survey feedback; not substantive for demographic benchmarking.\"\n    },\n    {\n      \"questionId\": \"91\",\n      \"reason\": \"Meta-survey feedback; not substantive for demographic benchmarking.\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"1\",\n    \"13\",\n    \"40\",\n    \"42\",\n    \"39\",\n    \"38\",\n    \"41\",\n    \"43\",\n    \"27\",\n    \"28\",\n    \"31\",\n    \"35\",\n    \"36\",\n    \"9\",\n    \"10\",\n    \"11\",\n    \"12\",\n    \"14\",\n    \"18\",\n    \"17\",\n    \"24\",\n    \"26\",\n    \"44\",\n    \"45\",\n    \"49\",\n    \"53\",\n    \"66\",\n    \"64\",\n    \"75\"\n  ]\n}\n```"
+    },
+    {
+      "modelId": "google/gemini-2.5-pro-preview",
+      "exclusions": [],
+      "subjectRanking": [],
+      "rawResponse": "An expert survey methodologist's review of questions for an AI demographic evaluation benchmark.\n\nThe benchmark tests whether AI models can predict how different demographic groups (by age, gender, country, religion, etc.) would respond to survey questions. Questions are scored by comparing AI-predicted response distributions to actual survey data.\n\nIMPORTANT: Do NOT favor questions that are easy for AI models to predict. The goal is to select questions that genuinely test whether models understand demographic differences — not questions that inflate AI scores.\n\nBelow are all questions from the survey. For each question, you see the question text and answer options.\n\nSURVEY: Global Dialogues GD6 (global-dialogues-gd6)\nQUESTIONS:\n  1. [ab8d91fa-cb00-4"
+    }
+  ],
+  "consensus": {
+    "exclusions": [],
+    "subjectRanking": [
+      {
+        "questionId": "2617912e-463a-4fb4-8781-0ada7a788fb2",
+        "voteCount": 1,
+        "avgRank": 1
+      },
+      {
+        "questionId": "249238a9-3050-4e7c-a3d4-ef799733b865",
+        "voteCount": 1,
+        "avgRank": 2
+      },
+      {
+        "questionId": "fee867c7-70e2-46ae-98e0-3dd3dd2865f6",
+        "voteCount": 1,
+        "avgRank": 3
+      },
+      {
+        "questionId": "49aaef31-00eb-40e1-ac68-a1b388d81ca9",
+        "voteCount": 1,
+        "avgRank": 4
+      },
+      {
+        "questionId": "75cce6ea-4a31-4103-a791-90e6db9ecd8f",
+        "voteCount": 1,
+        "avgRank": 5
+      },
+      {
+        "questionId": "2072e5fb-6a4f-46f5-98b5-17da5d70a776",
+        "voteCount": 1,
+        "avgRank": 6
+      },
+      {
+        "questionId": "84779ba6-1191-4840-862d-e9eacc2defe9",
+        "voteCount": 1,
+        "avgRank": 7
+      },
+      {
+        "questionId": "e97db5cf-118a-4016-ab42-fabb172ce5cd",
+        "voteCount": 1,
+        "avgRank": 8
+      },
+      {
+        "questionId": "7dd026f5-c70d-4126-bc78-68e823880f65",
+        "voteCount": 1,
+        "avgRank": 9
+      },
+      {
+        "questionId": "90ff5658-c6f7-4d37-a353-ec448940914d",
+        "voteCount": 1,
+        "avgRank": 10
+      },
+      {
+        "questionId": "1259ab9a-7157-4df6-87ef-4982508b49cc",
+        "voteCount": 1,
+        "avgRank": 11
+      },
+      {
+        "questionId": "ae245a88-3cc1-4ca1-8273-cdb64f43d10a",
+        "voteCount": 1,
+        "avgRank": 12
+      },
+      {
+        "questionId": "71deb6a0-82e9-4856-ac6d-e6b500904847",
+        "voteCount": 1,
+        "avgRank": 13
+      },
+      {
+        "questionId": "b894e8ff-78fd-4213-b0a3-8d81cde284b2",
+        "voteCount": 1,
+        "avgRank": 14
+      },
+      {
+        "questionId": "0a526274-32bc-4566-86c0-5015e80208c1",
+        "voteCount": 1,
+        "avgRank": 15
+      },
+      {
+        "questionId": "a5d5196f-4f5e-4b57-a26f-3baedb054cb6",
+        "voteCount": 1,
+        "avgRank": 16
+      },
+      {
+        "questionId": "b9a2819d-9924-4172-99d5-7a3630022d4b",
+        "voteCount": 1,
+        "avgRank": 17
+      },
+      {
+        "questionId": "13a2c7d0-b480-4cf4-946e-b54d19e065a2",
+        "voteCount": 1,
+        "avgRank": 18
+      },
+      {
+        "questionId": "fec8ed72-2275-423e-928d-d6683e720cab",
+        "voteCount": 1,
+        "avgRank": 19
+      },
+      {
+        "questionId": "fac8ce7a-1654-4517-94a3-9f6e5a5280b3",
+        "voteCount": 1,
+        "avgRank": 20
+      },
+      {
+        "questionId": "677830d5-3ee0-462b-8b56-73a939beb53d",
+        "voteCount": 1,
+        "avgRank": 21
+      },
+      {
+        "questionId": "5258fc4e-10cf-464d-ac27-d7c05b221be7",
+        "voteCount": 1,
+        "avgRank": 22
+      },
+      {
+        "questionId": "4d85b7fe-c1a8-47f4-843f-74eac3aaaeb5",
+        "voteCount": 1,
+        "avgRank": 23
+      },
+      {
+        "questionId": "471504dc-486c-4c3a-97fb-8b9a39026c6e",
+        "voteCount": 1,
+        "avgRank": 24
+      },
+      {
+        "questionId": "05cb1e2e-a790-41c3-b899-0dec305fe818",
+        "voteCount": 1,
+        "avgRank": 25
+      },
+      {
+        "questionId": "15497069-f42b-44cb-8fb6-7bdcfaea6f86",
+        "voteCount": 1,
+        "avgRank": 26
+      },
+      {
+        "questionId": "4eea4448-2896-4d6f-94c6-4dfdd597e77e",
+        "voteCount": 1,
+        "avgRank": 27
+      },
+      {
+        "questionId": "948ef76c-9b89-4461-84e3-43608d98c252",
+        "voteCount": 1,
+        "avgRank": 28
+      },
+      {
+        "questionId": "ab8d91fa-cb00-4044-828e-59e165532ed5",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "345c2b91-6de9-4c51-8288-922f9a39a650",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "7a5f9a6d-579b-4117-bb89-c4b92514e466",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "56f4b20b-87f9-4aa0-afed-adaffe5fbd91",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "df84db18-d207-47ae-ab9a-2f3339642576",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "da2fed27-d29a-416d-ab49-a5c2c037187b",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "770c5dc2-7f4a-4fd0-84eb-351ff475647e",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "daef59cb-9613-4468-81a8-d31ec8318ab7",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "0625fc89-8b0d-432c-a526-b3588b7edbeb",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "5710c67a-adf2-469d-aa92-1b6961e2b9de",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "87a7c03c-831b-4463-a0eb-1a40b2b47a17",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "8a238573-802f-4c76-81e3-21a367107ba8",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "a40ac181-e276-4d6d-9f17-c9e079bd1467",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "33407f11-6399-445c-9e33-9d7948c84b77",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "d536cd1c-0d35-4600-b7cb-9a766847548b",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "5bb37818-4e45-40f9-ba8c-96ec97831225",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f16e6aa0-0b90-4244-a1cb-b7381c66df63",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "44f058f5-5298-4648-b6e0-29b97111a3cf",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "7a85bcd5-7ba5-4285-af1c-d50944c6efff",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "515eb5c6-de73-40f5-bf9a-1200643cba44",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f0868346-3386-4c1d-8659-70cac7f5f83a",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "13a250db-ed4b-4c30-b44f-d011191136b2",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "e0b7bdbf-753b-48c2-9760-615a24ebe1f0",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "9307ab2b-c46e-488d-8144-0f3657bf99f9",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "d1e7db5c-b64f-4255-8654-03efcb49f232",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "a2da635f-73e2-437a-b087-14de27d01e71",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "deaf0310-f471-4a48-b708-c1b832b3b07f",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "ae9d3aad-cd36-45dc-8b84-1506f01e9b44",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "e8d2fb10-f00d-4037-9252-37c5110544b4",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f9d8b140-b42d-4be6-8605-c1da8567816c",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "4af2da82-87f3-465f-9d6c-bb71b31b7f17",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "59d425dc-ae24-4de4-aa8e-510e1dc3a7e9",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "2565f6c0-872d-4bcf-b772-cfc35fe0290f",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "19bdbb9d-55e7-4325-92c4-e904b38e010c",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "c807fb39-7c68-4629-bf2e-5b20bf73b3f6",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "2e3c16db-072c-4129-b714-01ea61167353",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f9aaefee-0155-419f-83b3-5c8009c25d90",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "16290c47-29d8-4928-9331-4d694ce494a6",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "89b8ff63-8cf7-42cb-a06e-b72232772973",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "3ff1c1c6-523e-4555-a7df-35a96224f343",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "ae843d50-4b05-4a4c-880d-ad8a9ed7e2c7",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "6c8f0fca-ab17-40e4-8581-9728d91cf993",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "96e0211f-6222-46f8-b587-8b40f1b8420b",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "832e4543-043b-419e-afec-00d795419297",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "ecba93d1-4204-4195-8f4d-838fbd517889",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "1a48f05a-f36d-4c7a-8532-f51c8d645196",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "b8e022eb-be4f-4e02-a346-739c01ca32ac",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "843a00ad-d036-4376-9a25-3ed62aedd5f1",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "2fdf22c0-18d7-41f5-967e-11f580a06028",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "62c24fd2-ecc7-496d-990a-1b5edd593615",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "61e6f9ed-bd09-4c71-ac5d-293aea28db32",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "84320916-86ae-4f0d-966d-b8bab4c62772",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "b8b89356-961f-4131-b14c-93ae0aea2a96",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "535d8f31-7417-43ce-91d1-93642026df23",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "b6ca6705-f5ad-40e9-b7eb-6e207b34a0fa",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "69e5c3bf-22bb-481b-a199-288f5b8a9f15",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "e8770f98-0792-453f-a370-03cb63875992",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f7cecd2f-8afa-47ad-9a09-fbf5e8b0adfd",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f1576fce-5455-40fc-89d9-a3758959171d",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "3249ff80-d73d-46c4-87bd-c40fb8252a1c",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "eadfc769-2907-4c59-be57-9ebf4d0c7d7a",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "2c1a077d-d969-4df8-8bbd-9f569feb2774",
+        "voteCount": 0,
+        "avgRank": 91
+      },
+      {
+        "questionId": "f5a834e3-55a7-42b6-b363-b5c768da3541",
+        "voteCount": 0,
+        "avgRank": 91
+      }
+    ]
+  },
+  "questionCount": 91,
+  "excludedCount": 0
+}
