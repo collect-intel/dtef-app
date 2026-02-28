@@ -22,6 +22,7 @@ export interface ExperimentCondition {
 export interface ExperimentDesign {
     independentVariable: string;
     conditions: ExperimentCondition[];
+    conditionMap?: Record<string, string[]>;  // condition name → configIds
     segments: string;
     models: string;
     subjectQuestions: string;
@@ -33,6 +34,15 @@ export interface ExperimentResults {
     pValue?: number;
     effectSize?: number;
     detailedResultsPath?: string;
+    perConditionStats?: Record<string, {
+        mean: number;
+        stddev: number;
+        n: number;
+        scores: number[];
+    }>;
+    analyzedAt?: string;
+    configsAnalyzed?: number;
+    configsMissing?: number;
 }
 
 export interface ExperimentRecord {

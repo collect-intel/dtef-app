@@ -18,7 +18,7 @@ S3_REGION := us-east-1
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
 	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
-	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
+	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index dtef-experiment-analyze dtef-experiment-add-configs
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
@@ -317,6 +317,16 @@ dtef-experiment-conclude: ## Conclude an experiment (ID=test-1 CONCLUSION=promot
 
 dtef-experiment-index: ## Rebuild the experiments index from S3
 	pnpm cli dtef experiment rebuild-index
+
+dtef-experiment-analyze: ## Analyze experiment results (ID=batch-size-1v2)
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-analyze ID=batch-size-1v2" && exit 1)
+	pnpm cli dtef experiment analyze --id "$(ID)"
+
+dtef-experiment-add-configs: ## Add configIds to an experiment condition (ID=test CONDITION=control CONFIGS=id1,id2)
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-add-configs ID=test CONDITION=control CONFIGS=id1,id2" && exit 1)
+	@test -n "$(CONDITION)" || (echo "CONDITION required" && exit 1)
+	@test -n "$(CONFIGS)" || (echo "CONFIGS required (comma-separated configIds)" && exit 1)
+	pnpm cli dtef experiment add-configs --id "$(ID)" --condition "$(CONDITION)" --configs "$(CONFIGS)"
 
 # --- Dev ---
 

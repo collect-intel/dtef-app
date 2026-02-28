@@ -38,6 +38,8 @@ import {
     loadCurationResult,
     applyCuration,
 } from '../services/questionCurationService';
+import { welchTTest, cohensD, stddev, interpretEffectSize } from '../utils/statisticalTests';
+import { getConfigSummary } from '@/lib/storageService';
 
 export const dtefCommand = new Command('dtef')
     .description('DTEF: Generate and manage demographic evaluation blueprints');
@@ -66,6 +68,8 @@ dtefCommand
     .option('--reasoning-mode <mode>', 'Reasoning mode: standard or cot', 'standard')
     .option('--synthetic-n <n>', 'Number of synthetic individuals (for synthetic-individual eval type)', '20')
     .option('--experiment <id>', 'Tag blueprints with experiment ID')
+    .option('--experiment-id <id>', 'Auto-populate experiment conditionMap with generated configIds')
+    .option('--condition-name <name>', 'Condition name for --experiment-id mapping')
     .option('--dry-run', 'Validate and preview without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -301,6 +305,30 @@ dtefCommand
         }
 
         console.log(chalk.green(`\nDone! ${blueprints.length} blueprint(s) written to ${outputDir}`));
+
+        // Auto-populate experiment conditionMap if --experiment-id and --condition-name given
+        if (options.experimentId && options.conditionName) {
+            const expId = options.experimentId;
+            const condName = options.conditionName;
+            const configIds = blueprints.map(bp => bp.configId).filter((id): id is string => !!id);
+
+            console.log(chalk.gray(`\nUpdating experiment "${expId}" conditionMap["${condName}"] with ${configIds.length} configIds...`));
+            const record = await getJsonFile<ExperimentRecord>(`live/experiments/${expId}.json`);
+            if (!record) {
+                console.error(chalk.yellow(`Experiment "${expId}" not found in S3 — skipping conditionMap update`));
+            } else {
+                if (!record.design.conditionMap) record.design.conditionMap = {};
+                const existing = record.design.conditionMap[condName] || [];
+                const merged = [...new Set([...existing, ...configIds])];
+                record.design.conditionMap[condName] = merged;
+
+                // Also merge into top-level configIds
+                record.configIds = [...new Set([...record.configIds, ...configIds])];
+
+                await saveJsonFile(`live/experiments/${record.id}.json`, record);
+                console.log(chalk.green(`  Updated: ${merged.length} configIds in condition "${condName}"`));
+            }
+        }
     });
 
 /**
@@ -955,6 +983,222 @@ experimentCommand
 
         await saveJsonFile('live/aggregates/experiments_index.json', index);
         console.log(chalk.green(`\nIndex rebuilt: ${experiments.length} experiment(s)`));
+    });
+
+/**
+ * dtef experiment analyze - Aggregate eval results and compute statistics
+ */
+experimentCommand
+    .command('analyze')
+    .description('Analyze experiment results: aggregate scores by condition, compute statistics')
+    .requiredOption('--id <id>', 'Experiment ID')
+    .option('--dry-run', 'Show analysis without writing back to S3')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        console.log(chalk.blue('\nExperiment Analysis\n'));
+
+        const record = await getJsonFile<ExperimentRecord>(`live/experiments/${options.id}.json`);
+        if (!record) {
+            console.error(chalk.red(`Experiment "${options.id}" not found`));
+            process.exit(1);
+        }
+
+        console.log(chalk.white(`Experiment: ${record.title}`));
+        console.log(chalk.white(`Hypothesis: ${record.hypothesis}\n`));
+
+        const conditionMap = record.design.conditionMap;
+        if (!conditionMap || Object.keys(conditionMap).length === 0) {
+            console.error(chalk.red('No conditionMap defined. Use --experiment-id/--condition-name with generate, or add-configs.'));
+            process.exit(1);
+        }
+
+        const conditionNames = Object.keys(conditionMap);
+        console.log(chalk.gray(`Conditions: ${conditionNames.join(', ')}`));
+
+        // Collect scores per condition
+        const perConditionStats: Record<string, { mean: number; stddev: number; n: number; scores: number[] }> = {};
+        let totalAnalyzed = 0;
+        let totalMissing = 0;
+
+        for (const condName of conditionNames) {
+            const configIds = conditionMap[condName];
+            const scores: number[] = [];
+
+            for (const configId of configIds) {
+                const summary = await getConfigSummary(configId);
+                if (!summary || summary.runs.length === 0) {
+                    totalMissing++;
+                    continue;
+                }
+
+                // Use the latest run's hybrid score
+                const latestRun = summary.runs[0];
+                const score = latestRun.hybridScoreStats?.average;
+                if (score != null) {
+                    scores.push(score);
+                    totalAnalyzed++;
+                } else {
+                    totalMissing++;
+                }
+            }
+
+            if (scores.length > 0) {
+                const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+                const sd = scores.length > 1 ? stddev(scores) : 0;
+                perConditionStats[condName] = { mean, stddev: sd, n: scores.length, scores };
+                console.log(chalk.green(`  ${condName}: mean=${mean.toFixed(4)}, sd=${sd.toFixed(4)}, n=${scores.length}/${configIds.length}`));
+            } else {
+                console.log(chalk.yellow(`  ${condName}: no scores available (0/${configIds.length} configs have results)`));
+            }
+        }
+
+        if (totalAnalyzed === 0) {
+            console.error(chalk.red('\nNo configs have results yet. Run evaluations first.'));
+            process.exit(1);
+        }
+
+        // Build conditionScores
+        const conditionScores: Record<string, number> = {};
+        for (const [name, stats] of Object.entries(perConditionStats)) {
+            conditionScores[name] = stats.mean;
+        }
+
+        // Compute statistics if exactly 2 conditions
+        let pValue: number | undefined;
+        let effectSize: number | undefined;
+        let summaryText: string;
+
+        const statsEntries = Object.entries(perConditionStats);
+        if (statsEntries.length === 2) {
+            const [nameA, statsA] = statsEntries[0];
+            const [nameB, statsB] = statsEntries[1];
+
+            if (statsA.scores.length >= 2 && statsB.scores.length >= 2) {
+                const tResult = welchTTest(statsA.scores, statsB.scores);
+                const d = cohensD(statsA.scores, statsB.scores);
+                pValue = tResult.pValue;
+                effectSize = Math.abs(d);
+
+                const delta = statsA.mean - statsB.mean;
+                const deltaSign = delta >= 0 ? '+' : '';
+                const effect = interpretEffectSize(d);
+
+                summaryText = `${nameA} scored ${statsA.mean.toFixed(4)} vs ${nameB} at ${statsB.mean.toFixed(4)}, Δ=${deltaSign}${delta.toFixed(4)}, p=${pValue.toFixed(4)}, d=${Math.abs(d).toFixed(3)} (${effect})`;
+
+                console.log(chalk.white(`\n  Welch's t-test: t=${tResult.t.toFixed(3)}, df=${tResult.df.toFixed(1)}, p=${pValue.toFixed(4)}`));
+                console.log(chalk.white(`  Cohen's d: ${d.toFixed(3)} (${effect})`));
+            } else {
+                summaryText = `${nameA}: ${statsA.mean.toFixed(4)} (n=${statsA.n}), ${nameB}: ${statsB.mean.toFixed(4)} (n=${statsB.n}) — insufficient data for significance test`;
+            }
+        } else {
+            const parts = statsEntries.map(([name, stats]) => `${name}: ${stats.mean.toFixed(4)} (n=${stats.n})`);
+            summaryText = parts.join(', ');
+        }
+
+        console.log(chalk.blue(`\nSummary: ${summaryText}`));
+        console.log(chalk.gray(`Configs analyzed: ${totalAnalyzed}, missing: ${totalMissing}`));
+
+        if (options.dryRun) {
+            console.log(chalk.yellow('\nDry run — not writing results to S3'));
+            return;
+        }
+
+        // Write results back
+        record.results = {
+            summary: summaryText,
+            conditionScores,
+            pValue,
+            effectSize,
+            perConditionStats,
+            analyzedAt: new Date().toISOString(),
+            configsAnalyzed: totalAnalyzed,
+            configsMissing: totalMissing,
+        };
+
+        if (totalMissing === 0 && totalAnalyzed > 0) {
+            record.status = 'completed';
+        } else if (totalAnalyzed > 0) {
+            record.status = 'running';
+        }
+
+        await saveJsonFile(`live/experiments/${record.id}.json`, record);
+        console.log(chalk.green(`\nResults written to live/experiments/${record.id}.json`));
+
+        // Rebuild index
+        console.log(chalk.gray('Rebuilding experiment index...'));
+        const { S3Client: S3, ListObjectsV2Command: ListCmd } = await import('@aws-sdk/client-s3');
+        const experiments: ExperimentRecord[] = [];
+        const prefix = 'live/experiments/';
+
+        try {
+            const s3Client = new S3({ region: process.env.APP_AWS_REGION || process.env.AWS_REGION || 'us-east-1' });
+            const bucket = process.env.APP_S3_BUCKET_NAME || process.env.S3_BUCKET_NAME;
+            if (bucket) {
+                let continuationToken: string | undefined;
+                const keys: string[] = [];
+                do {
+                    const resp = await s3Client.send(new ListCmd({
+                        Bucket: bucket,
+                        Prefix: prefix,
+                        ContinuationToken: continuationToken,
+                    }));
+                    for (const obj of resp.Contents || []) {
+                        if (obj.Key && obj.Key.endsWith('.json')) {
+                            keys.push(obj.Key);
+                        }
+                    }
+                    continuationToken = resp.NextContinuationToken;
+                } while (continuationToken);
+
+                for (const key of keys) {
+                    const exp = await getJsonFile<ExperimentRecord>(key);
+                    if (exp && exp.id) experiments.push(exp);
+                }
+
+                const index: ExperimentIndex = {
+                    experiments: experiments.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+                    lastUpdated: new Date().toISOString(),
+                };
+                await saveJsonFile('live/aggregates/experiments_index.json', index);
+                console.log(chalk.green(`Index rebuilt: ${experiments.length} experiment(s)`));
+            }
+        } catch (err: any) {
+            console.log(chalk.yellow(`Warning: could not rebuild index: ${err.message}`));
+        }
+    });
+
+/**
+ * dtef experiment add-configs - Add configIds to an experiment condition
+ */
+experimentCommand
+    .command('add-configs')
+    .description('Add configIds to an experiment condition mapping')
+    .requiredOption('--id <id>', 'Experiment ID')
+    .requiredOption('--condition <name>', 'Condition name')
+    .requiredOption('--configs <ids>', 'Comma-separated configIds to add')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        const record = await getJsonFile<ExperimentRecord>(`live/experiments/${options.id}.json`);
+        if (!record) {
+            console.error(chalk.red(`Experiment "${options.id}" not found`));
+            process.exit(1);
+        }
+
+        if (!record.design.conditionMap) record.design.conditionMap = {};
+
+        const configIds = options.configs.split(',').map((s: string) => s.trim());
+        const existing = record.design.conditionMap[options.condition] || [];
+        const merged = [...new Set([...existing, ...configIds])];
+        record.design.conditionMap[options.condition] = merged;
+
+        // Also merge into top-level configIds
+        record.configIds = [...new Set([...record.configIds, ...configIds])];
+
+        await saveJsonFile(`live/experiments/${record.id}.json`, record);
+        console.log(chalk.green(`Added ${configIds.length} configIds to condition "${options.condition}" (total: ${merged.length})`));
+        console.log(chalk.gray(`Experiment "${record.id}" now has ${record.configIds.length} total configIds`));
     });
 
 /**
