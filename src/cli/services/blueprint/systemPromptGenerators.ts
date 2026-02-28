@@ -107,7 +107,94 @@ PROBABILITIES: [p1, p2, p3, ...]
 
 The probabilities must sum to 1.0.`;
 
+// ─── Batched prompts for non-distribution eval types ─────────────────────────
+
+const BATCHED_SHIFT_SYSTEM_PROMPT = `You are a demographic survey analyst. You will be given the overall population's response distributions to multiple survey questions, and a specific demographic group. Predict how this group's distributions DIFFER from the overall population.
+
+Respond ONLY with a JSON object. Keys are question labels (Q1, Q2, etc.). Values are arrays of adjusted percentages summing to 100. Use one decimal place. Do not include any other text.
+
+Example:
+{"Q1": [35.2, 28.1, 22.4, 14.3], "Q2": [45.0, 35.0, 20.0]}`;
+
+const BATCHED_COT_DISTRIBUTION_PROMPT = `You are a demographic survey analyst. When given a demographic group and multiple survey questions, predict how that group would respond to each question.
+
+Think through this step-by-step for each question:
+1. OPTION INTERPRETATION: What does each answer option represent?
+2. SEGMENT ANALYSIS: How do the demographic attributes relate to this topic?
+3. DISTRIBUTION REASONING: How would this group's characteristics shape responses?
+
+After your reasoning, provide the final answer as a JSON object on its own line:
+DISTRIBUTION: {"Q1": [p1, p2, ...], "Q2": [p1, p2, ...]}
+
+Each array of percentages must sum to 100. Use one decimal place.`;
+
+const BATCHED_COT_SHIFT_PROMPT = `You are a demographic survey analyst. You will be given the overall population's response distributions to multiple survey questions, and a specific demographic group. Predict how this group's distributions DIFFER from the overall population.
+
+Think through this step-by-step for each question:
+1. OPTION INTERPRETATION: What does each answer option represent?
+2. SEGMENT ANALYSIS: How might this group differ from the general population?
+3. SHIFT REASONING: Which options would this group favor more or less?
+
+After your reasoning, provide the final answer as a JSON object on its own line:
+DISTRIBUTION: {"Q1": [p1, p2, ...], "Q2": [p1, p2, ...]}
+
+Each array of percentages must sum to 100. Use one decimal place.`;
+
+const BATCHED_SYNTHETIC_INDIVIDUAL_PROMPT = `You are a demographic survey analyst. When given a demographic group and multiple survey questions, simulate how individual members of this group would answer each question.
+
+Respond ONLY with a JSON object. Keys are question labels (Q1, Q2, etc.). Values are arrays of answer letters, each representing one simulated individual's response. Do not include any other text.
+
+Example:
+{"Q1": ["a", "c", "b", "a"], "Q2": ["b", "a", "c", "b"]}`;
+
+const BATCHED_INDIVIDUAL_ANSWER_PROMPT = `You are a demographic survey analyst. When given a person's demographic attributes and multiple survey questions, predict which answer they would most likely choose for each.
+
+Respond ONLY with a JSON object. Keys are question labels (Q1, Q2, etc.). Values are objects with "answer" (letter) and "probabilities" (array summing to 1.0). Do not include any other text.
+
+Example:
+{"Q1": {"answer": "a", "probabilities": [0.6, 0.3, 0.1]}, "Q2": {"answer": "b", "probabilities": [0.2, 0.7, 0.1]}}`;
+
+const BATCHED_COT_SYNTHETIC_INDIVIDUAL_PROMPT = `You are a demographic survey analyst. When given a demographic group and multiple survey questions, simulate how individual members of this group would answer each question.
+
+Think through this step-by-step for each question:
+1. Consider the diversity of views within this demographic group.
+2. For each simulated individual, choose the most likely answer.
+
+After your reasoning, provide the final answer as a JSON object on its own line:
+DISTRIBUTION: {"Q1": ["a", "c", ...], "Q2": ["b", "a", ...]}`;
+
+const BATCHED_COT_INDIVIDUAL_ANSWER_PROMPT = `You are a demographic survey analyst. When given a person's demographic attributes and multiple survey questions, predict which answer they would most likely choose for each.
+
+Think through this step-by-step for each question:
+1. Consider the person's attributes and how they relate to each topic.
+2. Determine the most likely answer and confidence probabilities.
+
+After your reasoning, provide the final answer as a JSON object on its own line:
+DISTRIBUTION: {"Q1": {"answer": "a", "probabilities": [0.6, 0.3, 0.1]}, "Q2": {"answer": "b", "probabilities": [0.2, 0.7, 0.1]}}`;
+
 // ─── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Get the batched system prompt for a given eval type and reasoning mode.
+ */
+function getBatchedSystemPrompt(evalType: DTEFEvalType, reasoningMode: DTEFReasoningMode): string {
+    if (reasoningMode === 'cot') {
+        switch (evalType) {
+            case 'distribution': return BATCHED_COT_DISTRIBUTION_PROMPT;
+            case 'shift': return BATCHED_COT_SHIFT_PROMPT;
+            case 'synthetic-individual': return BATCHED_COT_SYNTHETIC_INDIVIDUAL_PROMPT;
+            case 'individual-answer': return BATCHED_COT_INDIVIDUAL_ANSWER_PROMPT;
+            default: return BATCHED_COT_DISTRIBUTION_PROMPT;
+        }
+    }
+    switch (evalType) {
+        case 'distribution': return BATCHED_SYSTEM_PROMPT;
+        case 'shift': return BATCHED_SHIFT_SYSTEM_PROMPT;
+        case 'synthetic-individual': return BATCHED_SYNTHETIC_INDIVIDUAL_PROMPT;
+        case 'individual-answer': return BATCHED_INDIVIDUAL_ANSWER_PROMPT;
+        default: return BATCHED_SYSTEM_PROMPT;
+    }
+}
 
 /**
  * Get the system prompt for a given eval type and reasoning mode.
@@ -118,7 +205,7 @@ export function getSystemPrompt(
     options?: { customPrompt?: string; batched?: boolean },
 ): string {
     if (options?.customPrompt) return options.customPrompt;
-    if (options?.batched) return BATCHED_SYSTEM_PROMPT;
+    if (options?.batched) return getBatchedSystemPrompt(evalType, reasoningMode);
 
     if (reasoningMode === 'cot') {
         switch (evalType) {

@@ -33,7 +33,7 @@ import {
     BATCHED_SYSTEM_PROMPT,
     SHIFT_SYSTEM_PROMPT,
 } from './blueprint/systemPromptGenerators';
-import { assemblePrompt } from './blueprint/promptAssembler';
+import { assemblePrompt, assembleBatchedPrompt, BatchedQuestionItem } from './blueprint/promptAssembler';
 import { encodeConfigId } from './blueprint/configIdEncoder';
 
 /**
@@ -223,13 +223,30 @@ export class DemographicBlueprintService {
 
     /**
      * Generate a batched blueprint where multiple questions are asked per prompt.
+     * Uses the full composition model: context generators, prompt assembler,
+     * system prompt generators, and config ID encoder.
      */
     private static generateBatchedBlueprintForSegment(
         config: DTEFBlueprintConfig,
         segment: SegmentWithResponses,
         batchSize: number
     ): WevalConfig {
+        const evalType: DTEFEvalType = config.evalType || 'distribution';
+        const reasoningMode: DTEFReasoningMode = config.reasoningMode || 'standard';
+        const contextFormat: DTEFContextFormat = config.contextFormat
+            || (config.contextQuestionIds && config.contextQuestionIds.length > 0
+                ? 'distribution-context'
+                : 'attribute-label');
+
+        // Compute marginals if needed
+        let marginals: Record<string, number[]> | undefined;
+        if (evalType === 'shift' || contextFormat === 'narrative') {
+            marginals = config.populationMarginals || this.computePopulationMarginals(config.surveyData);
+        }
+
         const prompts: WevalPromptConfig[] = [];
+        let blueprintContextCount = 0;
+        let blueprintContextIds: string[] = [];
 
         // Collect valid question/response pairs
         const questionPairs: { questionId: string; question: { text: string; type: string; options?: string[] }; response: DemographicResponse }[] = [];
@@ -246,23 +263,44 @@ export class DemographicBlueprintService {
             const batch = questionPairs.slice(batchIdx, batchIdx + batchSize);
             const promptId = `batch-${Math.floor(batchIdx / batchSize)}-${segment.id}`;
 
-            // Build batched prompt text
-            const attributeLines = Object.entries(segment.attributes)
-                .map(([key, value]) => `- ${formatAttributeKey(key)}: ${value}`)
-                .join('\n');
+            // Exclude all batch question IDs from context
+            const batchQuestionIds = batch.map(item => item.questionId);
 
-            let promptText = `Consider the following demographic group (sample size: ${segment.sampleSize}):\n`;
-            promptText += `${attributeLines}\n\n`;
-            promptText += `For each of the following survey questions, predict the percentage distribution of responses for this demographic group.\n\n`;
+            // Build context using the composition model
+            let contextBlock: ContextResult | null = null;
+            if (contextFormat === 'distribution-context') {
+                contextBlock = buildDistributionContext(segment, config, undefined, batchQuestionIds);
+            } else if (contextFormat === 'narrative') {
+                contextBlock = buildNarrativeContext(segment, config, marginals, undefined, batchQuestionIds);
+            } else {
+                contextBlock = getContextBuilder(contextFormat, segment, config, undefined, marginals, batchQuestionIds);
+            }
 
-            batch.forEach((item, idx) => {
-                const label = `Q${idx + 1}`;
-                promptText += `${label}: "${item.question.text}"\n`;
-                if (item.question.options && item.question.options.length > 0) {
-                    promptText += `  Options: ${item.question.options.map((opt, i) => `${String.fromCharCode(97 + i)}. ${opt}`).join(', ')}\n`;
-                }
-                promptText += '\n';
-            });
+            // Assemble the batched prompt
+            const batchedItems: BatchedQuestionItem[] = batch.map(item => ({
+                questionId: item.questionId,
+                question: item.question,
+            }));
+
+            const assembled = assembleBatchedPrompt(
+                contextBlock,
+                segment,
+                batchedItems,
+                evalType,
+                reasoningMode,
+                {
+                    prefix: config.blueprintTemplate?.promptPrefix,
+                    suffix: config.blueprintTemplate?.promptSuffix,
+                    marginals,
+                    syntheticN: config.syntheticN,
+                },
+            );
+
+            // Track context counts
+            if (assembled.contextQuestionCount > blueprintContextCount) {
+                blueprintContextCount = assembled.contextQuestionCount;
+                blueprintContextIds = assembled.contextQuestionIds;
+            }
 
             // Build ideal response as JSON object
             const idealResponse = JSON.stringify(
@@ -283,19 +321,32 @@ export class DemographicBlueprintService {
             prompts.push({
                 id: promptId,
                 description: `Batched prediction (${batch.length} Qs): ${segment.label}`,
-                promptText,
+                promptText: assembled.text,
                 points,
                 idealResponse,
                 temperature: config.modelConfig?.temperature,
             });
         }
 
+        // Encode configId with full parameters
         const blueprintId = encodeConfigId({
             surveyId: config.surveyData.surveyId,
             segmentId: segment.id,
+            contextQuestionCount: blueprintContextCount,
+            contextFormat,
+            evalType,
+            reasoningMode,
             batchSize,
         });
-        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label} (batch ${batchSize})`;
+
+        const ctxLabel = blueprintContextCount > 0 ? ` (${blueprintContextCount} context Qs)` : '';
+        const evalLabel = evalType === 'shift' ? ' [shift]'
+            : evalType === 'synthetic-individual' ? ' [synth]'
+            : evalType === 'individual-answer' ? ' [indiv]'
+            : '';
+        const cotLabel = reasoningMode === 'cot' ? ' [CoT]' : '';
+        const fmtLabel = contextFormat === 'narrative' ? ' [narrative]' : '';
+        const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label} (batch ${batchSize})${ctxLabel}${evalLabel}${cotLabel}${fmtLabel}`;
 
         // Build ground truth distributions
         const groundTruthDistributions: Record<string, number[]> = {};
@@ -303,15 +354,31 @@ export class DemographicBlueprintService {
             groundTruthDistributions[pair.questionId] = pair.response.distribution;
         }
 
+        // System prompt via generator with batched flag
+        const systemPrompt = getSystemPrompt(evalType, reasoningMode, {
+            customPrompt: config.blueprintTemplate?.systemPrompt,
+            batched: true,
+        });
+
+        // Build tags (matching single-question path)
+        const evalTag = evalType === 'shift' ? 'shift'
+            : evalType === 'synthetic-individual' ? 'synthetic-individual'
+            : evalType === 'individual-answer' ? 'individual-answer'
+            : 'distribution';
+        const tags = ['_periodic', 'dtef', 'demographic', 'batched', evalTag, config.surveyData.surveyId];
+        if (reasoningMode === 'cot') tags.push('cot');
+        if (contextFormat === 'narrative') tags.push('narrative');
+        if (config.experimentId) tags.push(`experiment:${config.experimentId}`);
+
         return {
             configId: blueprintId,
             configTitle: blueprintTitle,
-            description: `DTEF: Batched distribution predictions (${batchSize} Qs/prompt) for ${segment.label}. Source: ${config.surveyData.source || config.surveyData.surveyName}`,
-            models: config.modelConfig?.models || ['CORE_CHEAP'],
-            system: getSystemPrompt('distribution', 'standard', { batched: true }),
+            description: `DTEF${evalLabel}: Batched predictions (${batchSize} Qs/prompt) for ${segment.label}. Source: ${config.surveyData.source || config.surveyData.surveyName}`,
+            models: config.modelConfig?.models || ['CORE'],
+            system: systemPrompt,
             temperature: config.modelConfig?.temperature || 0.3,
             prompts,
-            tags: ['_periodic', 'dtef', 'demographic', 'batched', config.surveyData.surveyId],
+            tags,
             context: {
                 dtef: {
                     surveyId: config.surveyData.surveyId,
@@ -319,7 +386,14 @@ export class DemographicBlueprintService {
                     segmentLabel: segment.label,
                     segmentAttributes: segment.attributes,
                     groundTruthDistributions,
+                    contextQuestionCount: blueprintContextCount,
+                    contextQuestionIds: blueprintContextIds,
                     batchSize,
+                    evalType,
+                    contextFormat,
+                    reasoningMode,
+                    ...(config.experimentId ? { experimentId: config.experimentId } : {}),
+                    ...(marginals ? { populationMarginals: marginals } : {}),
                 },
             },
         };

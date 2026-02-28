@@ -65,6 +65,7 @@ export function buildDistributionContext(
     segment: SegmentWithResponses,
     config: DTEFBlueprintConfig,
     targetQuestionId?: string,
+    excludeQuestionIds?: string[],
 ): ContextResult | null {
     const contextQuestionIds = config.contextQuestionIds;
     if (!contextQuestionIds || contextQuestionIds.length === 0) return null;
@@ -73,9 +74,11 @@ export function buildDistributionContext(
     const systemPrompt = config.blueprintTemplate?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
     const maxContextQuestions = config.contextQuestionCount;
 
+    const excludeSet = new Set(excludeQuestionIds || (targetQuestionId ? [targetQuestionId] : []));
+
     const contextTexts: { questionId: string; text: string }[] = [];
     for (const qId of contextQuestionIds) {
-        if (qId === targetQuestionId) continue;
+        if (excludeSet.has(qId)) continue;
         const q = config.surveyData.questions[qId];
         if (!q) continue;
         const resp = segment.responses.find(r => r.questionId === qId);
@@ -177,6 +180,7 @@ export function buildNarrativeContext(
     config: DTEFBlueprintConfig,
     populationMarginals?: Record<string, number[]>,
     targetQuestionId?: string,
+    excludeQuestionIds?: string[],
 ): ContextResult | null {
     const contextQuestionIds = config.contextQuestionIds;
     if (!contextQuestionIds || contextQuestionIds.length === 0) return null;
@@ -184,8 +188,10 @@ export function buildNarrativeContext(
     const maxContextQuestions = config.contextQuestionCount;
     const narratives: { questionId: string; text: string }[] = [];
 
+    const excludeSet = new Set(excludeQuestionIds || (targetQuestionId ? [targetQuestionId] : []));
+
     for (const qId of contextQuestionIds) {
-        if (qId === targetQuestionId) continue;
+        if (excludeSet.has(qId)) continue;
         const q = config.surveyData.questions[qId];
         if (!q) continue;
         const resp = segment.responses.find(r => r.questionId === qId);
@@ -262,14 +268,15 @@ export function getContextBuilder(
     config: DTEFBlueprintConfig,
     targetQuestionId?: string,
     populationMarginals?: Record<string, number[]>,
+    excludeQuestionIds?: string[],
 ): ContextResult | null {
     switch (format) {
         case 'attribute-label':
             return buildAttributeLabel(segment);
         case 'distribution-context':
-            return buildDistributionContext(segment, config, targetQuestionId);
+            return buildDistributionContext(segment, config, targetQuestionId, excludeQuestionIds);
         case 'narrative':
-            return buildNarrativeContext(segment, config, populationMarginals, targetQuestionId);
+            return buildNarrativeContext(segment, config, populationMarginals, targetQuestionId, excludeQuestionIds);
         case 'raw-survey':
             return buildRawSurveyContext(null, config, targetQuestionId);
         case 'interview':

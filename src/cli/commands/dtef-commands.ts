@@ -35,6 +35,8 @@ import {
     buildCurationPrompt,
     parseCurationResponse,
     buildCurationResult,
+    loadCurationResult,
+    applyCuration,
 } from '../services/questionCurationService';
 
 export const dtefCommand = new Command('dtef')
@@ -56,7 +58,9 @@ dtefCommand
     .option('--context-questions <ids>', 'Comma-separated question IDs to use as context, or "all" for all non-target questions')
     .option('--context-levels <levels>', 'Generate blueprints at multiple context levels (e.g., "0,5,10,all")')
     .option('--token-budget <tokens>', 'Token budget per prompt (controls context question inclusion)', '4096')
-    .option('--batch-size <n>', 'Number of questions per batched prompt (1-5, default: 1)', '1')
+    .option('--batch-size <n>', 'Number of questions per batched prompt (sugar for --batch-sizes N)')
+    .option('--batch-sizes <sizes>', 'Comma-separated batch sizes for generation matrix (e.g., "1,2,3")', '1')
+    .option('--num-evals <n>', 'Number of evaluation prompts per batch size (default: all questions / batch_size)')
     .option('--eval-type <type>', 'Evaluation type: distribution, shift, synthetic-individual, or individual-answer', 'distribution')
     .option('--context-format <format>', 'Context format: attribute-label, distribution-context, or narrative')
     .option('--reasoning-mode <mode>', 'Reasoning mode: standard or cot', 'standard')
@@ -105,10 +109,24 @@ dtefCommand
 
         console.log(chalk.green(`Validation passed: ${validation.summary.questionCount} questions, ${validation.summary.segmentCount} segments, ${validation.summary.totalResponses} responses\n`));
 
-        // Build config
-        const targetQuestionIds = options.questions
-            ? options.questions.split(',').map((s: string) => s.trim())
-            : Object.keys(surveyData.questions);
+        // Build config — determine target question IDs
+        let targetQuestionIds: string[];
+
+        if (options.questions) {
+            // Explicit --questions overrides curation entirely
+            targetQuestionIds = options.questions.split(',').map((s: string) => s.trim());
+        } else {
+            // Try auto-loading curation
+            const curation = loadCurationResult(surveyData.surveyId);
+            if (curation) {
+                const allIds = Object.keys(surveyData.questions);
+                const result = applyCuration(allIds, curation);
+                targetQuestionIds = result.questionIds;
+                console.log(chalk.cyan(`Curation loaded: ${result.excludedCount} excluded, ${result.rankedCount} ranked, ${targetQuestionIds.length} included`));
+            } else {
+                targetQuestionIds = Object.keys(surveyData.questions);
+            }
+        }
 
         const contextQuestionIds = options.contextQuestions
             ? (options.contextQuestions.toLowerCase() === 'all'
@@ -137,9 +155,20 @@ dtefCommand
             process.exit(1);
         }
 
-        const batchSize = parseInt(options.batchSize, 10);
-        if (batchSize < 1 || batchSize > 5) {
-            console.error(chalk.red('--batch-size must be between 1 and 5'));
+        // Parse batch sizes: --batch-size N is sugar for --batch-sizes N
+        const batchSizesStr = options.batchSize || options.batchSizes;
+        const batchSizes = batchSizesStr.split(',').map((s: string) => {
+            const n = parseInt(s.trim(), 10);
+            if (isNaN(n) || n < 1 || n > 5) {
+                console.error(chalk.red(`Invalid batch size "${s}". Must be 1-5.`));
+                process.exit(1);
+            }
+            return n;
+        });
+
+        const numEvals = options.numEvals ? parseInt(options.numEvals, 10) : undefined;
+        if (numEvals !== undefined && (isNaN(numEvals) || numEvals < 1)) {
+            console.error(chalk.red('--num-evals must be a positive integer'));
             process.exit(1);
         }
 
@@ -164,27 +193,63 @@ dtefCommand
         const syntheticN = parseInt(options.syntheticN, 10);
         const experimentId = options.experiment as string | undefined;
 
-        // Generate blueprints (possibly at multiple context levels)
+        // Generate blueprints across batch-size matrix (and optionally context levels)
         console.log(chalk.gray('Generating blueprints...'));
 
         let allBlueprints: ReturnType<typeof DemographicBlueprintService.generateBlueprints> = [];
 
-        if (contextLevels && contextQuestionIds) {
-            // Multi-level context generation
-            const allContextIds = contextQuestionIds;
-            for (const level of contextLevels) {
-                const levelContextIds = level === 0 ? undefined
-                    : level === -1 ? allContextIds
-                    : allContextIds.slice(0, level);
-                const levelContextCount = level === 0 ? undefined
-                    : level === -1 ? undefined
-                    : level;
+        for (const batchSize of batchSizes) {
+            // Compute how many questions to consume for this batch size
+            const questionsNeeded = numEvals !== undefined
+                ? numEvals * batchSize
+                : targetQuestionIds.length;
+            const slicedQuestions = targetQuestionIds.slice(0, questionsNeeded);
 
+            if (batchSizes.length > 1) {
+                console.log(chalk.gray(`  Batch size ${batchSize}: ${slicedQuestions.length} questions → ${Math.ceil(slicedQuestions.length / batchSize)} prompts/segment`));
+            }
+
+            if (contextLevels && contextQuestionIds) {
+                // Multi-level context generation
+                const allContextIds = contextQuestionIds;
+                for (const level of contextLevels) {
+                    const levelContextIds = level === 0 ? undefined
+                        : level === -1 ? allContextIds
+                        : allContextIds.slice(0, level);
+                    const levelContextCount = level === 0 ? undefined
+                        : level === -1 ? undefined
+                        : level;
+
+                    const config: DTEFBlueprintConfig = {
+                        surveyData,
+                        targetQuestionIds: slicedQuestions,
+                        contextQuestionIds: levelContextIds,
+                        contextQuestionCount: levelContextCount,
+                        segmentSelection: options.segments ? 'specific' : 'all',
+                        segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
+                        tokenBudget: parseInt(options.tokenBudget, 10),
+                        batchSize: batchSize > 1 ? batchSize : undefined,
+                        evalType,
+                        contextFormat,
+                        reasoningMode,
+                        syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
+                        experimentId,
+                        modelConfig: {
+                            models: options.models.split(',').map((s: string) => s.trim()),
+                            temperature: parseFloat(options.temperature),
+                        },
+                    };
+
+                    const levelLabel = level === -1 ? 'all' : level === 0 ? '0 (baseline)' : String(level);
+                    console.log(chalk.gray(`    Context level ${levelLabel}...`));
+                    const blueprints = DemographicBlueprintService.generateBlueprints(config);
+                    allBlueprints.push(...blueprints);
+                }
+            } else {
                 const config: DTEFBlueprintConfig = {
                     surveyData,
-                    targetQuestionIds,
-                    contextQuestionIds: levelContextIds,
-                    contextQuestionCount: levelContextCount,
+                    targetQuestionIds: slicedQuestions,
+                    contextQuestionIds,
                     segmentSelection: options.segments ? 'specific' : 'all',
                     segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
                     tokenBudget: parseInt(options.tokenBudget, 10),
@@ -199,32 +264,9 @@ dtefCommand
                         temperature: parseFloat(options.temperature),
                     },
                 };
-
-                const levelLabel = level === -1 ? 'all' : level === 0 ? '0 (baseline)' : String(level);
-                console.log(chalk.gray(`  Context level ${levelLabel}...`));
                 const blueprints = DemographicBlueprintService.generateBlueprints(config);
                 allBlueprints.push(...blueprints);
             }
-        } else {
-            const config: DTEFBlueprintConfig = {
-                surveyData,
-                targetQuestionIds,
-                contextQuestionIds,
-                segmentSelection: options.segments ? 'specific' : 'all',
-                segmentIds: options.segments?.split(',').map((s: string) => s.trim()),
-                tokenBudget: parseInt(options.tokenBudget, 10),
-                batchSize: batchSize > 1 ? batchSize : undefined,
-                evalType,
-                contextFormat,
-                reasoningMode,
-                syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
-                experimentId,
-                modelConfig: {
-                    models: options.models.split(',').map((s: string) => s.trim()),
-                    temperature: parseFloat(options.temperature),
-                },
-            };
-            allBlueprints = DemographicBlueprintService.generateBlueprints(config);
         }
 
         const blueprints = allBlueprints;

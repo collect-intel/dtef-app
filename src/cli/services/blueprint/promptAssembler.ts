@@ -13,7 +13,7 @@ import {
     DTEFReasoningMode,
     SegmentWithResponses,
 } from '@/types/dtef';
-import { buildDemographicsHeader, formatAttributeKey } from './contextGenerators';
+import { buildDemographicsHeader, formatAttributeKey, ContextResult } from './contextGenerators';
 
 export interface AssembledPrompt {
     text: string;
@@ -120,6 +120,101 @@ export function assemblePrompt(
         }
     } else {
         corePrompt += `Predict the adjusted percentage distribution for this demographic group.`;
+    }
+
+    if (suffix) {
+        corePrompt += `\n\n${suffix}`;
+    }
+
+    return {
+        text: corePrompt,
+        contextQuestionCount: contextBlock?.contextQuestionCount ?? 0,
+        contextQuestionIds: contextBlock?.contextQuestionIds ?? [],
+    };
+}
+
+export interface BatchedQuestionItem {
+    questionId: string;
+    question: { text: string; type: string; options?: string[] };
+}
+
+/**
+ * Assemble a batched prompt containing multiple questions.
+ * Uses the same composition model as single-question prompts.
+ */
+export function assembleBatchedPrompt(
+    contextBlock: ContextResult | null,
+    segment: SegmentWithResponses,
+    questions: BatchedQuestionItem[],
+    evalType: DTEFEvalType = 'distribution',
+    _reasoningMode: DTEFReasoningMode = 'standard',
+    options?: {
+        prefix?: string;
+        suffix?: string;
+        marginals?: Record<string, number[]>;
+        syntheticN?: number;
+    },
+): AssembledPrompt {
+    const prefix = options?.prefix || '';
+    const suffix = options?.suffix || '';
+
+    let corePrompt = '';
+
+    if (prefix) {
+        corePrompt += `${prefix}\n\n`;
+    }
+
+    // For shift eval type with marginals, show per-question marginals after demographics
+    if (evalType === 'shift' && options?.marginals) {
+        corePrompt += buildDemographicsHeader(segment) + '\n\n';
+
+        if (contextBlock && contextBlock.text) {
+            corePrompt += contextBlock.text;
+        }
+
+        corePrompt += `The overall population responded to the following survey questions as shown below. `;
+        corePrompt += `Predict how this demographic group's response distributions DIFFER from the overall population.\n\n`;
+
+        questions.forEach((item, idx) => {
+            const label = `Q${idx + 1}`;
+            const marginal = options.marginals![item.questionId];
+            corePrompt += `${label}: "${item.question.text}"\n`;
+            if (item.question.options && item.question.options.length > 0) {
+                corePrompt += `  Options: ${item.question.options.map((opt, i) => `${String.fromCharCode(97 + i)}. ${opt}`).join(', ')}\n`;
+                if (marginal) {
+                    corePrompt += `  Population distribution: ${item.question.options.map((opt, i) => `${opt}: ${marginal[i]?.toFixed(1) ?? '?'}%`).join(', ')}\n`;
+                }
+            }
+            corePrompt += '\n';
+        });
+
+        corePrompt += `Predict the adjusted percentage distributions for this demographic group.`;
+    } else {
+        corePrompt += buildDemographicsHeader(segment) + '\n\n';
+
+        if (contextBlock && contextBlock.text) {
+            corePrompt += contextBlock.text;
+        }
+
+        // Question list
+        questions.forEach((item, idx) => {
+            const label = `Q${idx + 1}`;
+            corePrompt += `${label}: "${item.question.text}"\n`;
+            if (item.question.options && item.question.options.length > 0) {
+                corePrompt += `  Options: ${item.question.options.map((opt, i) => `${String.fromCharCode(97 + i)}. ${opt}`).join(', ')}\n`;
+            }
+            corePrompt += '\n';
+        });
+
+        // Eval-type-appropriate instruction
+        if (evalType === 'synthetic-individual') {
+            const n = options?.syntheticN || 20;
+            corePrompt += `Simulate ${n} individual members of this demographic group answering each question.`;
+        } else if (evalType === 'individual-answer') {
+            corePrompt += `Predict the most likely answer for a member of this demographic group for each question.`;
+        } else {
+            corePrompt += `For each question, predict the percentage distribution of responses for this demographic group across the answer options.`;
+        }
     }
 
     if (suffix) {

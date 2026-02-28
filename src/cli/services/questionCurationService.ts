@@ -11,6 +11,8 @@
  * @module cli/services/questionCurationService
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { DTEFSurveyData } from '@/types/dtef';
 
 export interface QuestionExclusion {
@@ -79,7 +81,7 @@ export function buildCurationPrompt(surveyData: DTEFSurveyData): string {
         .join('\n');
 
     const totalQuestions = Object.keys(surveyData.questions).length;
-    const rankLimit = Math.max(20, Math.round(totalQuestions * 0.3));
+    const rankLimit = Math.max(15, Math.round(Math.sqrt(totalQuestions) * 3));
 
     return CURATION_PROMPT_TEMPLATE
         .replace('{surveyName}', surveyData.surveyName)
@@ -224,5 +226,60 @@ export function buildCurationResult(
         consensus,
         questionCount: allQuestionIds.length,
         excludedCount: consensus.exclusions.length,
+    };
+}
+
+/**
+ * Load a previously-saved curation result for a survey.
+ * Looks in data/question-curation/{surveyId}.json.
+ */
+export function loadCurationResult(surveyId: string): QuestionCurationResult | null {
+    const filePath = path.resolve(`data/question-curation/${surveyId}.json`);
+    if (!fs.existsSync(filePath)) return null;
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        return JSON.parse(raw) as QuestionCurationResult;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Apply curation results to a list of question IDs.
+ * Removes excluded questions and reorders by ranking (ranked first, then unranked).
+ */
+export function applyCuration(
+    allQuestionIds: string[],
+    curation: QuestionCurationResult,
+): {
+    questionIds: string[];
+    excludedCount: number;
+    rankedCount: number;
+} {
+    const excludedSet = new Set(curation.consensus.exclusions.map(e => e.questionId));
+
+    // Filter out excluded questions
+    const included = allQuestionIds.filter(id => !excludedSet.has(id));
+
+    // Build rank map from consensus ranking (lower avgRank = better)
+    const rankMap = new Map<string, number>();
+    for (const entry of curation.consensus.subjectRanking) {
+        if (!excludedSet.has(entry.questionId)) {
+            rankMap.set(entry.questionId, entry.avgRank);
+        }
+    }
+
+    // Split into ranked and unranked
+    const ranked = included.filter(id => rankMap.has(id) && rankMap.get(id)! < allQuestionIds.length);
+    const unranked = included.filter(id => !rankMap.has(id) || rankMap.get(id)! >= allQuestionIds.length);
+
+    // Sort ranked by avgRank (best first)
+    ranked.sort((a, b) => (rankMap.get(a) ?? Infinity) - (rankMap.get(b) ?? Infinity));
+
+    return {
+        questionIds: [...ranked, ...unranked],
+        excludedCount: allQuestionIds.length - included.length,
+        rankedCount: ranked.length,
     };
 }

@@ -18,7 +18,7 @@ S3_REGION := us-east-1
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
 	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
-	dtef-curate dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
+	dtef-generate-matrix dtef-curate dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
@@ -164,6 +164,15 @@ dtef-generate: ## Generate blueprints for a round (ROUND=GD4, CTX=5 for context 
 		echo "Generating context blueprints ($(CTX) context questions)..."; \
 		pnpm cli dtef generate -i $(INPUT) -o output/dtef-blueprints-ctx/$(ROUND_LC) --context-questions $(CTX); \
 	fi
+
+dtef-generate-matrix: ## Generate blueprints across batch sizes (ROUND=GD4 BATCH_SIZES=1,2,3 NUM_EVALS=5)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate-matrix ROUND=GD4 BATCH_SIZES=1,2,3 NUM_EVALS=5" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	pnpm cli dtef generate -i $(INPUT) -o output/blueprints/$(ROUND_LC)-matrix \
+		--batch-sizes $(or $(BATCH_SIZES),1,2,3) \
+		$(if $(NUM_EVALS),--num-evals $(NUM_EVALS),)
 
 dtef-generate-cot: ## Generate CoT blueprints for a round (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate-cot ROUND=GD4" && exit 1)
