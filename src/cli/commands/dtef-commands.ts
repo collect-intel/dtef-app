@@ -911,10 +911,10 @@ experimentCommand
         const prefix = 'live/experiments/';
 
         try {
-            const s3Client = new S3({ region: process.env.AWS_REGION || 'us-east-1' });
-            const bucket = process.env.S3_BUCKET_NAME;
+            const s3Client = new S3({ region: process.env.APP_AWS_REGION || process.env.AWS_REGION || 'us-east-1' });
+            const bucket = process.env.APP_S3_BUCKET_NAME || process.env.S3_BUCKET_NAME;
             if (!bucket) {
-                console.error(chalk.red('S3_BUCKET_NAME not set'));
+                console.error(chalk.red('APP_S3_BUCKET_NAME / S3_BUCKET_NAME not set'));
                 process.exit(1);
             }
 
