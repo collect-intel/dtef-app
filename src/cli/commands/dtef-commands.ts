@@ -965,7 +965,7 @@ dtefCommand
     .description('Use frontier LLMs to curate survey questions for evaluation')
     .requiredOption('-i, --input <path>', 'Path to DTEF survey data JSON file')
     .option('-o, --output <path>', 'Output path for curation results')
-    .option('--models <list>', 'Comma-separated model IDs for curation', 'claude-sonnet-4,gpt-4.1,gemini-2.5-pro')
+    .option('--models <list>', 'Comma-separated model IDs for curation', 'claude-sonnet-4,gpt-4.1,google/gemini-2.5-pro-preview')
     .option('--top-n <n>', 'Number of top-ranked questions to highlight', '50')
     .option('--force', 'Overwrite existing curation file')
     .option('--dry-run', 'Show the curation prompt without calling models')
@@ -1014,14 +1014,48 @@ dtefCommand
             process.exit(0);
         }
 
-        console.log(chalk.yellow('Note: Full LLM curation requires API calls to the specified models.'));
-        console.log(chalk.yellow('This is a prompt-generation mode. To run full curation:'));
-        console.log(chalk.gray('  1. Send the prompt (shown with --dry-run) to each model'));
-        console.log(chalk.gray('  2. Save responses as JSON files'));
-        console.log(chalk.gray('  3. Use the curation library to compute consensus'));
-        console.log(chalk.gray(`\nPrompt saved to: ${outputPath.replace('.json', '.prompt.txt')}`));
+        // Actually call models
+        const { getModelResponse } = await import('../services/llm-service');
+        const modelIds = options.models.split(',').map((s: string) => s.trim());
+
+        console.log(chalk.gray(`Querying ${modelIds.length} models for curation...\n`));
+
+        const modelResults: import('../services/questionCurationService').ModelCurationResult[] = [];
+
+        for (const modelId of modelIds) {
+            console.log(chalk.gray(`  Querying ${modelId}...`));
+            try {
+                const response = await getModelResponse({
+                    modelId: `openrouter:${modelId}`,
+                    prompt,
+                    temperature: 0.3,
+                    maxTokens: 4096,
+                    useCache: true,
+                    timeout: 120000,
+                    retries: 2,
+                });
+                const parsed = parseCurationResponse(response, modelId);
+                modelResults.push(parsed);
+                console.log(chalk.green(`    ${parsed.exclusions.length} exclusions, ${parsed.subjectRanking.length} ranked`));
+            } catch (err: any) {
+                console.error(chalk.red(`    Failed: ${err.message}`));
+            }
+        }
+
+        if (modelResults.length === 0) {
+            console.error(chalk.red('\nNo models returned valid results. Curation aborted.'));
+            process.exit(1);
+        }
+
+        // Compute consensus and save
+        const curationResult = buildCurationResult(surveyData, modelResults);
 
         fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-        fs.writeFileSync(outputPath.replace('.json', '.prompt.txt'), prompt, 'utf-8');
-        console.log(chalk.green('\nDone!'));
+        fs.writeFileSync(outputPath, JSON.stringify(curationResult, null, 2), 'utf-8');
+
+        console.log(chalk.green(`\nCuration complete:`));
+        console.log(chalk.green(`  Models queried: ${modelResults.length}/${modelIds.length}`));
+        console.log(chalk.green(`  Questions excluded: ${curationResult.excludedCount}/${curationResult.questionCount}`));
+        console.log(chalk.green(`  Top ranked: ${curationResult.consensus.subjectRanking.filter(r => r.voteCount > 0).length}`));
+        console.log(chalk.green(`  Saved to: ${outputPath}`));
     });

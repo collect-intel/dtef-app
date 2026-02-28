@@ -1,0 +1,800 @@
+{
+  "surveyId": "global-dialogues-gd4",
+  "curatedAt": "2026-02-28T04:23:32.923Z",
+  "models": [
+    {
+      "modelId": "claude-sonnet-4",
+      "exclusions": [
+        {
+          "questionId": "46",
+          "reason": "Purely demographic question about number of children"
+        },
+        {
+          "questionId": "47",
+          "reason": "Purely demographic question about parenting status"
+        },
+        {
+          "questionId": "48",
+          "reason": "Purely demographic question about children living at home"
+        },
+        {
+          "questionId": "49",
+          "reason": "Purely demographic question about marital status"
+        },
+        {
+          "questionId": "91",
+          "reason": "Simple yes/no factual question with limited variance potential"
+        },
+        {
+          "questionId": "114",
+          "reason": "Meta-question about survey participation, not substantive opinion"
+        },
+        {
+          "questionId": "115",
+          "reason": "Meta-question about survey experience, not substantive opinion"
+        },
+        {
+          "questionId": "116",
+          "reason": "Meta-question about self-understanding from survey, not substantive opinion"
+        }
+      ],
+      "subjectRanking": [
+        "28cfe238-1c8f-476f-8c57-48b8ca1071a7",
+        "25e16598-f3a7-411d-b4cb-736c91bc3d03",
+        "e70a42e6-c1c0-43c6-a389-d28347e17f2f",
+        "d7943aa5-3a9f-4161-9d2b-651c71d92c73",
+        "be27a244-3429-417d-8517-de800bc90acf",
+        "2b25f92c-33ec-4ab7-ad20-9a53e56f3475",
+        "cc7346fb-571e-48ad-aeaa-4135f0fdf58c",
+        "3cf6da25-08f3-496d-9a4a-93afc5069e36",
+        "e5d7cc7b-d2cc-4b34-9c25-af67f8b7b83c",
+        "c6c411f0-409e-4518-9763-813738535308",
+        "23d5fd25-2168-4fd3-bd18-efafd73c6f2a",
+        "29598fc6-6928-49f7-9a42-2f57cf5e1c28",
+        "dbe2139a-1d10-48e6-861a-f64260d01659",
+        "5b8a5926-74e0-4500-b57f-76d5b912ea2f",
+        "85d29925-21b5-4b25-9fe0-5df069945870",
+        "22b7dc74-6101-4c0f-b6ee-c666ba7fc324",
+        "b94b8fa4-40ea-4a43-80a5-d7db02df1951",
+        "800f0a14-aa6e-4e86-900b-1c40d3810603",
+        "2f828d26-4a15-4f80-8c4b-5b0c833caecd",
+        "e2b01bdb-722a-480d-b303-182eed6b83b6",
+        "06f3f408-02fb-4f34-a8d5-db6bb6aeff51",
+        "01c22e5d-c296-4e3c-8b98-0339fbdda370",
+        "ec0d14f7-a5d6-4038-8db1-acabd81c75d8",
+        "97b3e1122-6c82-40d7-ad3c-9171e5855fe1",
+        "df2dc208-7f05-4cc7-ab3b-f19dc49ec305",
+        "c62ebe03-ba72-4b34-ba36-3dfd3db25680",
+        "ca819eb9-19ea-42fc-89e7-f9ebb7d2219e",
+        "59db192e-38a8-4790-a377-81bc4ba187a8",
+        "5f507e72-e0eb-4059-84ff-fd139e2ad470",
+        "ffbcc898-1cf2-4cbe-90ae-d1cc9db1aa5e",
+        "5a64b627-a4f4-4d3e-86d0-99342b77ec58",
+        "c3c2ae98-92fe-49c6-a2bd-d6bee9838418"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"46\",\n      \"reason\": \"Purely demographic question about number of children\"\n    },\n    {\n      \"questionId\": \"47\",\n      \"reason\": \"Purely demographic question about parenting status\"\n    },\n    {\n      \"questionId\": \"48\",\n      \"reason\": \"Purely demographic question about children living at home\"\n    },\n    {\n      \"questionId\": \"49\",\n      \"reason\": \"Purely demographic question about marital status\"\n    },\n    {\n      \"questionId\": \"91\",\n      \"reason\": \"Simple yes/no factual question with limited variance potential\"\n    },\n    {\n      \"questionId\": \"114\",\n      \"reason\": \"Meta-question about survey participation, not substantive opinion\"\n    },\n    {\n      \"questionId\": \"115\",\n      \"reason\": \"Meta-question about survey experience, not substantive opinion\"\n    },\n    {\n      \"questionId\": \"116\",\n      \"reason\": \"Meta-question about self-understanding from survey, not substantive opinion\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"28cfe238-1c8f-476f-8c57-48b8ca1071a7\",\n    \"25e16598-f3a7-411d-b4cb-736c91bc3d03\",\n    \"e70a42e6-c1c0-43c6-a389-d28347e17f2f\",\n    \"d7943aa5-3a9f-4161-9d2b-651c71d92c73\",\n    \"be27a244-3429-417d-8517-de800bc90acf\",\n    \"2b25f92c-33ec-4ab7-ad20-9a53e56f3475\",\n    \"cc7346fb-571e-48ad-aeaa-4135f0fdf58c\",\n    \"3cf6da25-08f3-496d-9a4a-93afc5069e36\",\n    \"e5d7cc7b-d2cc-4b34-9c25-af67f8b7b83c\",\n    \"c6c411f0-409e-4518-9763-813738535308\",\n    \"23d5fd25-2168-4fd3-bd18-efafd73c6f2a\",\n    \"29598fc6-6928-49f7-9a42-2f57cf5e1c28\",\n    \"dbe2139a-1d10-48e6-861a-f64260d01659\",\n    \"5b8a5926-74e0-4500-b57f-76d5b912ea2f\",\n    \"85d29925-21b5-4b25-9fe0-5df069945870\",\n    \"22b7dc74-6101-4c0f-b6ee-c666ba7fc324\",\n    \"b94b8fa4-40ea-4a43-80a5-d7db02df1951\",\n    \"800f0a14-aa6e-4e86-900b-1c40d3810603\",\n    \"2f828d26-4a15-4f80-8c4b-5b0c833caecd\",\n    \"e2b01bdb-722a-480d-b303-182eed6b83b6\",\n    \"06f3f408-02fb-4f34-a8d5-db6bb6aeff51\",\n    \"01c22e5d-c296-4e3c-8b98-0339fbdda370\",\n    \"ec0d14f7-a5d6-4038-8db1-acabd81c75d8\",\n    \"97b3e1122-6c82-40d7-ad3c-9171e5855fe1\",\n    \"df2dc208-7f05-4cc7-ab3b-f19dc49ec305\",\n    \"c62ebe03-ba72-4b34-ba36-3dfd3db25680\",\n    \"ca819eb9-19ea-42fc-89e7-f9ebb7d2219e\",\n    \"59db192e-38a8-4790-a377-81bc4ba187a8\",\n    \"5f507e72-e0eb-4059-84ff-fd139e2ad470\",\n    \"ffbcc898-1cf2-4cbe-90ae-d1cc9db1aa5e\",\n    \"5a64b627-a4f4-4d3e-86d0-99342b77ec58\",\n    \"c3c2ae98-92fe-49c6-a2bd-d6bee9838418\"\n  ]\n}\n```"
+    },
+    {
+      "modelId": "gpt-4.1",
+      "exclusions": [
+        {
+          "questionId": "4baa8683-eee5-4152-b402-0946f50b6a46",
+          "reason": "Purely demographic (number of children)."
+        },
+        {
+          "questionId": "47f96023f2-33a7-46ef-b607-a7b26a64423a",
+          "reason": "Purely demographic (parent/guardian status)."
+        },
+        {
+          "questionId": "4b5fccdd-0613-4d6e-bb96-3c5e5941b75a",
+          "reason": "Purely demographic (children under 18 living with respondent)."
+        },
+        {
+          "questionId": "8ff3a13c-4d23-4556-bd78-6d39836a5fbd",
+          "reason": "Purely demographic (relationship/marital status)."
+        },
+        {
+          "questionId": "115.17100f6f-19ac-4cf0-acf0-37667d002d08",
+          "reason": "Meta-survey, not substantive opinion/value."
+        },
+        {
+          "questionId": "116.908cb51b-eecc-4b74-909c-2ae89fadbb5c",
+          "reason": "Meta-survey, not substantive opinion/value."
+        }
+      ],
+      "subjectRanking": [
+        "28cfe238-1c8f-476f-8c57-48b8ca1071a7",
+        "e2b01bdb-722a-480d-b303-182eed6b83b6",
+        "25e16598-f3a7-411d-b4cb-736c91bc3d03",
+        "be27a244-3429-417d-8517-de800bc90acf",
+        "d7943aa5-3a9f-4161-9d2b-651c71d92c73",
+        "e70a42e6-c1c0-43c6-a389-d28347e17f2f",
+        "6630ff34-e67e-423a-9cea-0a4861106680",
+        "2f828d26-4a15-4f80-8c4b-5b0c833caecd",
+        "29598fc6-6928-49f7-9a42-2f57cf5e1c28",
+        "23d5fd25-2168-4fd3-bd18-efafd73c6f2a",
+        "e3f96004-866e-46e6-be4a-1e83a3e709f8",
+        "d2af725e-0391-4019-9ade-31f25162b6f0",
+        "7ecf1a2a-b34a-40a3-b481-a6eb15883b18",
+        "c6c411f0-409e-4518-9763-813738535308",
+        "b94b8fa4-40ea-4a43-80a5-d7db02df1951",
+        "36.800f0a14-aa6e-4e86-900b-1c40d3810603",
+        "5ab3d437-9098-4f12-9ede-ae9aa0fb7d36",
+        "dcb90e98-ab77-4dd7-a204-8a3b36b1f72f",
+        "f6323f3b-de97-4be6-9c48-f55ff9e65f66",
+        "cb65b063-bff3-4cac-a827-dbab6693e307",
+        "a376cbfc-98d2-4b9a-9435-428aa3fd6834",
+        "61c0d32e-6f96-45a4-8ece-cfb2df9d51cb",
+        "65.db95bba3-cb1c-4c07-a325-f5264b145d31",
+        "66.cc7346fb-571e-48ad-aeaa-4135f0fdf58c",
+        "2b25f92c-33ec-4ab7-ad20-9a53e56f3475",
+        "59db192e-38a8-4790-a377-81bc4ba187a8",
+        "c3c2ae98-92fe-49c6-a2bd-d6bee9838418",
+        "d7f5dfb7-c6a4-4501-a624-f2c722639d80",
+        "5f507e72-e0eb-4059-84ff-fd139e2ad470",
+        "5a64b627-a4f4-4d3e-86d0-99342b77ec58",
+        "92.06f3f408-02fb-4f34-a8d5-db6bb6aeff51",
+        "97.df2dc208-7f05-4cc7-ab3b-f19dc49ec305"
+      ],
+      "rawResponse": "```json\n{\n  \"exclusions\": [\n    {\n      \"questionId\": \"4baa8683-eee5-4152-b402-0946f50b6a46\",\n      \"reason\": \"Purely demographic (number of children).\"\n    },\n    {\n      \"questionId\": \"47f96023f2-33a7-46ef-b607-a7b26a64423a\",\n      \"reason\": \"Purely demographic (parent/guardian status).\"\n    },\n    {\n      \"questionId\": \"4b5fccdd-0613-4d6e-bb96-3c5e5941b75a\",\n      \"reason\": \"Purely demographic (children under 18 living with respondent).\"\n    },\n    {\n      \"questionId\": \"8ff3a13c-4d23-4556-bd78-6d39836a5fbd\",\n      \"reason\": \"Purely demographic (relationship/marital status).\"\n    },\n    {\n      \"questionId\": \"115.17100f6f-19ac-4cf0-acf0-37667d002d08\",\n      \"reason\": \"Meta-survey, not substantive opinion/value.\"\n    },\n    {\n      \"questionId\": \"116.908cb51b-eecc-4b74-909c-2ae89fadbb5c\",\n      \"reason\": \"Meta-survey, not substantive opinion/value.\"\n    }\n  ],\n  \"subjectRanking\": [\n    \"28cfe238-1c8f-476f-8c57-48b8ca1071a7\",\n    \"e2b01bdb-722a-480d-b303-182eed6b83b6\",\n    \"25e16598-f3a7-411d-b4cb-736c91bc3d03\",\n    \"be27a244-3429-417d-8517-de800bc90acf\",\n    \"d7943aa5-3a9f-4161-9d2b-651c71d92c73\",\n    \"e70a42e6-c1c0-43c6-a389-d28347e17f2f\",\n    \"6630ff34-e67e-423a-9cea-0a4861106680\",\n    \"2f828d26-4a15-4f80-8c4b-5b0c833caecd\",\n    \"29598fc6-6928-49f7-9a42-2f57cf5e1c28\",\n    \"23d5fd25-2168-4fd3-bd18-efafd73c6f2a\",\n    \"e3f96004-866e-46e6-be4a-1e83a3e709f8\",\n    \"d2af725e-0391-4019-9ade-31f25162b6f0\",\n    \"7ecf1a2a-b34a-40a3-b481-a6eb15883b18\",\n    \"c6c411f0-409e-4518-9763-813738535308\",\n    \"b94b8fa4-40ea-4a43-80a5-d7db02df1951\",\n    \"36.800f0a14-aa6e-4e86-900b-1c40d3810603\",\n    \"5ab3d437-9098-4f12-9ede-ae9aa0fb7d36\",\n    \"dcb90e98-ab77-4dd7-a204-8a3b36b1f72f\",\n    \"f6323f3b-de97-4be6-9c48-f55ff9e65f66\",\n    \"cb65b063-bff3-4cac-a827-dbab6693e307\",\n    \"a376cbfc-98d2-4b9a-9435-428aa3fd6834\",\n    \"61c0d32e-6f96-45a4-8ece-cfb2df9d51cb\",\n    \"65.db95bba3-cb1c-4c07-a325-f5264b145d31\",\n    \"66.cc7346fb-571e-48ad-aeaa-4135f0fdf58c\",\n    \"2b25f92c-33ec-4ab7-ad20-9a53e56f3475\",\n    \"59db192e-38a8-4790-a377-81bc4ba187a8\",\n    \"c3c2ae98-92fe-49c6-a2bd-d6bee9838418\",\n    \"d7f5dfb7-c6a4-4501-a624-f2c722639d80\",\n    \"5f507e72-e0eb-4059-84ff-fd139e2ad470\",\n    \"5a64b627-a4f4-4d3e-86d0-99342b77ec58\",\n    \"92.06f3f408-02fb-4f34-a8d5-db6bb6aeff51\",\n    \"97.df2dc208-7f05-4cc7-ab3b-f19dc49ec305\"\n  ]\n}\n```"
+    }
+  ],
+  "consensus": {
+    "exclusions": [
+      {
+        "questionId": "46",
+        "reason": "[claude-sonnet-4] Purely demographic question about number of children",
+        "voteCount": 1
+      },
+      {
+        "questionId": "47",
+        "reason": "[claude-sonnet-4] Purely demographic question about parenting status",
+        "voteCount": 1
+      },
+      {
+        "questionId": "48",
+        "reason": "[claude-sonnet-4] Purely demographic question about children living at home",
+        "voteCount": 1
+      },
+      {
+        "questionId": "49",
+        "reason": "[claude-sonnet-4] Purely demographic question about marital status",
+        "voteCount": 1
+      },
+      {
+        "questionId": "91",
+        "reason": "[claude-sonnet-4] Simple yes/no factual question with limited variance potential",
+        "voteCount": 1
+      },
+      {
+        "questionId": "114",
+        "reason": "[claude-sonnet-4] Meta-question about survey participation, not substantive opinion",
+        "voteCount": 1
+      },
+      {
+        "questionId": "115",
+        "reason": "[claude-sonnet-4] Meta-question about survey experience, not substantive opinion",
+        "voteCount": 1
+      },
+      {
+        "questionId": "116",
+        "reason": "[claude-sonnet-4] Meta-question about self-understanding from survey, not substantive opinion",
+        "voteCount": 1
+      },
+      {
+        "questionId": "4baa8683-eee5-4152-b402-0946f50b6a46",
+        "reason": "[gpt-4.1] Purely demographic (number of children).",
+        "voteCount": 1
+      },
+      {
+        "questionId": "47f96023f2-33a7-46ef-b607-a7b26a64423a",
+        "reason": "[gpt-4.1] Purely demographic (parent/guardian status).",
+        "voteCount": 1
+      },
+      {
+        "questionId": "4b5fccdd-0613-4d6e-bb96-3c5e5941b75a",
+        "reason": "[gpt-4.1] Purely demographic (children under 18 living with respondent).",
+        "voteCount": 1
+      },
+      {
+        "questionId": "8ff3a13c-4d23-4556-bd78-6d39836a5fbd",
+        "reason": "[gpt-4.1] Purely demographic (relationship/marital status).",
+        "voteCount": 1
+      },
+      {
+        "questionId": "115.17100f6f-19ac-4cf0-acf0-37667d002d08",
+        "reason": "[gpt-4.1] Meta-survey, not substantive opinion/value.",
+        "voteCount": 1
+      },
+      {
+        "questionId": "116.908cb51b-eecc-4b74-909c-2ae89fadbb5c",
+        "reason": "[gpt-4.1] Meta-survey, not substantive opinion/value.",
+        "voteCount": 1
+      }
+    ],
+    "subjectRanking": [
+      {
+        "questionId": "28cfe238-1c8f-476f-8c57-48b8ca1071a7",
+        "voteCount": 2,
+        "avgRank": 0
+      },
+      {
+        "questionId": "25e16598-f3a7-411d-b4cb-736c91bc3d03",
+        "voteCount": 2,
+        "avgRank": 1.5
+      },
+      {
+        "questionId": "e70a42e6-c1c0-43c6-a389-d28347e17f2f",
+        "voteCount": 2,
+        "avgRank": 3.5
+      },
+      {
+        "questionId": "be27a244-3429-417d-8517-de800bc90acf",
+        "voteCount": 2,
+        "avgRank": 3.5
+      },
+      {
+        "questionId": "d7943aa5-3a9f-4161-9d2b-651c71d92c73",
+        "voteCount": 2,
+        "avgRank": 3.5
+      },
+      {
+        "questionId": "29598fc6-6928-49f7-9a42-2f57cf5e1c28",
+        "voteCount": 2,
+        "avgRank": 9.5
+      },
+      {
+        "questionId": "23d5fd25-2168-4fd3-bd18-efafd73c6f2a",
+        "voteCount": 2,
+        "avgRank": 9.5
+      },
+      {
+        "questionId": "e2b01bdb-722a-480d-b303-182eed6b83b6",
+        "voteCount": 2,
+        "avgRank": 10
+      },
+      {
+        "questionId": "c6c411f0-409e-4518-9763-813738535308",
+        "voteCount": 2,
+        "avgRank": 11
+      },
+      {
+        "questionId": "2f828d26-4a15-4f80-8c4b-5b0c833caecd",
+        "voteCount": 2,
+        "avgRank": 12.5
+      },
+      {
+        "questionId": "2b25f92c-33ec-4ab7-ad20-9a53e56f3475",
+        "voteCount": 2,
+        "avgRank": 14.5
+      },
+      {
+        "questionId": "b94b8fa4-40ea-4a43-80a5-d7db02df1951",
+        "voteCount": 2,
+        "avgRank": 15
+      },
+      {
+        "questionId": "59db192e-38a8-4790-a377-81bc4ba187a8",
+        "voteCount": 2,
+        "avgRank": 26
+      },
+      {
+        "questionId": "5f507e72-e0eb-4059-84ff-fd139e2ad470",
+        "voteCount": 2,
+        "avgRank": 28
+      },
+      {
+        "questionId": "c3c2ae98-92fe-49c6-a2bd-d6bee9838418",
+        "voteCount": 2,
+        "avgRank": 28.5
+      },
+      {
+        "questionId": "5a64b627-a4f4-4d3e-86d0-99342b77ec58",
+        "voteCount": 2,
+        "avgRank": 29.5
+      },
+      {
+        "questionId": "6630ff34-e67e-423a-9cea-0a4861106680",
+        "voteCount": 1,
+        "avgRank": 6
+      },
+      {
+        "questionId": "cc7346fb-571e-48ad-aeaa-4135f0fdf58c",
+        "voteCount": 1,
+        "avgRank": 6
+      },
+      {
+        "questionId": "3cf6da25-08f3-496d-9a4a-93afc5069e36",
+        "voteCount": 1,
+        "avgRank": 7
+      },
+      {
+        "questionId": "e5d7cc7b-d2cc-4b34-9c25-af67f8b7b83c",
+        "voteCount": 1,
+        "avgRank": 8
+      },
+      {
+        "questionId": "e3f96004-866e-46e6-be4a-1e83a3e709f8",
+        "voteCount": 1,
+        "avgRank": 10
+      },
+      {
+        "questionId": "d2af725e-0391-4019-9ade-31f25162b6f0",
+        "voteCount": 1,
+        "avgRank": 11
+      },
+      {
+        "questionId": "dbe2139a-1d10-48e6-861a-f64260d01659",
+        "voteCount": 1,
+        "avgRank": 12
+      },
+      {
+        "questionId": "7ecf1a2a-b34a-40a3-b481-a6eb15883b18",
+        "voteCount": 1,
+        "avgRank": 12
+      },
+      {
+        "questionId": "5b8a5926-74e0-4500-b57f-76d5b912ea2f",
+        "voteCount": 1,
+        "avgRank": 13
+      },
+      {
+        "questionId": "85d29925-21b5-4b25-9fe0-5df069945870",
+        "voteCount": 1,
+        "avgRank": 14
+      },
+      {
+        "questionId": "22b7dc74-6101-4c0f-b6ee-c666ba7fc324",
+        "voteCount": 1,
+        "avgRank": 15
+      },
+      {
+        "questionId": "5ab3d437-9098-4f12-9ede-ae9aa0fb7d36",
+        "voteCount": 1,
+        "avgRank": 16
+      },
+      {
+        "questionId": "800f0a14-aa6e-4e86-900b-1c40d3810603",
+        "voteCount": 1,
+        "avgRank": 17
+      },
+      {
+        "questionId": "dcb90e98-ab77-4dd7-a204-8a3b36b1f72f",
+        "voteCount": 1,
+        "avgRank": 17
+      },
+      {
+        "questionId": "f6323f3b-de97-4be6-9c48-f55ff9e65f66",
+        "voteCount": 1,
+        "avgRank": 18
+      },
+      {
+        "questionId": "cb65b063-bff3-4cac-a827-dbab6693e307",
+        "voteCount": 1,
+        "avgRank": 19
+      },
+      {
+        "questionId": "a376cbfc-98d2-4b9a-9435-428aa3fd6834",
+        "voteCount": 1,
+        "avgRank": 20
+      },
+      {
+        "questionId": "06f3f408-02fb-4f34-a8d5-db6bb6aeff51",
+        "voteCount": 1,
+        "avgRank": 20
+      },
+      {
+        "questionId": "61c0d32e-6f96-45a4-8ece-cfb2df9d51cb",
+        "voteCount": 1,
+        "avgRank": 21
+      },
+      {
+        "questionId": "01c22e5d-c296-4e3c-8b98-0339fbdda370",
+        "voteCount": 1,
+        "avgRank": 21
+      },
+      {
+        "questionId": "ec0d14f7-a5d6-4038-8db1-acabd81c75d8",
+        "voteCount": 1,
+        "avgRank": 22
+      },
+      {
+        "questionId": "df2dc208-7f05-4cc7-ab3b-f19dc49ec305",
+        "voteCount": 1,
+        "avgRank": 24
+      },
+      {
+        "questionId": "c62ebe03-ba72-4b34-ba36-3dfd3db25680",
+        "voteCount": 1,
+        "avgRank": 25
+      },
+      {
+        "questionId": "ca819eb9-19ea-42fc-89e7-f9ebb7d2219e",
+        "voteCount": 1,
+        "avgRank": 26
+      },
+      {
+        "questionId": "d7f5dfb7-c6a4-4501-a624-f2c722639d80",
+        "voteCount": 1,
+        "avgRank": 27
+      },
+      {
+        "questionId": "ffbcc898-1cf2-4cbe-90ae-d1cc9db1aa5e",
+        "voteCount": 1,
+        "avgRank": 29
+      },
+      {
+        "questionId": "0b473fbf-be43-4c32-a805-1275d54ac9ef",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f24f304d-b314-401a-a259-ce0596ad77d4",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f66d16d1-630b-4aba-8c2d-a96961fcb03e",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "2cbb900b-8d9f-4c7e-a558-3a5376e8ce5c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "6d18ebd0-402c-4db9-a61f-14527e77874a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "c002632e-4356-4f98-9191-f86412fe48a7",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "334a0ebd-4c3e-44d2-ac51-13fb444c069a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "865926b0-3032-4d3a-bbc2-80c102d549bb",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "144768d5-2b91-4c55-9935-98a246c6d3bf",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5af76eba-316e-489f-a57e-0498a5768643",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "32a41e36-1567-42e8-8636-39d21f87550a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "015a07c1-b996-4bde-b412-e79c314cf761",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "372d603d-460c-4691-8656-d256f84a6583",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "ac4c9ca2-d2e7-4b35-afe2-b3b2174ee030",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5dd17247-f85e-4419-b7d4-4130e0df0b77",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "52bbba43-5119-43a8-9bb1-5596c3ad8a1c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "02e1e447-c6e1-44ed-86c9-226f2c72b5c6",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "c1ffd634-9209-4440-9804-4b397d7bfa8c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "e787d98a-e40b-493b-875f-f59169cc849c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "a8c7a309-9e7e-4e8f-960f-d94acc97614b",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "2a16a259-3822-4efe-a1df-100a55a83896",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "a2cd2134-b0a1-4610-a40c-66c6cf3bd0af",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "4baa8683-eee5-4152-b402-0946f50b6a46",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f96023f2-33a7-46ef-b607-a7b26a64423a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "4b5fccdd-0613-4d6e-bb96-3c5e5941b75a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "8ff3a13c-4d23-4556-bd78-6d39836a5fbd",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "df390e18-e53b-4106-b81c-d6c80c01faed",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "179300a7-9cdf-486a-814b-842b7123254f",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5bf3142c-9b73-4fbb-8883-b2994840f9d6",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "e9d0f3c1-2189-48c0-99cb-4a3b07e37b36",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "7e99c66a-c63a-4788-a8d5-29212c7dd01d",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "0f8f1706-fc7d-4f28-a681-ba8c222e2d92",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "0f572253-0025-4b17-a8eb-c8fe8029a32c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "9ee21a65-e19d-4b94-8c3f-f431a54f7751",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "918bc079-5e6c-4b4c-b55f-074c82dd127f",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "16555f1f-2a88-435f-930e-fbe8232e8b51",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "8a19c6ea-532f-49d3-92d0-59033e04fb5c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "db95bba3-cb1c-4c07-a325-f5264b145d31",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "0e105382-d368-4eed-bc1a-8ab77850d0ef",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "423784cf-1eb2-48aa-a3cc-7f945983c00a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5537a602-8b2b-4d0f-b621-76cb2aab5960",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f2e0093a-b64f-4afc-99d8-f79665bf3aa7",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "49a65297-bd14-494f-b3ce-24313a6b93f3",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "3da0fc33-3a81-4526-bee7-a4044eb617e3",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f426e846-6bf5-4e4d-8c8d-546e8323cb2b",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "03f4e069-c276-4081-8591-cb541a491152",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "df334446-2675-4974-a5b9-52416fd03192",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5751b0e5-750c-439b-beec-2b364a2e4744",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "a44994fb-8455-47c4-a3f0-7bcf98ebb8e7",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "c545872f-2b47-4b20-a230-4aede30a5f8c",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "0ff23754-9660-4a10-afbf-938bc54f24f2",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "b0eefcbf-4539-42f5-8791-6d417da47158",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "811fce20-6831-46ff-80a8-de1617883da4",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "f829aae7-14ab-4299-9382-4954829ab5a6",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "435da2e3-9ad9-4bfd-9e55-ffb301a924ab",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "4b84964d-8fda-40c6-be01-020606b58af8",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "3ceab213-3ac5-4111-b55a-0cc4fbe2d1d3",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "0901bed1-bad3-4f36-9272-294df92e360d",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "844b76b8-97cf-4cf2-ba3a-20889166744b",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "2a31b721-4619-40d2-8964-3b07dc7a215d",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5a9771a4-b6a2-4567-9504-14bdf14a63bd",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "5908eedf-f481-4d3d-a863-674f617e2ce2",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "7b3e1122-6c82-40d7-ad3c-9171e5855fe1",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "cbad42c4-f20d-41c7-8306-3f1182874b59",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "ab58c9ad-8c34-4053-90f3-aa010a9ab14a",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "1d9b5fbc-78ed-41d5-b996-dd3b01a9665f",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "4178d870-d669-429b-a05e-8b681136849b",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "51f1f741-5c9b-4b13-8ed3-cc9e2a1ee645",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "77b2d06d-ba89-48b4-adfb-940f50fb2178",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "724fd72e-8770-440c-ad13-34a61772dc86",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "b539b574-3f47-4438-9479-6c9de722aac3",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "2c1c70c6-2f75-43ee-b568-ece520f52a44",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "17100f6f-19ac-4cf0-acf0-37667d002d08",
+        "voteCount": 0,
+        "avgRank": 116
+      },
+      {
+        "questionId": "908cb51b-eecc-4b74-909c-2ae89fadbb5c",
+        "voteCount": 0,
+        "avgRank": 116
+      }
+    ]
+  },
+  "questionCount": 116,
+  "excludedCount": 14
+}
