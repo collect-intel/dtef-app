@@ -236,10 +236,10 @@ dtef-publish: ## Publish blueprints to dtef-configs repo (ROUND=GD4)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-publish ROUND=GD4" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
 	@test -d $(DTEF_CONFIGS_DIR) || (echo "dtef-configs repo not found at $(DTEF_CONFIGS_DIR)" && exit 1)
-	pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/configs --tag $(ROUND_LC) --dry-run
+	pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/blueprints/$(ROUND_LC) --tag $(ROUND_LC) --dry-run
 	@echo ""
 	@echo "Above is a dry run. To actually publish, run:"
-	@echo "  pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/configs --tag $(ROUND_LC)"
+	@echo "  pnpm cli dtef publish -s output/blueprints/$(ROUND_LC) -t $(DTEF_CONFIGS_DIR)/blueprints/$(ROUND_LC) --tag $(ROUND_LC)"
 
 dtef-upload-baselines: ## (deprecated) Baselines now upload automatically via --upload flag
 	@echo "dtef-baselines now uploads directly. Just run: make dtef-baselines ROUND=GD4"
