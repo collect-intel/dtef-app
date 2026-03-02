@@ -1610,8 +1610,14 @@ export default function DemographicLeaderboard() {
     }, []);
 
     // Filter out baseline pseudo-models — they appear as reference lines, not leaderboard entries
-    const modelResults = (data?.aggregation?.modelResults || []).filter(m => !m.modelId.startsWith('baseline:'));
-    const disparities = (data?.aggregation?.disparities || []).filter(d => !d.modelId.startsWith('baseline:'));
+    const modelResults = useMemo(() =>
+        (data?.aggregation?.modelResults || []).filter(m => !m.modelId.startsWith('baseline:')),
+        [data?.aggregation?.modelResults]
+    );
+    const disparities = useMemo(() =>
+        (data?.aggregation?.disparities || []).filter(d => !d.modelId.startsWith('baseline:')),
+        [data?.aggregation?.disparities]
+    );
     const baselines = data?.baselines;
 
     // Build a runs lookup from contextAnalysis (fallback for data generated before pipeline update)

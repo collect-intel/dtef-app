@@ -689,13 +689,20 @@ export class DemographicAggregationService {
             const coverageScores = result.evaluationResults?.llmCoverageScores;
             if (!coverageScores) continue;
 
-            // Each promptId typically encodes the questionId as `{questionId}-{segmentId}`
+            // Each promptId encodes the questionId as `{questionId}-{segmentId}`.
+            // Batched prompts use `batch-{N}-{segmentId}` — skip these since they
+            // don't map to individual questions.
             for (const [promptId, promptScores] of Object.entries(coverageScores)) {
                 if (!promptScores) continue;
 
-                // Extract question ID from prompt ID (format: "questionId-segmentId")
-                const dashIdx = promptId.lastIndexOf(`-${ctx.segmentId}`);
-                const questionId = dashIdx > 0 ? promptId.slice(0, dashIdx) : promptId;
+                // Skip batched prompt IDs (they don't map to individual questions)
+                if (promptId.startsWith('batch-')) continue;
+
+                // Extract question ID from the suffix `-{segmentId}`
+                const suffix = `-${ctx.segmentId}`;
+                const suffixIdx = promptId.lastIndexOf(suffix);
+                if (suffixIdx <= 0) continue; // can't determine question ID
+                const questionId = promptId.slice(0, suffixIdx);
 
                 for (const [modelId, coverage] of Object.entries(promptScores)) {
                     if (!coverage || typeof coverage.avgCoverageExtent !== 'number') continue;
@@ -716,7 +723,9 @@ export class DemographicAggregationService {
         for (const [key, segments] of questionScores) {
             if (segments.length < 2) continue;
 
-            const [modelId, questionId] = key.split('::');
+            const sepIdx = key.indexOf('::');
+            const modelId = key.slice(0, sepIdx);
+            const questionId = key.slice(sepIdx + 2);
             const sorted = [...segments].sort((a, b) => b.score - a.score);
             const best = sorted[0];
             const worst = sorted[sorted.length - 1];

@@ -39,6 +39,41 @@ import { assemblePrompt, assembleBatchedPrompt, assembleIndividualPrompt, Batche
 import { encodeConfigId } from './blueprint/configIdEncoder';
 
 /**
+ * Simple seeded PRNG (mulberry32) for deterministic sampling.
+ */
+function seededRng(seed: number): () => number {
+    return () => {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+function hashString(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+        h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+    }
+    return h;
+}
+
+/**
+ * Deterministic sample of N items using a seeded shuffle.
+ */
+function seededSample<T>(items: T[], n: number, seed: string): T[] {
+    if (items.length <= n) return [...items];
+    const rng = seededRng(hashString(seed));
+    const arr = [...items];
+    // Fisher-Yates shuffle (only first n elements needed)
+    for (let i = 0; i < n && i < arr.length - 1; i++) {
+        const j = i + Math.floor(rng() * (arr.length - i));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, n);
+}
+
+/**
  * Generates DTEF blueprints from demographic survey data.
  */
 export class DemographicBlueprintService {
@@ -244,6 +279,10 @@ export class DemographicBlueprintService {
         const reasoningMode: DTEFReasoningMode = config.reasoningMode || 'standard';
         const blueprints: WevalConfig[] = [];
 
+        let totalMatched = 0;
+        let segmentsWithMatches = 0;
+        let segmentsWithoutMatches = 0;
+
         // Build a mapping: segment attribute key/value → segment
         // Each participant maps to segments based on attribute overlap
         for (const segment of segments) {
@@ -254,11 +293,15 @@ export class DemographicBlueprintService {
                 );
             });
 
-            if (matchingParticipants.length === 0) continue;
+            if (matchingParticipants.length === 0) {
+                segmentsWithoutMatches++;
+                continue;
+            }
+            segmentsWithMatches++;
+            totalMatched += matchingParticipants.length;
 
-            // Sample N participants (random, deterministic by sorting on ID)
-            const sorted = [...matchingParticipants].sort((a, b) => a.participantId.localeCompare(b.participantId));
-            const sampled = sorted.slice(0, sampleSize);
+            // Sample N participants using seeded shuffle (deterministic by segment ID)
+            const sampled = seededSample(matchingParticipants, sampleSize, segment.id);
 
             const prompts: WevalPromptConfig[] = [];
             let blueprintContextCount = 0;
@@ -303,7 +346,7 @@ export class DemographicBlueprintService {
                         i === participantResponse.selectedIndex ? 100 : 0
                     );
 
-                    const promptId = `${questionId}-${segment.id}-${participant.participantId.slice(0, 8)}`;
+                    const promptId = `${questionId}-${segment.id}-${participant.participantId}`;
 
                     prompts.push({
                         id: promptId,
@@ -372,6 +415,8 @@ export class DemographicBlueprintService {
                 },
             });
         }
+
+        console.log(`  Individual generation: ${segmentsWithMatches}/${segments.length} segments matched participants (${segmentsWithoutMatches} empty), ${totalMatched} total matches, ${blueprints.length} blueprints generated`);
 
         return blueprints;
     }
