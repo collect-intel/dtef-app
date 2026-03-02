@@ -184,6 +184,8 @@ export interface DemographicAggregation {
     modelDPDs?: ModelDPD[];
     /** Stereotype scores (present when multi-context results exist) */
     stereotypeScores?: StereotypeScore[];
+    /** Per-question DPD analysis (questions with highest demographic bias) */
+    questionDPDs?: QuestionDPD[];
 }
 
 /**
@@ -652,6 +654,9 @@ export class DemographicAggregationService {
         // Compute stereotype scores from context analysis
         const stereotypeScores = this.computeStereotypeScores(contextAnalysis);
 
+        // Compute per-question DPD
+        const questionDPDs = this.computeQuestionDPD(dtefResults);
+
         return {
             surveyId,
             aggregatedAt: new Date().toISOString(),
@@ -662,7 +667,74 @@ export class DemographicAggregationService {
             contextAnalysis,
             modelDPDs,
             stereotypeScores,
+            questionDPDs: questionDPDs.length > 0 ? questionDPDs : undefined,
         };
+    }
+
+    /**
+     * Compute per-question DPD: for each question × model, find the max and min
+     * segment scores. dpd = max - min. Identifies questions with highest bias.
+     */
+    static computeQuestionDPD(results: WevalResult[]): QuestionDPD[] {
+        // Collect (modelId, segmentId, questionId) → score
+        type QKey = string; // `${modelId}::${questionId}`
+        const questionScores = new Map<QKey, Array<{ segmentId: string; score: number }>>();
+
+        for (const result of results) {
+            if (!this.isDTEFResult(result) || this.isExperimentalResult(result)) continue;
+
+            const ctx = this.extractDTEFContext(result);
+            if (!ctx) continue;
+
+            const coverageScores = result.evaluationResults?.llmCoverageScores;
+            if (!coverageScores) continue;
+
+            // Each promptId typically encodes the questionId as `{questionId}-{segmentId}`
+            for (const [promptId, promptScores] of Object.entries(coverageScores)) {
+                if (!promptScores) continue;
+
+                // Extract question ID from prompt ID (format: "questionId-segmentId")
+                const dashIdx = promptId.lastIndexOf(`-${ctx.segmentId}`);
+                const questionId = dashIdx > 0 ? promptId.slice(0, dashIdx) : promptId;
+
+                for (const [modelId, coverage] of Object.entries(promptScores)) {
+                    if (!coverage || typeof coverage.avgCoverageExtent !== 'number') continue;
+
+                    const key = `${modelId}::${questionId}`;
+                    if (!questionScores.has(key)) questionScores.set(key, []);
+                    questionScores.get(key)!.push({
+                        segmentId: ctx.segmentId,
+                        score: coverage.avgCoverageExtent,
+                    });
+                }
+            }
+        }
+
+        // Compute DPD for each model×question
+        const dpds: QuestionDPD[] = [];
+
+        for (const [key, segments] of questionScores) {
+            if (segments.length < 2) continue;
+
+            const [modelId, questionId] = key.split('::');
+            const sorted = [...segments].sort((a, b) => b.score - a.score);
+            const best = sorted[0];
+            const worst = sorted[sorted.length - 1];
+            const dpd = best.score - worst.score;
+
+            dpds.push({
+                questionId,
+                modelId,
+                dpd,
+                bestSegment: { id: best.segmentId, score: best.score },
+                worstSegment: { id: worst.segmentId, score: worst.score },
+            });
+        }
+
+        // Sort by DPD descending (most biased questions first)
+        dpds.sort((a, b) => b.dpd - a.dpd);
+
+        return dpds;
     }
 
     /**

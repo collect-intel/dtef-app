@@ -9,12 +9,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DemographicBlueprintService } from '../services/demographicBlueprintService';
 import { validateDTEFSurveyData } from '@/lib/dtef-validation';
-import { DTEFSurveyData, DTEFBlueprintConfig, DTEFEvalType, DTEFContextFormat, DTEFReasoningMode } from '@/types/dtef';
+import { DTEFSurveyData, DTEFBlueprintConfig, DTEFEvalType, DTEFContextFormat, DTEFReasoningMode, DTEFIndividualData } from '@/types/dtef';
 import * as yaml from 'js-yaml';
 import {
     convertGlobalDialogues,
     detectAvailableRounds,
     loadGlobalDialoguesRound,
+    loadIndividualData,
     summarizeDataset,
 } from '../services/adapters/globalDialoguesAdapter';
 import {
@@ -67,6 +68,8 @@ dtefCommand
     .option('--context-format <format>', 'Context format: attribute-label, distribution-context, or narrative')
     .option('--reasoning-mode <mode>', 'Reasoning mode: standard or cot', 'standard')
     .option('--synthetic-n <n>', 'Number of synthetic individuals (for synthetic-individual eval type)', '20')
+    .option('--individuals-input <path>', 'Path to individual participant data JSON (for individual-answer eval type)')
+    .option('--sample-size <n>', 'Participants per segment for individual-answer eval type', '20')
     .option('--experiment <id>', 'Tag blueprints with experiment ID')
     .option('--experiment-id <id>', 'Auto-populate experiment conditionMap with generated configIds')
     .option('--condition-name <name>', 'Condition name for --experiment-id mapping')
@@ -196,6 +199,29 @@ dtefCommand
 
         const syntheticN = parseInt(options.syntheticN, 10);
         const experimentId = options.experiment as string | undefined;
+        const sampleSize = parseInt(options.sampleSize, 10);
+
+        // Load individual data if provided
+        let individualData: DTEFIndividualData | undefined;
+        if (options.individualsInput) {
+            const indivPath = path.resolve(options.individualsInput);
+            if (!fs.existsSync(indivPath)) {
+                console.error(chalk.red(`Individual data file not found: ${indivPath}`));
+                process.exit(1);
+            }
+            try {
+                const raw = fs.readFileSync(indivPath, 'utf-8');
+                individualData = JSON.parse(raw);
+                console.log(chalk.cyan(`Individual data loaded: ${individualData!.participants.length} participants`));
+            } catch (e: any) {
+                console.error(chalk.red(`Failed to parse individual data: ${e.message}`));
+                process.exit(1);
+            }
+        }
+
+        if (evalType === 'individual-answer' && !individualData) {
+            console.log(chalk.yellow('Warning: --eval-type individual-answer without --individuals-input will use aggregate-based prompts'));
+        }
 
         // Generate blueprints across batch-size matrix (and optionally context levels)
         console.log(chalk.gray('Generating blueprints...'));
@@ -237,6 +263,8 @@ dtefCommand
                         contextFormat,
                         reasoningMode,
                         syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
+                        individualData,
+                        sampleSize: evalType === 'individual-answer' ? sampleSize : undefined,
                         experimentId,
                         modelConfig: {
                             models: options.models.split(',').map((s: string) => s.trim()),
@@ -262,6 +290,8 @@ dtefCommand
                     contextFormat,
                     reasoningMode,
                     syntheticN: evalType === 'synthetic-individual' ? syntheticN : undefined,
+                    individualData,
+                    sampleSize: evalType === 'individual-answer' ? sampleSize : undefined,
                     experimentId,
                     modelConfig: {
                         models: options.models.split(',').map((s: string) => s.trim()),
@@ -580,6 +610,7 @@ dtefCommand
     .option('--include-demographic-questions', 'Include demographic-defining questions (language, age, gender, etc.)')
     .option('--min-sample-size <n>', 'Minimum sample size for segments', '10')
     .option('--questions <ids>', 'Specific question IDs to include (comma-separated)')
+    .option('--individuals', 'Also load individual participant data')
     .option('--dry-run', 'Show summary without writing files')
     .action(async (options) => {
         const chalk = (await import('chalk')).default;
@@ -664,6 +695,33 @@ dtefCommand
             fs.mkdirSync(path.dirname(outputPath), { recursive: true });
             fs.writeFileSync(outputPath, JSON.stringify(data, null, 2), 'utf-8');
             console.log(chalk.gray(`  Written: ${outputPath}\n`));
+
+            // Load individual data if requested
+            if (options.individuals) {
+                try {
+                    console.log(chalk.gray(`  Loading individual participant data...`));
+                    const individualData = loadIndividualData(roundId, dataDir, data);
+
+                    const totalResponses = individualData.participants.reduce((sum, p) => sum + p.responses.length, 0);
+                    const avgResponses = individualData.participants.length > 0
+                        ? (totalResponses / individualData.participants.length).toFixed(1)
+                        : '0';
+
+                    console.log(chalk.green(`  Participants: ${individualData.participants.length}`));
+                    console.log(chalk.green(`  Avg responses/participant: ${avgResponses}`));
+                    console.log(chalk.green(`  Questions mapped: ${Object.keys(individualData.questionIdMap).length}`));
+
+                    if (!options.dryRun) {
+                        const indivOutputPath = options.output
+                            ? path.resolve(options.output.replace('.json', '_individuals.json'))
+                            : path.resolve(`./output/${roundId.toLowerCase()}_individuals.json`);
+                        fs.writeFileSync(indivOutputPath, JSON.stringify(individualData, null, 2), 'utf-8');
+                        console.log(chalk.gray(`  Written: ${indivOutputPath}\n`));
+                    }
+                } catch (err: any) {
+                    console.log(chalk.yellow(`  Individual data: ${err.message}`));
+                }
+            }
         }
 
         console.log(chalk.green('Done!'));

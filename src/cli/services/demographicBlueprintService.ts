@@ -13,6 +13,8 @@ import {
     DTEFBlueprintConfig,
     DTEFPrompt,
     DTEFGeneratedBlueprint,
+    DTEFParticipant,
+    DTEFIndividualData,
     SegmentWithResponses,
     DemographicResponse,
     DTEFEvalType,
@@ -33,7 +35,7 @@ import {
     BATCHED_SYSTEM_PROMPT,
     SHIFT_SYSTEM_PROMPT,
 } from './blueprint/systemPromptGenerators';
-import { assemblePrompt, assembleBatchedPrompt, BatchedQuestionItem } from './blueprint/promptAssembler';
+import { assemblePrompt, assembleBatchedPrompt, assembleIndividualPrompt, BatchedQuestionItem } from './blueprint/promptAssembler';
 import { encodeConfigId } from './blueprint/configIdEncoder';
 
 /**
@@ -44,8 +46,16 @@ export class DemographicBlueprintService {
      * Generate WevalConfig blueprints from demographic survey data.
      * Produces one blueprint per demographic segment containing prompts
      * for each target question.
+     *
+     * For individual-answer eval type with individualData, generates
+     * per-segment blueprints with sampled individual participants.
      */
     static generateBlueprints(config: DTEFBlueprintConfig): WevalConfig[] {
+        // Individual-answer with individual data: generate per-participant prompts
+        if (config.evalType === 'individual-answer' && config.individualData) {
+            return this.generateIndividualBlueprints(config);
+        }
+
         const segments = this.selectSegments(config);
         const blueprints: WevalConfig[] = [];
 
@@ -219,6 +229,151 @@ export class DemographicBlueprintService {
                 },
             },
         };
+    }
+
+    /**
+     * Generate blueprints for individual-answer eval type with participant data.
+     * Groups participants by segment, samples N per segment, creates one prompt
+     * per participant × target question.
+     */
+    private static generateIndividualBlueprints(config: DTEFBlueprintConfig): WevalConfig[] {
+        const individualData = config.individualData!;
+        const segments = this.selectSegments(config);
+        const sampleSize = config.sampleSize || 20;
+        const contextFormat: DTEFContextFormat = config.contextFormat || 'attribute-label';
+        const reasoningMode: DTEFReasoningMode = config.reasoningMode || 'standard';
+        const blueprints: WevalConfig[] = [];
+
+        // Build a mapping: segment attribute key/value → segment
+        // Each participant maps to segments based on attribute overlap
+        for (const segment of segments) {
+            // Find participants matching this segment's attributes
+            const matchingParticipants = individualData.participants.filter(p => {
+                return Object.entries(segment.attributes).every(([key, value]) =>
+                    p.attributes[key]?.toLowerCase() === value.toLowerCase()
+                );
+            });
+
+            if (matchingParticipants.length === 0) continue;
+
+            // Sample N participants (random, deterministic by sorting on ID)
+            const sorted = [...matchingParticipants].sort((a, b) => a.participantId.localeCompare(b.participantId));
+            const sampled = sorted.slice(0, sampleSize);
+
+            const prompts: WevalPromptConfig[] = [];
+            let blueprintContextCount = 0;
+            let blueprintContextIds: string[] = [];
+
+            for (const participant of sampled) {
+                for (const questionId of config.targetQuestionIds) {
+                    const question = config.surveyData.questions[questionId];
+                    if (!question) continue;
+
+                    // Check if this participant answered this question
+                    const participantResponse = participant.responses.find(r => r.questionId === questionId);
+                    if (!participantResponse) continue;
+
+                    // Build context block for this participant
+                    const contextBlock = getContextBuilder(
+                        contextFormat, segment, config, questionId,
+                        undefined, undefined, participant,
+                    );
+
+                    // Assemble the prompt
+                    const assembled = assembleIndividualPrompt(
+                        contextBlock,
+                        participant,
+                        question,
+                        reasoningMode,
+                        {
+                            prefix: config.blueprintTemplate?.promptPrefix,
+                            suffix: config.blueprintTemplate?.promptSuffix,
+                        },
+                    );
+
+                    if (assembled.contextQuestionCount > blueprintContextCount) {
+                        blueprintContextCount = assembled.contextQuestionCount;
+                        blueprintContextIds = assembled.contextQuestionIds;
+                    }
+
+                    // Build expected distribution from the participant's actual answer
+                    // (one-hot at the selected index)
+                    const options = question.options || [];
+                    const expectedDist = options.map((_, i) =>
+                        i === participantResponse.selectedIndex ? 100 : 0
+                    );
+
+                    const promptId = `${questionId}-${segment.id}-${participant.participantId.slice(0, 8)}`;
+
+                    prompts.push({
+                        id: promptId,
+                        description: `Individual: ${segment.label} → "${question.text.slice(0, 50)}..."`,
+                        promptText: assembled.text,
+                        points: [{
+                            text: 'Individual Answer Accuracy',
+                            fn: 'individual_metric',
+                            fnArgs: {
+                                expected: expectedDist,
+                                mode: 'brier',
+                            },
+                        }],
+                        idealResponse: `ANSWER: ${String.fromCharCode(97 + participantResponse.selectedIndex)}`,
+                        temperature: config.modelConfig?.temperature,
+                    });
+                }
+            }
+
+            if (prompts.length === 0) continue;
+
+            const blueprintId = encodeConfigId({
+                surveyId: config.surveyData.surveyId,
+                segmentId: segment.id,
+                contextQuestionCount: blueprintContextCount,
+                contextFormat,
+                evalType: 'individual-answer',
+                reasoningMode,
+            }) + '-individual';
+
+            const fmtLabel = contextFormat !== 'attribute-label' ? ` [${contextFormat}]` : '';
+            const ctxLabel = blueprintContextCount > 0 ? ` (${blueprintContextCount} ctx)` : '';
+            const blueprintTitle = `${config.surveyData.surveyName} - ${segment.label} [indiv]${ctxLabel}${fmtLabel}`;
+
+            const systemPrompt = getSystemPrompt('individual-answer', reasoningMode, {
+                customPrompt: config.blueprintTemplate?.systemPrompt,
+            });
+
+            const tags = ['_periodic', 'dtef', 'demographic', 'individual-answer', config.surveyData.surveyId];
+            if (contextFormat !== 'attribute-label') tags.push(contextFormat);
+            if (config.experimentId) tags.push(`experiment:${config.experimentId}`);
+
+            blueprints.push({
+                configId: blueprintId,
+                configTitle: blueprintTitle,
+                description: `DTEF [indiv]: Predict individual answers for ${segment.label} (${sampled.length} participants). Source: ${config.surveyData.source || config.surveyData.surveyName}`,
+                models: config.modelConfig?.models || ['CORE'],
+                system: systemPrompt,
+                temperature: config.modelConfig?.temperature || 0.3,
+                prompts,
+                tags,
+                context: {
+                    dtef: {
+                        surveyId: config.surveyData.surveyId,
+                        segmentId: segment.id,
+                        segmentLabel: segment.label,
+                        segmentAttributes: segment.attributes,
+                        evalType: 'individual-answer',
+                        contextFormat,
+                        reasoningMode,
+                        contextQuestionCount: blueprintContextCount,
+                        contextQuestionIds: blueprintContextIds,
+                        sampleSize: sampled.length,
+                        ...(config.experimentId ? { experimentId: config.experimentId } : {}),
+                    },
+                },
+            });
+        }
+
+        return blueprints;
     }
 
     /**

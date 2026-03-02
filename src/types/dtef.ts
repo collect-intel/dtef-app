@@ -205,6 +205,12 @@ export interface DTEFBlueprintConfig {
    * Computed from weighted average of all segment distributions.
    */
   populationMarginals?: Record<string, number[]>;
+
+  /** Individual-level participant data (for individual-answer eval type) */
+  individualData?: DTEFIndividualData;
+
+  /** Number of participants to sample per segment (for individual-answer, default: 20) */
+  sampleSize?: number;
 }
 
 /**
@@ -382,6 +388,32 @@ export interface DTEFLeaderboardEntry {
 
   /** Last evaluation timestamp */
   lastEvaluatedAt: string;
+}
+
+// ── Individual-level data types ─────────────────────────────────────
+
+/** Individual participant response to a single question */
+export interface IndividualResponse {
+  questionId: string;
+  /** The selected answer option (e.g. "Agree", "Somewhat Trust") */
+  selectedOption: string;
+  /** Index of the selected option in the question's options array */
+  selectedIndex: number;
+}
+
+/** A single survey participant with demographics and responses */
+export interface DTEFParticipant {
+  participantId: string;
+  attributes: Record<string, string>;
+  responses: IndividualResponse[];
+}
+
+/** Individual-level survey data alongside aggregate data */
+export interface DTEFIndividualData {
+  surveyId: string;
+  participants: DTEFParticipant[];
+  /** Question ID mapping (column text → question ID) */
+  questionIdMap: Record<string, string>;
 }
 
 /**

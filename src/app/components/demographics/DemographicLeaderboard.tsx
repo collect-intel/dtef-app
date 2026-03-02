@@ -119,6 +119,17 @@ interface DemographicsData {
             worstSegment: { id: string; label: string; score: number };
         }>;
         contextAnalysis?: FullContextAnalysis;
+        modelDPDs?: Array<{
+            modelId: string;
+            overallDPD: number;
+            dimensionDPD: Array<{ dimension: string; dimensionLabel: string; dpd: number }>;
+        }>;
+        stereotypeScores?: Array<{
+            modelId: string;
+            zeroContextScore: number;
+            fullContextScore: number;
+            improvementRatio: number;
+        }>;
     };
 }
 
@@ -1328,6 +1339,183 @@ function FairnessAnalysisTable({
     );
 }
 
+// --- DPD Summary Card ---
+
+function DPDBar({ dpd }: { dpd: number }) {
+    const pct = Math.min(100, dpd * 100);
+    const color = pct < 5 ? 'bg-green-500' : pct < 15 ? 'bg-yellow-500' : 'bg-red-500';
+    return (
+        <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(2, pct)}%` }} />
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-right font-mono">
+                {(dpd * 100).toFixed(1)}%
+            </span>
+        </div>
+    );
+}
+
+function DPDSummaryCard({ modelDPDs }: {
+    modelDPDs: Array<{
+        modelId: string;
+        overallDPD: number;
+        dimensionDPD: Array<{ dimension: string; dimensionLabel: string; dpd: number }>;
+    }>;
+}) {
+    const [expandedModel, setExpandedModel] = useState<string | null>(null);
+
+    if (!modelDPDs || modelDPDs.length === 0) return null;
+
+    const sorted = [...modelDPDs].sort((a, b) => a.overallDPD - b.overallDPD);
+
+    return (
+        <section>
+            <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold tracking-tight">Demographic Parity Difference</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                    Overall fairness gap per model (lower is fairer)
+                </p>
+            </div>
+            <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-left text-muted-foreground">Model</th>
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-left text-muted-foreground w-1/3">Overall DPD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map(m => {
+                            const isExpanded = expandedModel === m.modelId;
+                            return (
+                                <Fragment key={m.modelId}>
+                                    <tr
+                                        className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                                        onClick={() => setExpandedModel(isExpanded ? null : m.modelId)}
+                                    >
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
+                                            <span className="inline-flex items-center gap-2">
+                                                {formatModelName(m.modelId)}
+                                                <span className={`text-muted-foreground text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <DPDBar dpd={m.overallDPD} />
+                                        </td>
+                                    </tr>
+                                    {isExpanded && m.dimensionDPD.length > 0 && (
+                                        <tr>
+                                            <td colSpan={2} className="p-0 border-b border-border/30 bg-muted/10">
+                                                <div className="px-6 py-3">
+                                                    <p className="text-xs text-muted-foreground mb-2">Per-dimension DPD:</p>
+                                                    <ul className="space-y-1.5">
+                                                        {m.dimensionDPD
+                                                            .sort((a, b) => b.dpd - a.dpd)
+                                                            .map(d => (
+                                                                <li key={d.dimension} className="flex items-center gap-3 text-sm">
+                                                                    <span className="w-24 flex-shrink-0">
+                                                                        <CategoryBadge label={d.dimensionLabel} />
+                                                                    </span>
+                                                                    <div className="flex-1">
+                                                                        <DPDBar dpd={d.dpd} />
+                                                                    </div>
+                                                                </li>
+                                                            ))}
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+                DPD = max accuracy gap between best and worst segments. Green (&lt;5%), Yellow (5-15%), Red (&gt;15%).
+                Click a row to see per-dimension breakdown.
+            </p>
+        </section>
+    );
+}
+
+// --- Stereotype Score Card ---
+
+function StereotypeScoreCard({ stereotypeScores }: {
+    stereotypeScores: Array<{
+        modelId: string;
+        zeroContextScore: number;
+        fullContextScore: number;
+        improvementRatio: number;
+    }>;
+}) {
+    if (!stereotypeScores || stereotypeScores.length === 0) return null;
+
+    return (
+        <section>
+            <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold tracking-tight">Stereotype Analysis</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                    Does the model improve with evidence, or rely on stereotypes?
+                </p>
+            </div>
+            <div className="bg-card border border-border/50 rounded-lg overflow-hidden">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border/50 bg-muted/30">
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-left text-muted-foreground">Model</th>
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-right text-muted-foreground"
+                                title="Accuracy with minimal demographic context">Zero-Context</th>
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-right text-muted-foreground"
+                                title="Accuracy with full survey context">Full-Context</th>
+                            <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-right text-muted-foreground"
+                                title="(full - zero) / full. Low or negative = possible stereotyping">Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {stereotypeScores.map(s => {
+                            const improvementPct = (s.improvementRatio * 100);
+                            const isNegative = improvementPct < 0;
+                            const isLow = improvementPct < 5;
+                            return (
+                                <tr key={s.modelId} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                                    <td className="px-4 py-3 text-sm font-medium text-foreground truncate max-w-[250px]">
+                                        {formatModelName(s.modelId)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-sm text-muted-foreground font-mono">
+                                        {(s.zeroContextScore * 100).toFixed(1)}%
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-sm text-muted-foreground font-mono">
+                                        {(s.fullContextScore * 100).toFixed(1)}%
+                                    </td>
+                                    <td className={`px-4 py-3 text-right text-sm font-mono ${
+                                        isNegative ? 'text-red-600 dark:text-red-400'
+                                        : isLow ? 'text-yellow-600 dark:text-yellow-400'
+                                        : 'text-green-600 dark:text-green-400'
+                                    }`}>
+                                        {improvementPct >= 0 ? '+' : ''}{improvementPct.toFixed(1)}%
+                                        {isNegative && (
+                                            <span className="ml-1 text-xs" title="Model may be applying stereotypes — accuracy decreased with more context">
+                                                ⚠
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+                Improvement = (full-context − zero-context) / full-context.
+                Negative values indicate the model may rely on stereotypes rather than evidence.
+            </p>
+        </section>
+    );
+}
+
 // --- Methodology Section ---
 
 function MethodologySection({ baselines }: { baselines?: BaselineScores }) {
@@ -1520,6 +1708,14 @@ export default function DemographicLeaderboard() {
 
             {disparities.length > 0 && (
                 <FairnessAnalysisTable disparities={disparities} modelResults={modelResults} runsLookup={runsLookup} />
+            )}
+
+            {data.aggregation?.modelDPDs && data.aggregation.modelDPDs.length > 0 && (
+                <DPDSummaryCard modelDPDs={data.aggregation.modelDPDs} />
+            )}
+
+            {data.aggregation?.stereotypeScores && data.aggregation.stereotypeScores.length > 0 && (
+                <StereotypeScoreCard stereotypeScores={data.aggregation.stereotypeScores} />
             )}
 
             <MethodologySection baselines={baselines} />

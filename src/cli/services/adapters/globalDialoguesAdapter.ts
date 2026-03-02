@@ -10,7 +10,14 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { DTEFSurveyData, SegmentWithResponses, DemographicResponse } from '@/types/dtef';
+import {
+    DTEFSurveyData,
+    DTEFIndividualData,
+    DTEFParticipant,
+    IndividualResponse,
+    SegmentWithResponses,
+    DemographicResponse,
+} from '@/types/dtef';
 
 // ── Column classification ──────────────────────────────────────────────
 
@@ -582,6 +589,174 @@ export function loadAllGlobalDialoguesRounds(
 ): DTEFSurveyData[] {
   const rounds = detectAvailableRounds(dataDir);
   return rounds.map(roundId => loadGlobalDialoguesRound(dataDir, roundId, overrides));
+}
+
+// ── Individual Data Loading ────────────────────────────────────────────
+
+/**
+ * Demographic question column headers (exact match, used to extract participant attributes).
+ * Maps column header prefixes to attribute names.
+ */
+const PARTICIPANT_DEMOGRAPHIC_COLUMNS: Array<{ pattern: RegExp; attribute: string }> = [
+    { pattern: /^Please select your preferred language/i, attribute: 'language' },
+    { pattern: /^How old are you/i, attribute: 'ageGroup' },
+    { pattern: /^What is your gender/i, attribute: 'gender' },
+    { pattern: /^What best describes where you live/i, attribute: 'environment' },
+    { pattern: /increased use of artificial intelligence.*feel/i, attribute: 'aiConcern' },
+    { pattern: /^What religious group/i, attribute: 'religion' },
+    { pattern: /^What country or region/i, attribute: 'country' },
+];
+
+/**
+ * Load question ID mapping from GD{N}_question_id_mapping.csv.
+ * Returns a map from question text → UUID.
+ */
+function loadQuestionIdMapping(filePath: string): Map<string, string> {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const rows = parseCSV(content);
+    if (rows.length < 2) return new Map();
+
+    const headers = rows[0];
+    const uuidIdx = headers.indexOf('uuid');
+    const textIdx = headers.indexOf('question_text');
+
+    if (uuidIdx < 0 || textIdx < 0) return new Map();
+
+    const map = new Map<string, string>();
+    for (let i = 1; i < rows.length; i++) {
+        const uuid = rows[i][uuidIdx];
+        const text = rows[i][textIdx];
+        if (uuid && text) {
+            map.set(text, uuid);
+        }
+    }
+    return map;
+}
+
+/**
+ * Load individual participant data from GD{N}_participants.csv.
+ *
+ * @param round - Round identifier (e.g., "GD4")
+ * @param dataDir - Path to the GD Data/ directory
+ * @param surveyData - Already-loaded aggregate survey data (for option matching)
+ * @returns Individual participant data
+ */
+export function loadIndividualData(
+    round: string,
+    dataDir: string,
+    surveyData: DTEFSurveyData,
+): DTEFIndividualData {
+    const roundDir = path.join(dataDir, round);
+    const participantsPath = path.join(roundDir, `${round}_participants.csv`);
+    const mappingPath = path.join(roundDir, `${round}_question_id_mapping.csv`);
+
+    if (!fs.existsSync(participantsPath)) {
+        throw new Error(`Participants file not found: ${participantsPath}`);
+    }
+    if (!fs.existsSync(mappingPath)) {
+        throw new Error(`Question ID mapping file not found: ${mappingPath}`);
+    }
+
+    // Load question ID mapping: question text → UUID
+    const questionTextToUuid = loadQuestionIdMapping(mappingPath);
+
+    // Parse participants CSV
+    const content = fs.readFileSync(participantsPath, 'utf-8');
+    const rows = parseCSV(content);
+    if (rows.length < 2) {
+        throw new Error(`Participants CSV has insufficient data: ${participantsPath}`);
+    }
+
+    const headers = rows[0];
+
+    // Find participant ID column
+    const pidIdx = headers.indexOf('Participant Id');
+    if (pidIdx < 0) {
+        throw new Error('Participants CSV missing "Participant Id" column');
+    }
+
+    // Classify each column: demographic attribute, poll question, or skip
+    interface ColumnMapping {
+        colIdx: number;
+        type: 'demographic' | 'question';
+        attribute?: string;     // for demographics
+        questionId?: string;    // for poll questions
+    }
+
+    const columnMappings: ColumnMapping[] = [];
+    const questionIdMap: Record<string, string> = {};
+
+    for (let j = 0; j < headers.length; j++) {
+        const header = headers[j];
+        if (!header || j === pidIdx || header === 'Sample Provider Id') continue;
+
+        // Check if it's a demographic column
+        const demoMatch = PARTICIPANT_DEMOGRAPHIC_COLUMNS.find(d => d.pattern.test(header));
+        if (demoMatch) {
+            columnMappings.push({ colIdx: j, type: 'demographic', attribute: demoMatch.attribute });
+            continue;
+        }
+
+        // Check if it matches a question in our survey data via UUID mapping
+        const uuid = questionTextToUuid.get(header);
+        if (uuid && surveyData.questions[uuid]) {
+            columnMappings.push({ colIdx: j, type: 'question', questionId: uuid });
+            questionIdMap[header] = uuid;
+        }
+    }
+
+    // Build option lookup: questionId → (lowercase option text → option index)
+    const optionLookup = new Map<string, Map<string, number>>();
+    for (const [qId, q] of Object.entries(surveyData.questions)) {
+        if (!q.options) continue;
+        const map = new Map<string, number>();
+        for (let i = 0; i < q.options.length; i++) {
+            map.set(q.options[i].toLowerCase().trim(), i);
+        }
+        optionLookup.set(qId, map);
+    }
+
+    // Parse each participant row
+    const participants: DTEFParticipant[] = [];
+    let skipped = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+        const fields = rows[i];
+        const participantId = fields[pidIdx];
+        if (!participantId) { skipped++; continue; }
+
+        const attributes: Record<string, string> = {};
+        const responses: IndividualResponse[] = [];
+
+        for (const mapping of columnMappings) {
+            const value = fields[mapping.colIdx]?.trim();
+            if (!value) continue;
+
+            if (mapping.type === 'demographic' && mapping.attribute) {
+                attributes[mapping.attribute] = value;
+            } else if (mapping.type === 'question' && mapping.questionId) {
+                const lookup = optionLookup.get(mapping.questionId);
+                if (!lookup) continue;
+                const idx = lookup.get(value.toLowerCase().trim());
+                if (idx === undefined) continue; // response doesn't match any known option
+                responses.push({
+                    questionId: mapping.questionId,
+                    selectedOption: value,
+                    selectedIndex: idx,
+                });
+            }
+        }
+
+        if (responses.length === 0) { skipped++; continue; }
+
+        participants.push({ participantId, attributes, responses });
+    }
+
+    return {
+        surveyId: surveyData.surveyId,
+        participants,
+        questionIdMap,
+    };
 }
 
 /**

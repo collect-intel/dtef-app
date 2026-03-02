@@ -10,6 +10,7 @@
 import {
     DTEFSurveyData,
     DTEFBlueprintConfig,
+    DTEFParticipant,
     SegmentWithResponses,
     DTEFContextFormat,
 } from '@/types/dtef';
@@ -227,36 +228,146 @@ export function buildNarrativeContext(
 }
 
 /**
- * Stub: raw-survey context (individual-level data, Phase 4).
+ * Raw survey context: shows other Q&A pairs from the same participant.
+ * Most data-rich individual context format.
  */
 export function buildRawSurveyContext(
-    _individual: unknown,
-    _config: DTEFBlueprintConfig,
-    _targetQuestionId?: string,
+    individual: DTEFParticipant | null,
+    config: DTEFBlueprintConfig,
+    targetQuestionId?: string,
 ): ContextResult | null {
-    return null;
+    if (!individual) return null;
+
+    const contextResponses = individual.responses.filter(r => r.questionId !== targetQuestionId);
+    if (contextResponses.length === 0) return null;
+
+    // Use contextQuestionIds ordering if available, otherwise use all
+    const orderedIds = config.contextQuestionIds || contextResponses.map(r => r.questionId);
+    const maxQuestions = config.contextQuestionCount;
+
+    const lines: string[] = [];
+    const includedIds: string[] = [];
+
+    for (const qId of orderedIds) {
+        if (qId === targetQuestionId) continue;
+        const resp = contextResponses.find(r => r.questionId === qId);
+        if (!resp) continue;
+        const q = config.surveyData.questions[qId];
+        if (!q) continue;
+
+        lines.push(`Q: ${q.text}\nA: ${resp.selectedOption}\n`);
+        includedIds.push(qId);
+
+        if (maxQuestions !== undefined && includedIds.length >= maxQuestions) break;
+    }
+
+    if (lines.length === 0) return null;
+
+    return {
+        text: `This person's other survey responses:\n${lines.join('\n')}\n`,
+        contextQuestionCount: includedIds.length,
+        contextQuestionIds: includedIds,
+    };
 }
 
 /**
- * Stub: interview context (Phase 4).
+ * Interview context: wraps participant answers in conversational interview format.
+ * Simulates qualitative research context.
  */
 export function buildInterviewContext(
-    _individual: unknown,
-    _config: DTEFBlueprintConfig,
-    _targetQuestionId?: string,
+    individual: DTEFParticipant | null,
+    config: DTEFBlueprintConfig,
+    targetQuestionId?: string,
 ): ContextResult | null {
-    return null;
+    if (!individual) return null;
+
+    const contextResponses = individual.responses.filter(r => r.questionId !== targetQuestionId);
+    if (contextResponses.length === 0) return null;
+
+    const orderedIds = config.contextQuestionIds || contextResponses.map(r => r.questionId);
+    const maxQuestions = config.contextQuestionCount;
+
+    const lines: string[] = [];
+    const includedIds: string[] = [];
+
+    for (const qId of orderedIds) {
+        if (qId === targetQuestionId) continue;
+        const resp = contextResponses.find(r => r.questionId === qId);
+        if (!resp) continue;
+        const q = config.surveyData.questions[qId];
+        if (!q) continue;
+
+        // Convert question text to conversational phrasing
+        let interviewerQ = q.text;
+        // Strip trailing punctuation and rephrase as conversational
+        interviewerQ = interviewerQ.replace(/[?:]$/, '').trim();
+
+        lines.push(`Interviewer: ${interviewerQ}?\nRespondent: ${resp.selectedOption}.\n`);
+        includedIds.push(qId);
+
+        if (maxQuestions !== undefined && includedIds.length >= maxQuestions) break;
+    }
+
+    if (lines.length === 0) return null;
+
+    return {
+        text: `Interview transcript with this person:\n${lines.join('\n')}\n`,
+        contextQuestionCount: includedIds.length,
+        contextQuestionIds: includedIds,
+    };
 }
 
 /**
- * Stub: first-person context (Phase 4).
+ * First-person context: generates a biographical self-description from
+ * demographics and prior answers in narrative form.
  */
 export function buildFirstPersonContext(
-    _individual: unknown,
-    _config: DTEFBlueprintConfig,
-    _targetQuestionId?: string,
+    individual: DTEFParticipant | null,
+    config: DTEFBlueprintConfig,
+    targetQuestionId?: string,
 ): ContextResult | null {
-    return null;
+    if (!individual) return null;
+
+    // Build demographic description
+    const demoParts: string[] = [];
+    const attrs = individual.attributes;
+    if (attrs.ageGroup) demoParts.push(`I'm ${attrs.ageGroup} years old`);
+    if (attrs.gender) demoParts.push(`${attrs.gender.toLowerCase()}`);
+    if (attrs.environment) demoParts.push(`living in ${attrs.environment === 'Urban' ? 'an urban area' : attrs.environment === 'Rural' ? 'a rural area' : `a ${attrs.environment.toLowerCase()} area`}`);
+    if (attrs.country) demoParts.push(`from ${attrs.country}`);
+    if (attrs.religion) demoParts.push(`${attrs.religion.startsWith('Do not') ? 'not identifying with any religious group' : `identifying with ${attrs.religion}`}`);
+    if (attrs.aiConcern) demoParts.push(`${attrs.aiConcern.toLowerCase()} about AI`);
+
+    let narrative = demoParts.length > 0
+        ? `${demoParts.join(', ')}.`
+        : 'I am a survey participant.';
+
+    // Add prior answer context
+    const contextResponses = individual.responses.filter(r => r.questionId !== targetQuestionId);
+    const orderedIds = config.contextQuestionIds || contextResponses.map(r => r.questionId);
+    const maxQuestions = config.contextQuestionCount;
+    const includedIds: string[] = [];
+
+    for (const qId of orderedIds) {
+        if (qId === targetQuestionId) continue;
+        const resp = contextResponses.find(r => r.questionId === qId);
+        if (!resp) continue;
+        const q = config.surveyData.questions[qId];
+        if (!q) continue;
+
+        // Shorten question text for narrative embedding
+        const shortQ = q.text.length > 80 ? q.text.slice(0, 77) + '...' : q.text;
+        narrative += ` When asked "${shortQ}", I said "${resp.selectedOption}".`;
+        includedIds.push(qId);
+
+        if (maxQuestions !== undefined && includedIds.length >= maxQuestions) break;
+    }
+
+    return {
+        text: `This person describes themselves:\n"${narrative}"\n\n`,
+        contextQuestionCount: includedIds.length,
+        contextQuestionIds: includedIds,
+    };
 }
 
 /**
@@ -269,6 +380,7 @@ export function getContextBuilder(
     targetQuestionId?: string,
     populationMarginals?: Record<string, number[]>,
     excludeQuestionIds?: string[],
+    individual?: DTEFParticipant | null,
 ): ContextResult | null {
     switch (format) {
         case 'attribute-label':
@@ -278,11 +390,11 @@ export function getContextBuilder(
         case 'narrative':
             return buildNarrativeContext(segment, config, populationMarginals, targetQuestionId, excludeQuestionIds);
         case 'raw-survey':
-            return buildRawSurveyContext(null, config, targetQuestionId);
+            return buildRawSurveyContext(individual ?? null, config, targetQuestionId);
         case 'interview':
-            return buildInterviewContext(null, config, targetQuestionId);
+            return buildInterviewContext(individual ?? null, config, targetQuestionId);
         case 'first-person':
-            return buildFirstPersonContext(null, config, targetQuestionId);
+            return buildFirstPersonContext(individual ?? null, config, targetQuestionId);
         default:
             return null;
     }

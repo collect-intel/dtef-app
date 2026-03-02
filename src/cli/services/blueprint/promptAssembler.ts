@@ -11,6 +11,7 @@ import {
     DTEFBlueprintConfig,
     DTEFEvalType,
     DTEFReasoningMode,
+    DTEFParticipant,
     SegmentWithResponses,
 } from '@/types/dtef';
 import { buildDemographicsHeader, formatAttributeKey, ContextResult } from './contextGenerators';
@@ -216,6 +217,66 @@ export function assembleBatchedPrompt(
             corePrompt += `For each question, predict the percentage distribution of responses for this demographic group across the answer options.`;
         }
     }
+
+    if (suffix) {
+        corePrompt += `\n\n${suffix}`;
+    }
+
+    return {
+        text: corePrompt,
+        contextQuestionCount: contextBlock?.contextQuestionCount ?? 0,
+        contextQuestionIds: contextBlock?.contextQuestionIds ?? [],
+    };
+}
+
+/**
+ * Assemble a prompt for individual-answer prediction with participant context.
+ * Given a specific participant's demographics and optional context (other answers),
+ * ask the model to predict what this individual would answer.
+ */
+export function assembleIndividualPrompt(
+    contextBlock: { text: string; contextQuestionCount: number; contextQuestionIds: string[] } | null,
+    participant: DTEFParticipant,
+    question: { text: string; type: string; options?: string[] },
+    _reasoningMode: DTEFReasoningMode = 'standard',
+    options?: {
+        prefix?: string;
+        suffix?: string;
+    },
+): AssembledPrompt {
+    const prefix = options?.prefix || '';
+    const suffix = options?.suffix || '';
+    const questionOptions = question.options || [];
+
+    let corePrompt = '';
+
+    if (prefix) {
+        corePrompt += `${prefix}\n\n`;
+    }
+
+    // Describe the individual's demographics
+    const attrLines = Object.entries(participant.attributes)
+        .map(([key, value]) => `- ${formatAttributeKey(key)}: ${value}`)
+        .join('\n');
+    corePrompt += `Consider the following survey respondent:\n${attrLines}\n\n`;
+
+    // Add context block (other answers from this participant)
+    if (contextBlock && contextBlock.text) {
+        corePrompt += contextBlock.text;
+    }
+
+    // Target question
+    corePrompt += `Survey question:\n"${question.text}"\n\n`;
+    if (questionOptions.length > 0) {
+        corePrompt += `Answer options:\n`;
+        questionOptions.forEach((opt, idx) => {
+            const letter = String.fromCharCode(97 + idx);
+            corePrompt += `  ${letter}. ${opt}\n`;
+        });
+        corePrompt += '\n';
+    }
+
+    corePrompt += `Predict which answer this specific person would choose and your confidence in each option.`;
 
     if (suffix) {
         corePrompt += `\n\n${suffix}`;
