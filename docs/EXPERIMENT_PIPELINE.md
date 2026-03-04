@@ -175,6 +175,8 @@ The evaluation scheduler (`/api/internal/fetch-and-schedule-evals`) works as fol
 
 **Key implication:** Experiment configs published to dtef-configs with `_periodic` tag are automatically scheduled alongside production configs. No special handling needed.
 
+**IMPORTANT — ConfigId derivation:** The scheduler derives configIds from file paths, NOT from the `configId` field in the YAML. A file at `blueprints/gd4-synthetic-n50/dtef-global-dialogues-gd4-ageGroup:18-25-synth50.yml` gets configId `gd4-synthetic-n50__dtef-global-dialogues-gd4-ageGroup:18-25-synth50` (directory prefix + `__` separator). The `--experiment-id` flag on `dtef generate` now automatically computes these path-derived IDs when registering configIds in the experiment's conditionMap.
+
 ---
 
 ## Experiment Naming Conventions
@@ -196,14 +198,14 @@ The evaluation scheduler (`/api/internal/fetch-and-schedule-evals`) works as fol
 | `batch-size-1v2-multi` | completed | **promoted** | Batch=2 non-inferior (Δ=-0.009, p=0.16). Batch=2 uses fewer prompts, so promoted for efficiency. |
 | `context-label-vs-narrative` | completed | **promoted** | Narrative context +2.5% over attribute-label (p=0.0001, d=0.36). Medium effect size. |
 | `reasoning-std-vs-cot` | completed | **rejected** | CoT showed no improvement (Δ=+0.002, p=0.70). Adds token cost with no accuracy gain. |
+| `temp-0-vs-03` | completed | **rejected** | Negligible difference: temp-0.0=0.7942 vs temp-0.3=0.7937 (p=0.96, d=0.022). Temperature doesn't matter. |
 
 ## Active / Planned Experiments
 
 | Experiment | Status | Conditions | Configs | Description |
 |---|---|---|---|---|
-| `individual-context-format` | planned | raw-survey, interview, first-person | 144 (GD4) | Tests 3 context formats for individual-answer eval type |
-| `synthetic-N-20v50v100` | planned | N20, N50, N100 | 60 (GD4 non-country) | Tests synthetic-individual N parameter stability |
-| `temp-0-vs-03` | planned | — | 49 (GD4, multi-temp) | Temperature ablation using `temperatures: [0.0, 0.3]` per config |
+| `individual-context-format` | needs-more-data | raw-survey (0.471), interview (0.344), first-person (0.373) | 144 (GD4) | Raw-survey best, but scores are coverage-only. Needs verification that distribution_metric scores correctly for individual eval type. |
+| `synthetic-N-20v50v100` | needs-more-data | N20, N50, N100 | 60 (GD4 non-country) | All conditions scored 0.000 — distribution_metric doesn't aggregate individual responses into distributions before computing JSD. Needs pipeline fix. |
 | `batch-size-1v2` | running | — | — | Superseded by `batch-size-1v2-multi` |
 
 ## Validated Findings So Far
@@ -211,8 +213,9 @@ The evaluation scheduler (`/api/internal/fetch-and-schedule-evals`) works as fol
 1. **Batch size:** Batch=2 is non-inferior to batch=1 (saves ~50% API calls)
 2. **Narrative context:** +2.5% improvement over attribute-label (medium effect)
 3. **Chain-of-thought:** No benefit for group distribution prediction (saves token cost to skip)
-4. **Baseline hierarchy:** uniform (0.647) < shuffled (0.761) < models (0.73 avg) < population marginal (0.833)
-5. **No model beats population marginal** — the core challenge for demographic prediction
+4. **Temperature:** 0.0 and 0.3 produce identical results (p=0.96). Use default 0.3.
+5. **Baseline hierarchy:** uniform (0.647) < shuffled (0.761) < models (0.73 avg) < population marginal (0.833)
+6. **No model beats population marginal** — the core challenge for demographic prediction
 
 ---
 

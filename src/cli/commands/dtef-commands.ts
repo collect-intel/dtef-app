@@ -24,7 +24,7 @@ import {
     BASELINE_MODEL_IDS,
     BaselineType,
 } from '../services/baselineGeneratorService';
-import { saveResult, getJsonFile, saveJsonFile } from '@/lib/storageService';
+import { saveResult, getJsonFile, saveJsonFile, listRunsForConfig, getResultByFileName, getConfigSummary } from '@/lib/storageService';
 import { toSafeTimestamp } from '@/lib/timestampUtils';
 import type {
     ExperimentRecord,
@@ -40,7 +40,9 @@ import {
     applyCuration,
 } from '../services/questionCurationService';
 import { welchTTest, cohensD, stddev, interpretEffectSize } from '../utils/statisticalTests';
-import { getConfigSummary } from '@/lib/storageService';
+import { calculateHybridScore, IDEAL_MODEL_ID } from '@/app/utils/calculationUtils';
+import { generateBlueprintIdFromPath } from '@/app/utils/blueprintIdUtils';
+import type { WevalResult } from '@/types/shared';
 
 export const dtefCommand = new Command('dtef')
     .description('DTEF: Generate and manage demographic evaluation blueprints');
@@ -355,9 +357,22 @@ dtefCommand
         if (options.experimentId && options.conditionName) {
             const expId = options.experimentId;
             const condName = options.conditionName;
-            const configIds = blueprints.map(bp => bp.configId).filter((id): id is string => !!id);
+
+            // Compute path-derived configIds matching what the scheduler will use.
+            // The scheduler derives IDs from file paths relative to blueprints/ in dtef-configs:
+            // e.g., "gd4-synthetic-n50/file.yml" → "gd4-synthetic-n50__file"
+            // We use the output directory basename as the prefix.
+            const outputDirName = path.basename(outputDir);
+            const configIds = blueprints.map(bp => {
+                const yamlConfigId = bp.configId;
+                if (!yamlConfigId) return null;
+                const ext = options.format === 'yaml' ? '.yml' : '.json';
+                const blueprintPath = `${outputDirName}/${yamlConfigId}${ext}`;
+                return generateBlueprintIdFromPath(blueprintPath);
+            }).filter((id): id is string => !!id);
 
             console.log(chalk.gray(`\nUpdating experiment "${expId}" conditionMap["${condName}"] with ${configIds.length} configIds...`));
+            console.log(chalk.gray(`  (using path-derived IDs with prefix "${outputDirName}__")`));
             const record = await getJsonFile<ExperimentRecord>(`live/experiments/${expId}.json`);
             if (!record) {
                 console.error(chalk.yellow(`Experiment "${expId}" not found in S3 — skipping conditionMap update`));
@@ -1249,30 +1264,97 @@ experimentCommand
         const conditionNames = Object.keys(conditionMap);
         console.log(chalk.gray(`Conditions: ${conditionNames.join(', ')}`));
 
+        // Detect temperature experiment: conditions share configIds and independent variable is temperature
+        const isTemperatureExperiment = record.design.independentVariable === 'temperature';
+        if (isTemperatureExperiment) {
+            console.log(chalk.gray('Temperature experiment detected — extracting per-temperature scores from raw results'));
+        }
+
+        // Helper: extract temperature from condition name (e.g., "temp-0.3" → 0.3)
+        function extractTemperatureFromCondition(condName: string): number | null {
+            const match = condName.match(/(\d+\.?\d*)$/);
+            return match ? parseFloat(match[1]) : null;
+        }
+
+        // Helper: compute hybrid score for a specific temperature subset of a result
+        function computeHybridScoreForTemperature(resultData: WevalResult, targetTemp: number): number | null {
+            const scores: number[] = [];
+            const tempStr = Number.isInteger(targetTemp) ? targetTemp.toString() : targetTemp.toString();
+            const tempModels = resultData.effectiveModels.filter(m => {
+                const tempMatch = m.match(/\[temp:(\d+\.?\d*)\]/);
+                if (!tempMatch) return false;
+                return parseFloat(tempMatch[1]) === targetTemp;
+            });
+            if (tempModels.length === 0) return null;
+
+            for (const promptId of resultData.promptIds) {
+                for (const modelId of tempModels) {
+                    if (modelId === IDEAL_MODEL_ID) continue;
+                    const sim = resultData.evaluationResults?.perPromptSimilarities?.[promptId]?.[modelId]?.[IDEAL_MODEL_ID];
+                    const covResult = resultData.evaluationResults?.llmCoverageScores?.[promptId]?.[modelId];
+                    const cov = covResult && !('error' in covResult) ? covResult.avgCoverageExtent : undefined;
+                    const hybridScore = calculateHybridScore(sim, cov);
+                    if (hybridScore !== null) scores.push(hybridScore);
+                }
+            }
+            return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+        }
+
         // Collect scores per condition
         const perConditionStats: Record<string, { mean: number; stddev: number; n: number; scores: number[] }> = {};
         let totalAnalyzed = 0;
         let totalMissing = 0;
 
+        // For temperature experiments, deduplicate configIds and load raw results once
+        const rawResultCache = new Map<string, WevalResult | null>();
+
         for (const condName of conditionNames) {
             const configIds = conditionMap[condName];
             const scores: number[] = [];
+            const targetTemp = isTemperatureExperiment ? extractTemperatureFromCondition(condName) : null;
 
             for (const configId of configIds) {
-                const summary = await getConfigSummary(configId);
-                if (!summary || summary.runs.length === 0) {
-                    totalMissing++;
-                    continue;
-                }
+                if (isTemperatureExperiment && targetTemp !== null) {
+                    // Per-temperature analysis: load raw result and extract per-temp score
+                    let resultData = rawResultCache.get(configId);
+                    if (resultData === undefined) {
+                        const runs = await listRunsForConfig(configId);
+                        if (runs && runs.length > 0) {
+                            resultData = await getResultByFileName(configId, runs[0].fileName) as WevalResult | null;
+                        } else {
+                            resultData = null;
+                        }
+                        rawResultCache.set(configId, resultData);
+                    }
 
-                // Use the latest run's hybrid score
-                const latestRun = summary.runs[0];
-                const score = latestRun.hybridScoreStats?.average;
-                if (score != null) {
-                    scores.push(score);
-                    totalAnalyzed++;
+                    if (!resultData) {
+                        totalMissing++;
+                        continue;
+                    }
+
+                    const score = computeHybridScoreForTemperature(resultData, targetTemp);
+                    if (score != null) {
+                        scores.push(score);
+                        totalAnalyzed++;
+                    } else {
+                        totalMissing++;
+                    }
                 } else {
-                    totalMissing++;
+                    // Standard analysis: use summary hybrid score
+                    const summary = await getConfigSummary(configId);
+                    if (!summary || summary.runs.length === 0) {
+                        totalMissing++;
+                        continue;
+                    }
+
+                    const latestRun = summary.runs[0];
+                    const score = latestRun.hybridScoreStats?.average;
+                    if (score != null) {
+                        scores.push(score);
+                        totalAnalyzed++;
+                    } else {
+                        totalMissing++;
+                    }
                 }
             }
 
