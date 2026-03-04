@@ -70,6 +70,7 @@ dtefCommand
     .option('--synthetic-n <n>', 'Number of synthetic individuals (for synthetic-individual eval type)', '20')
     .option('--individuals-input <path>', 'Path to individual participant data JSON (for individual-answer eval type)')
     .option('--sample-size <n>', 'Participants per segment for individual-answer eval type', '20')
+    .option('--temperatures <temps>', 'Comma-separated temperatures to evaluate (e.g., "0.0,0.3"). Overrides --temperature.')
     .option('--experiment <id>', 'Tag blueprints with experiment ID')
     .option('--experiment-id <id>', 'Auto-populate experiment conditionMap with generated configIds')
     .option('--condition-name <name>', 'Condition name for --experiment-id mapping')
@@ -201,6 +202,18 @@ dtefCommand
         const experimentId = options.experiment as string | undefined;
         const sampleSize = parseInt(options.sampleSize, 10);
 
+        // Parse --temperatures if specified (overrides --temperature)
+        const temperatures: number[] | undefined = options.temperatures
+            ? options.temperatures.split(',').map((s: string) => {
+                const t = parseFloat(s.trim());
+                if (isNaN(t) || t < 0 || t > 2) {
+                    console.error(chalk.red(`Invalid temperature "${s}". Must be 0-2.`));
+                    process.exit(1);
+                }
+                return t;
+            })
+            : undefined;
+
         // Load individual data if provided
         let individualData: DTEFIndividualData | undefined;
         if (options.individualsInput) {
@@ -269,6 +282,7 @@ dtefCommand
                         modelConfig: {
                             models: options.models.split(',').map((s: string) => s.trim()),
                             temperature: parseFloat(options.temperature),
+                            temperatures,
                         },
                     };
 
@@ -296,6 +310,7 @@ dtefCommand
                     modelConfig: {
                         models: options.models.split(',').map((s: string) => s.trim()),
                         temperature: parseFloat(options.temperature),
+                        temperatures,
                     },
                 };
                 const blueprints = DemographicBlueprintService.generateBlueprints(config);
@@ -978,6 +993,166 @@ experimentCommand
 
         await saveJsonFile(`live/experiments/${record.id}.json`, record);
         console.log(chalk.green(`Experiment "${record.id}" concluded as: ${record.conclusion}`));
+    });
+
+/**
+ * dtef experiment promote - Promote winning configs from a concluded experiment
+ *
+ * Searches the dtef-configs repo for configs matching the winning condition's
+ * configIds, strips experiment tags, and copies them to a production output directory.
+ */
+experimentCommand
+    .command('promote')
+    .description('Promote winning configs: strip experiment tags and copy to production directory')
+    .requiredOption('--id <id>', 'Experiment ID (must have conclusion: promoted)')
+    .option('--output <dir>', 'Output directory for promoted configs', './output/blueprints/promoted')
+    .option('--configs-dir <dir>', 'Path to dtef-configs/blueprints directory', '../dtef-configs/blueprints')
+    .option('--condition <name>', 'Override: promote a specific condition (default: highest-scoring)')
+    .option('--dry-run', 'Show what would be promoted without writing files')
+    .action(async (options) => {
+        const chalk = (await import('chalk')).default;
+
+        console.log(chalk.blue('\nExperiment Promotion\n'));
+
+        const record = await getJsonFile<ExperimentRecord>(`live/experiments/${options.id}.json`);
+        if (!record) {
+            console.error(chalk.red(`Experiment "${options.id}" not found`));
+            process.exit(1);
+        }
+
+        if (record.conclusion !== 'promoted') {
+            console.error(chalk.red(`Experiment "${record.id}" has conclusion "${record.conclusion}", not "promoted".`));
+            console.error(chalk.gray('Use: dtef experiment conclude --id <id> --conclusion promoted'));
+            process.exit(1);
+        }
+
+        const conditionMap = record.design.conditionMap;
+        if (!conditionMap || Object.keys(conditionMap).length === 0) {
+            console.error(chalk.red('No conditionMap defined. Cannot determine which configs to promote.'));
+            process.exit(1);
+        }
+
+        // Determine winning condition
+        let winningCondition: string;
+        if (options.condition) {
+            winningCondition = options.condition;
+            if (!conditionMap[winningCondition]) {
+                console.error(chalk.red(`Condition "${winningCondition}" not found in conditionMap.`));
+                console.error(chalk.gray(`Available: ${Object.keys(conditionMap).join(', ')}`));
+                process.exit(1);
+            }
+        } else if (record.results?.conditionScores) {
+            // Pick highest-scoring condition
+            const entries = Object.entries(record.results.conditionScores);
+            entries.sort((a, b) => b[1] - a[1]);
+            winningCondition = entries[0][0];
+        } else {
+            console.error(chalk.red('No conditionScores in results. Run "dtef experiment analyze" first, or specify --condition.'));
+            process.exit(1);
+        }
+
+        const configIds = new Set(conditionMap[winningCondition]);
+        console.log(chalk.white(`Winning condition: ${winningCondition}`));
+        console.log(chalk.white(`Configs to promote: ${configIds.size}\n`));
+
+        // Search dtef-configs/blueprints for matching config files
+        const configsDir = path.resolve(options.configsDir);
+        if (!fs.existsSync(configsDir)) {
+            console.error(chalk.red(`Configs directory not found: ${configsDir}`));
+            console.error(chalk.gray('Use --configs-dir to specify the dtef-configs/blueprints path'));
+            process.exit(1);
+        }
+
+        // Recursively find all yml/yaml/json config files
+        function findConfigFiles(dir: string): string[] {
+            const results: string[] = [];
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    results.push(...findConfigFiles(fullPath));
+                } else if (/\.(yml|yaml|json)$/.test(entry.name)) {
+                    results.push(fullPath);
+                }
+            }
+            return results;
+        }
+
+        const allFiles = findConfigFiles(configsDir);
+        console.log(chalk.gray(`Scanning ${allFiles.length} config files in ${configsDir}...`));
+
+        const outputDir = path.resolve(options.output);
+        let promoted = 0;
+        let notFound = 0;
+        const foundIds = new Set<string>();
+
+        for (const filepath of allFiles) {
+            const raw = fs.readFileSync(filepath, 'utf-8');
+            let parsed: Record<string, unknown>;
+            try {
+                if (filepath.endsWith('.json')) {
+                    parsed = JSON.parse(raw);
+                } else {
+                    parsed = yaml.load(raw) as Record<string, unknown>;
+                }
+            } catch {
+                continue;
+            }
+
+            const configId = parsed.configId as string;
+            if (!configId || !configIds.has(configId)) continue;
+            foundIds.add(configId);
+
+            // Strip experiment-related tags
+            if (Array.isArray(parsed.tags)) {
+                parsed.tags = (parsed.tags as string[]).filter(t =>
+                    !t.startsWith('experiment:') && t !== record.id
+                );
+            }
+
+            // Strip experiment metadata from context
+            if (parsed.context && typeof parsed.context === 'object') {
+                const ctx = parsed.context as Record<string, unknown>;
+                if (ctx.dtef && typeof ctx.dtef === 'object') {
+                    delete (ctx.dtef as Record<string, unknown>).experimentId;
+                }
+            }
+
+            if (options.dryRun) {
+                console.log(chalk.gray(`  Would promote: ${configId}`));
+                promoted++;
+                continue;
+            }
+
+            // Write to output directory
+            fs.mkdirSync(outputDir, { recursive: true });
+            const outFilename = `${configId}.yml`;
+            const outFilepath = path.join(outputDir, outFilename);
+            const content = yaml.dump(parsed, { lineWidth: 120, noRefs: true });
+            fs.writeFileSync(outFilepath, content, 'utf-8');
+            console.log(chalk.gray(`  Promoted: ${outFilepath}`));
+            promoted++;
+        }
+
+        // Report missing configs
+        for (const id of configIds) {
+            if (!foundIds.has(id)) {
+                console.log(chalk.yellow(`  NOT FOUND: ${id}`));
+                notFound++;
+            }
+        }
+
+        if (options.dryRun) {
+            console.log(chalk.yellow(`\nDry run — would promote ${promoted} config(s) to ${outputDir}`));
+            if (notFound > 0) console.log(chalk.yellow(`${notFound} config(s) not found in ${configsDir}`));
+            return;
+        }
+
+        console.log(chalk.green(`\nPromoted ${promoted} config(s) to ${outputDir}`));
+        if (notFound > 0) console.log(chalk.yellow(`${notFound} config(s) not found in ${configsDir}`));
+        console.log(chalk.gray('\nNext steps:'));
+        console.log(chalk.gray(`  1. Review promoted configs in ${outputDir}`));
+        console.log(chalk.gray(`  2. Publish: pnpm cli dtef publish -s ${outputDir} -t ../dtef-configs/blueprints/<round> --tag _periodic`));
+        console.log(chalk.gray('  3. Commit + push dtef-configs'));
     });
 
 /**

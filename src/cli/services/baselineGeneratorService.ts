@@ -144,7 +144,19 @@ function generateBaselineResult(
             const k = resp.distribution.length;
             prediction = new Array(k).fill(100 / k);
         } else if (baselineType === 'shuffled') {
-            // Average JSD similarity between this segment and all OTHER segments
+            // CROSS-SEGMENT SIMILARITY BASELINE ("shuffled-segment null")
+            //
+            // For each (segment, question) pair, compute the average JSD similarity
+            // between this segment's distribution and every OTHER segment's distribution
+            // on the SAME question. This answers: "How well would you do if you used
+            // a random segment's distribution to predict this segment?"
+            //
+            // This is conceptually distinct from a "shuffled-question" baseline, which
+            // would use the SAME segment's distribution for a DIFFERENT question.
+            //
+            // The hardcoded 0.761 in FindingsContent.tsx is the global mean of this
+            // baseline across all segments and questions — it represents average
+            // inter-segment similarity on the same questions.
             const otherSegments = (allSegments || surveyData.segments)
                 .filter(s => s.id !== segment.id);
             if (otherSegments.length === 0) {

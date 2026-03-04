@@ -199,6 +199,7 @@ export class DemographicBlueprintService {
             contextFormat,
             evalType,
             reasoningMode,
+            syntheticN: evalType === 'synthetic-individual' ? config.syntheticN : undefined,
         });
 
         const ctxLabel = blueprintContextCount > 0 ? ` (${blueprintContextCount} context Qs)` : '';
@@ -245,6 +246,7 @@ export class DemographicBlueprintService {
             models: config.modelConfig?.models || ['CORE'],
             system: systemPrompt,
             temperature: config.modelConfig?.temperature || 0.3,
+            ...(config.modelConfig?.temperatures ? { temperatures: config.modelConfig.temperatures } : {}),
             prompts,
             tags,
             context: {
@@ -396,6 +398,7 @@ export class DemographicBlueprintService {
                 models: config.modelConfig?.models || ['CORE'],
                 system: systemPrompt,
                 temperature: config.modelConfig?.temperature || 0.3,
+                ...(config.modelConfig?.temperatures ? { temperatures: config.modelConfig.temperatures } : {}),
                 prompts,
                 tags,
                 context: {
@@ -536,6 +539,7 @@ export class DemographicBlueprintService {
             contextFormat,
             evalType,
             reasoningMode,
+            syntheticN: evalType === 'synthetic-individual' ? config.syntheticN : undefined,
             batchSize,
         });
 
@@ -577,6 +581,7 @@ export class DemographicBlueprintService {
             models: config.modelConfig?.models || ['CORE'],
             system: systemPrompt,
             temperature: config.modelConfig?.temperature || 0.3,
+            ...(config.modelConfig?.temperatures ? { temperatures: config.modelConfig.temperatures } : {}),
             prompts,
             tags,
             context: {

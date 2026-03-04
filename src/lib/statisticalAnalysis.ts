@@ -190,18 +190,64 @@ export function bootstrapAggregateCI(
     };
 }
 
-// ── Noise Floor ───────────────────────────────────────────────────────────
+// ── Sampling Noise Ceiling ─────────────────────────────────────────────────
+//
+// NOTE: This is a *data quality ceiling*, not a behavioral ceiling.
+//
+// The formula estimates the expected JSD similarity between a population's
+// true distribution and a sample of size n drawn from it. It answers:
+// "How good could ANY predictor be, given sampling noise in the ground truth?"
+//
+// This is DISTINCT from Park et al.'s self-consistency normalization, which
+// uses human test-retest reliability (a behavioral ceiling measuring how
+// consistently humans reproduce their own answers).
+//
+// Our ceiling: statistical (sampling noise in ground truth data)
+// Park et al.: behavioral (human response consistency across sessions)
+//
+// Both are valid ceilings but measure different things. A normalized score
+// of 1.0 here means "as good as statistically achievable given sample size",
+// not "as good as a human retaking the survey."
 
 /**
- * Compute the analytical noise floor for a (k, n) pair.
+ * Compute the sampling noise ceiling for a (k, n) pair.
  * Returns the expected JSD similarity between the true distribution and
  * one drawn from it with n samples and k categories.
  *
  * Formula: 1 - sqrt((k-1) / (2n × ln2))
+ *
+ * Previously called "noise floor" — renamed to "sampling noise ceiling" for
+ * clarity. This is the maximum achievable score given ground truth data quality.
  */
 export function computeNoiseFloorValue(k: number, n: number): number {
     if (n <= 0 || k <= 1) return 0;
     return 1 - Math.sqrt((k - 1) / (2 * n * Math.LN2));
+}
+
+/**
+ * Compute a normalized score that maps raw JSD similarity into the
+ * meaningful range between the uniform baseline and sampling noise ceiling.
+ *
+ * normalizedScore = (rawScore - uniformBaseline) / (noiseCeiling - uniformBaseline)
+ *
+ * Interpretation:
+ * - 0.0 = performing at uniform baseline (random guessing)
+ * - 1.0 = performing at the sampling noise ceiling (best achievable given data quality)
+ * - >1.0 = overfitting or measurement artifact
+ * - <0.0 = worse than random
+ *
+ * @param rawScore - JSD similarity score (0-1)
+ * @param uniformBaseline - uniform baseline score for this question (JSD similarity of equal distribution)
+ * @param noiseCeiling - sampling noise ceiling for this (k, n) pair
+ */
+export function computeNormalizedScore(
+    rawScore: number,
+    uniformBaseline: number,
+    noiseCeiling: number,
+): number {
+    const range = noiseCeiling - uniformBaseline;
+    if (range <= 0) return 0;
+    return (rawScore - uniformBaseline) / range;
 }
 
 // ── Weighted Aggregation ──────────────────────────────────────────────────

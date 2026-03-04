@@ -18,7 +18,8 @@ S3_REGION := us-east-1
 .PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
 	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
-	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index dtef-experiment-analyze dtef-experiment-add-configs
+	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index dtef-experiment-analyze dtef-experiment-add-configs dtef-experiment-promote \
+	dtef-generate-individual
 
 help: ## Show available commands
 	@echo "\033[1mEvaluations:\033[0m"
@@ -169,6 +170,10 @@ dtef-import: ## Import a GD round (ROUND=GD4)
 dtef-import-all: ## Import all available GD rounds
 	pnpm cli dtef import-gd --all
 
+dtef-import-individuals: ## Import individual participant data for a round (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-import-individuals ROUND=GD4" && exit 1)
+	pnpm cli dtef import-gd --round $(ROUND) --individuals
+
 dtef-generate: ## Generate blueprints for a round (ROUND=GD4, CTX=5 for context questions)
 	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate ROUND=GD4 [CTX=5]" && exit 1)
 	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
@@ -286,6 +291,36 @@ dtef-status: ## Show local DTEF data: imported rounds, blueprints, baselines
 		test -d "$$dir" && echo "  $$(basename $$dir): $$(ls $$dir | wc -l | xargs) files"; \
 	done 2>/dev/null || echo "  (none)"
 
+dtef-generate-individual: ## Generate individual eval configs for a round with all 3 context formats (ROUND=GD4)
+	@test -n "$(ROUND)" || (echo "Usage: make dtef-generate-individual ROUND=GD4" && exit 1)
+	$(eval ROUND_LC := $(shell echo $(ROUND) | tr A-Z a-z))
+	$(eval INPUT := output/$(ROUND_LC).json)
+	$(eval INDIV_INPUT := output/$(ROUND_LC)_individuals.json)
+	@test -f $(INPUT) || (echo "Survey data not found: $(INPUT) — run 'make dtef-import ROUND=$(ROUND)' first" && exit 1)
+	@test -f $(INDIV_INPUT) || (echo "Individual data not found: $(INDIV_INPUT) — run 'pnpm cli dtef import-gd --round $(ROUND) --individuals' first" && exit 1)
+	@echo "=== raw-survey context ==="
+	pnpm cli dtef generate -i $(INPUT) --individuals-input $(INDIV_INPUT) \
+		-o output/blueprints/$(ROUND_LC)-individual-raw-survey \
+		--eval-type individual-answer --context-format raw-survey \
+		--experiment-id individual-context-format --condition-name raw-survey
+	@echo "=== interview context ==="
+	pnpm cli dtef generate -i $(INPUT) --individuals-input $(INDIV_INPUT) \
+		-o output/blueprints/$(ROUND_LC)-individual-interview \
+		--eval-type individual-answer --context-format interview \
+		--experiment-id individual-context-format --condition-name interview
+	@echo "=== first-person context ==="
+	pnpm cli dtef generate -i $(INPUT) --individuals-input $(INDIV_INPUT) \
+		-o output/blueprints/$(ROUND_LC)-individual-first-person \
+		--eval-type individual-answer --context-format first-person \
+		--experiment-id individual-context-format --condition-name first-person
+
+dtef-generate-individual-all: ## Generate individual eval configs for GD3, GD5, GD6, GD7
+	@for round in GD3 GD5 GD6 GD7; do \
+		echo ""; \
+		echo "========== $$round =========="; \
+		$(MAKE) dtef-generate-individual ROUND=$$round || echo "FAILED: $$round"; \
+	done
+
 # --- Experiments & Curation ---
 
 dtef-curate: ## Run LLM curation for a round (ROUND=GD4) — calls 3 models, saves results
@@ -327,6 +362,10 @@ dtef-experiment-add-configs: ## Add configIds to an experiment condition (ID=tes
 	@test -n "$(CONDITION)" || (echo "CONDITION required" && exit 1)
 	@test -n "$(CONFIGS)" || (echo "CONFIGS required (comma-separated configIds)" && exit 1)
 	pnpm cli dtef experiment add-configs --id "$(ID)" --condition "$(CONDITION)" --configs "$(CONFIGS)"
+
+dtef-experiment-promote: ## Promote winning configs from a concluded experiment (ID=test)
+	@test -n "$(ID)" || (echo "Usage: make dtef-experiment-promote ID=test" && exit 1)
+	pnpm cli dtef experiment promote --id "$(ID)"
 
 # --- Dev ---
 

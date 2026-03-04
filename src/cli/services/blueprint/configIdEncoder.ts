@@ -19,6 +19,8 @@ export interface ConfigIdParts {
     evalType?: DTEFEvalType;
     reasoningMode?: DTEFReasoningMode;
     batchSize?: number;
+    /** For synthetic-individual: N value (only included in configId when non-default, i.e. != 20) */
+    syntheticN?: number;
 }
 
 /**
@@ -62,6 +64,10 @@ export function encodeConfigId(parts: ConfigIdParts): string {
         id += '-shift';
     } else if (evalType === 'synthetic-individual') {
         id += '-synth';
+        // Include N in configId when non-default (default is 20)
+        if (parts.syntheticN && parts.syntheticN !== 20) {
+            id += `${parts.syntheticN}`;
+        }
     } else if (evalType === 'individual-answer') {
         id += '-indiv';
     }

@@ -19,10 +19,13 @@ const STATS = {
     resultCount: 1308,
     /** Total segment-question score data points */
     scoreDataPoints: '929,597',
-    /** Baselines */
+    /** Baselines — computed from baselineGeneratorService.ts across all GD rounds */
     baselines: {
         uniform: 0.647,
         populationMarginal: 0.833,
+        /** Cross-segment similarity: avg JSD between each segment and all other
+         *  segments on the same question. See baselineGeneratorService.ts "shuffled" type.
+         *  This is NOT a shuffled-question baseline (same segment, different question). */
         shuffled: 0.761,
     },
     /** Best model score and name */

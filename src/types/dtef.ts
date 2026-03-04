@@ -150,8 +150,11 @@ export interface DTEFBlueprintConfig {
   modelConfig?: {
     /** Models to evaluate */
     models?: string[];
-    /** Model temperature setting */
+    /** Model temperature setting (single value, used when temperatures is not set) */
     temperature?: number;
+    /** Multiple temperatures to evaluate (e.g., [0.0, 0.3]). When set, the evaluation
+     *  pipeline runs each prompt at each temperature. Takes precedence over temperature. */
+    temperatures?: number[];
   };
 
   /**
