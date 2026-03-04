@@ -15,7 +15,7 @@ APP_URL := $(or $(APP_URL),http://localhost:3172)
 S3_BUCKET := collect-intel-dtef
 S3_REGION := us-east-1
 
-.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
+.PHONY: help rerun-evals rerun-evals-force rerun-evals-batch rerun-evals-prefix queue-status queue-watch backfill-summary lightweight-backfill streaming-summaries dev build test test-infra \
 	s3-status s3-runs s3-watch s3-size s3-latest \
 	dtef-import dtef-import-all dtef-generate dtef-generate-cot dtef-generate-narrative dtef-baselines dtef-baselines-all dtef-baselines-full dtef-publish dtef-upload-baselines dtef-upload-baselines-all dtef-stats dtef-rebuild dtef-pipeline dtef-status \
 	dtef-generate-matrix dtef-curate dtef-curate-dry-run dtef-experiment-create dtef-experiment-status dtef-experiment-conclude dtef-experiment-index dtef-experiment-analyze dtef-experiment-add-configs dtef-experiment-promote \
@@ -58,6 +58,14 @@ rerun-evals-batch: ## Schedule a batch of evals (default 50, override with BATCH
 		-H "Content-Type: application/json" \
 		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
 		-d '{"limit": $(BATCH)}' \
+		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
+
+rerun-evals-prefix: ## Force rerun evals matching a path prefix (PREFIX=gd4-synthetic-n)
+	@echo "Force-triggering evaluations matching prefix '$(PREFIX)' at $(APP_URL)..."
+	@curl -s -X POST "$(APP_URL)/api/internal/fetch-and-schedule-evals" \
+		-H "Content-Type: application/json" \
+		-H "X-Background-Function-Auth-Token: $(BACKGROUND_FUNCTION_AUTH_TOKEN)" \
+		-d '{"force": true, "pathPrefix": "$(PREFIX)"}' \
 		| python3 -m json.tool 2>/dev/null || echo "(no JSON response)"
 
 rerun-evals-force: ## Force rerun ALL periodic evaluations (ignores freshness check)

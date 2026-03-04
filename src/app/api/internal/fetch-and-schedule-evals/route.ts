@@ -35,14 +35,18 @@ export async function POST(req: NextRequest) {
   const logger = await getLogger('schedule-evals:cron');
   logger.info(`Function triggered (${new Date().toISOString()})`);
 
-  // Parse request body for force and limit flags
+  // Parse request body for force, limit, and pathPrefix flags
   let force = false;
   let limit = 0; // 0 = no limit
+  let pathPrefix = ''; // empty = no filter
   try {
     const body = await req.json();
     force = body?.force === true;
     if (typeof body?.limit === 'number' && body.limit > 0) {
       limit = body.limit;
+    }
+    if (typeof body?.pathPrefix === 'string' && body.pathPrefix.length > 0) {
+      pathPrefix = body.pathPrefix;
     }
   } catch {
     // No body or invalid JSON — not forced
@@ -53,6 +57,9 @@ export async function POST(req: NextRequest) {
   }
   if (limit > 0) {
     logger.info(`Batch limit: ${limit} evaluations`);
+  }
+  if (pathPrefix) {
+    logger.info(`Path prefix filter: blueprints/${pathPrefix}*`);
   }
 
   const githubToken = process.env.GITHUB_TOKEN;
@@ -188,6 +195,11 @@ export async function POST(req: NextRequest) {
       const blueprintPath = file.path.startsWith('blueprints/')
         ? file.path.substring('blueprints/'.length)
         : file.path;
+
+      // Apply path prefix filter if specified
+      if (pathPrefix && !blueprintPath.startsWith(pathPrefix)) {
+        continue;
+      }
 
       try {
         const configContent = contentMap.get(file.path);
