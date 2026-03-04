@@ -24,6 +24,56 @@ interface DistributionMetricArgs {
 }
 
 /**
+ * Parse an array of individual answer letters from LLM response text.
+ * Handles synthetic-individual eval type responses like:
+ *   ["a", "b", "a", "c", "a"]
+ *   ```json\n["a", "b", "a"]\n```
+ *
+ * Returns the aggregated distribution as percentages, using numOptions
+ * to determine the number of bins (a=0, b=1, c=2, ...).
+ */
+export function parseIndividualAnswers(text: string, numOptions: number): number[] | null {
+    // Strip markdown code blocks
+    const cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+
+    // Match a JSON array of quoted single-letter strings
+    const bracketMatch = cleaned.match(/\[([^\]]+)\]/);
+    if (!bracketMatch) return null;
+
+    // Try to parse as JSON first for robustness
+    let items: string[];
+    try {
+        const parsed = JSON.parse(`[${bracketMatch[1]}]`);
+        if (!Array.isArray(parsed)) return null;
+        items = parsed.map((v: any) => String(v).toLowerCase().trim());
+    } catch {
+        // Fallback: extract quoted letters manually
+        const letterMatches = bracketMatch[1].match(/["']([a-zA-Z])["']/g);
+        if (!letterMatches || letterMatches.length < 2) return null;
+        items = letterMatches.map(m => m.replace(/["']/g, '').toLowerCase().trim());
+    }
+
+    // Validate all items are single lowercase letters
+    if (!items.every(item => /^[a-z]$/.test(item))) return null;
+
+    // Count frequencies per option (a=0, b=1, c=2, ...)
+    const counts = new Array(numOptions).fill(0);
+    for (const letter of items) {
+        const idx = letter.charCodeAt(0) - 'a'.charCodeAt(0);
+        if (idx >= 0 && idx < numOptions) {
+            counts[idx]++;
+        }
+        // Letters outside the expected range are ignored (e.g., model hallucinated extra options)
+    }
+
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total === 0) return null;
+
+    // Convert to percentages
+    return counts.map(c => (c / total) * 100);
+}
+
+/**
  * Parse a distribution array from LLM response text.
  * Handles formats like:
  *   [45.2, 30.1, 15.5, 9.2]
@@ -229,10 +279,20 @@ export const distribution_metric: PointFunction = (
         predicted = parseDistribution(llmResponseText);
     }
 
+    // If distribution parsing failed, try parsing as individual answer letters
+    // (synthetic-individual eval type: model responds with ["a", "b", "a", ...])
+    let aggregatedFromIndividuals = false;
+    if (!predicted) {
+        predicted = parseIndividualAnswers(llmResponseText, expected.length);
+        if (predicted) {
+            aggregatedFromIndividuals = true;
+        }
+    }
+
     if (!predicted) {
         return {
             score: 0,
-            explain: `Could not parse a distribution from the response${questionKey ? ` for key "${questionKey}"` : ''}. Expected format: ${questionKey ? `{"${questionKey}": [n1, n2, ...]}` : '[n1, n2, n3, ...]'}`,
+            explain: `Could not parse a distribution from the response${questionKey ? ` for key "${questionKey}"` : ''}. Expected format: ${questionKey ? `{"${questionKey}": [n1, n2, ...]}` : '[n1, n2, n3, ...] or ["a", "b", "c", ...]'}`,
         };
     }
 
@@ -266,9 +326,10 @@ export const distribution_metric: PointFunction = (
 
     const expectedStr = expected.map(n => n.toFixed(1)).join(', ');
     const predictedStr = predicted.map(n => n.toFixed(1)).join(', ');
+    const aggregationNote = aggregatedFromIndividuals ? ' (aggregated from individual answers)' : '';
 
     return {
         score,
-        explain: `${metricName}: ${score.toFixed(3)}. Expected: [${expectedStr}], Predicted: [${predictedStr}]`,
+        explain: `${metricName}: ${score.toFixed(3)}. Expected: [${expectedStr}], Predicted: [${predictedStr}]${aggregationNote}`,
     };
 };
