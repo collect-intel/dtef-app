@@ -97,38 +97,16 @@ function ExperimentCard({ experiment, expanded, onToggle }: {
                         </div>
                     </div>
 
-                    {experiment.design && (
+                    {experiment.design?.conditionMap && !experiment.results?.conditionScores && (
                         <div>
                             <h4 className="text-sm font-medium text-muted-foreground mb-2">Conditions</h4>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border/50">
-                                            <th className="text-left py-2 pr-4 font-medium">Name</th>
-                                            <th className="text-left py-2 pr-4 font-medium">Eval Type</th>
-                                            <th className="text-left py-2 pr-4 font-medium">Context</th>
-                                            <th className="text-left py-2 pr-4 font-medium">Reasoning</th>
-                                            {experiment.results?.conditionScores && (
-                                                <th className="text-right py-2 font-medium">Score</th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {experiment.design.conditions.map((cond) => (
-                                            <tr key={cond.name} className="border-b border-border/30">
-                                                <td className="py-2 pr-4 font-mono text-xs">{cond.name}</td>
-                                                <td className="py-2 pr-4">{cond.evalType}</td>
-                                                <td className="py-2 pr-4">{cond.contextFormat}</td>
-                                                <td className="py-2 pr-4">{cond.reasoningMode}</td>
-                                                {experiment.results?.conditionScores && (
-                                                    <td className="py-2 text-right font-mono">
-                                                        {experiment.results.conditionScores[cond.name]?.toFixed(3) ?? '-'}
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(experiment.design.conditionMap).map(([name, configIds]) => (
+                                    <span key={name} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/30 text-sm">
+                                        <span className="font-mono text-xs">{name}</span>
+                                        <span className="text-muted-foreground text-xs">({(configIds as string[]).length} configs)</span>
+                                    </span>
+                                ))}
                             </div>
                         </div>
                     )}
