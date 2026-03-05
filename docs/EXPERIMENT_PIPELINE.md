@@ -106,9 +106,12 @@ The `_periodic` tag ensures the scheduler picks up these configs for evaluation.
 
 ```bash
 make rerun-evals           # Normal scheduler (respects 1-week freshness)
-make rerun-evals-force     # Force ALL periodic evals
+make rerun-evals-prefix PREFIX=gd4-synthetic-n  # Force re-eval only matching configs
 make rerun-evals-batch BATCH=50  # Schedule a specific batch size
+make rerun-evals-force     # Force ALL periodic evals (expensive! 2000+ configs)
 ```
+
+**Prefer `rerun-evals-prefix`** for targeted re-evaluation after scoring pipeline changes. The prefix matches the blueprint directory path (e.g., `PREFIX=gd4-synthetic-n` matches `gd4-synthetic-n20/`, `gd4-synthetic-n50/`, `gd4-synthetic-n100/`). Only use `rerun-evals-force` when you truly need to re-evaluate everything.
 
 ### 5. Monitor Progress
 
