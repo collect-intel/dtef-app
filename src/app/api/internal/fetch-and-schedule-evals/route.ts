@@ -17,7 +17,7 @@ import { fetchRawContent, preWarmModelCollections } from '@/lib/github-raw-conte
 
 const GITHUB_API_BASE = `https://api.github.com/repos/${BLUEPRINT_CONFIG_REPO_SLUG}`;
 const REPO_COMMITS_API_URL = `${GITHUB_API_BASE}/commits/main`;
-const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
+const FRESHNESS_WINDOW_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 
 // Concurrency limit for CDN fetches (conservative; CDN handles much more)
 const cdnLimit = pLimit(20);
@@ -277,7 +277,7 @@ export async function POST(req: NextRequest) {
           if (latestRun.timestamp) {
             const isoTimestamp = fromSafeTimestamp(latestRun.timestamp);
             const runAge = Date.now() - new Date(isoTimestamp).getTime();
-            if (runAge < ONE_WEEK_IN_MS) {
+            if (runAge < FRESHNESS_WINDOW_MS) {
               needsRun = false;
               skippedFresh++;
             } else {

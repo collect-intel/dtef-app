@@ -1,7 +1,7 @@
-name: Hourly Evaluation Batch
+name: Bimonthly Evaluation Batch
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour at :00
+    - cron: '0 6 1 1,3,5,7,9,11 *'  # 6 AM UTC on the 1st of every other month
   workflow_dispatch:
     inputs:
       batch:
